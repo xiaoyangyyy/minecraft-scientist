@@ -1,0 +1,10 @@
+{
+  "change_episode": 1,
+  "hypothesis_generator": "heuristic",
+  "intervention_budget": 80,
+  "library_learning": true,
+  "planner": "information_gain",
+  "planner_checkpoint": null,
+  "seed": 0,
+  "world_name": "mvp"
+}

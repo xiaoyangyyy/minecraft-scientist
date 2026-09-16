@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "scientist_world_rules",
+  "version": "${version}",
+  "name": "Minecraft Scientist World Rules",
+  "description": "Privileged deterministic rule variants for causal discovery experiments.",
+  "authors": ["Minecraft Scientist"],
+  "license": "MIT",
+  "environment": "server",
+  "entrypoints": {
+    "main": [
+      "dev.minecraftscientist.worldrules.ScientistWorldRulesMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "~1.21.11",
+    "java": ">=21",
+    "fabric-api": ">=0.141.6"
+  }
+}

@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.coverage
+.pytest_cache/
+.ruff_cache/
+.venv/
+.java-tmp/
+build/
+dist/
+node_modules/
+
+# Experiment outputs
+runs/
+checkpoints/*
+!checkpoints/four-form-experiment-policy.pt
+!checkpoints/four-form-experiment-policy.json
+!checkpoints/SHA256SUMS
+minecraft-server/
+mod/**/.gradle/
+mod/**/.java-tmp/
+mod/**/build/
+mod/**/run/
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

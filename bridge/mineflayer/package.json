@@ -1,0 +1,21 @@
+{
+  "name": "minecraft-scientist-mineflayer-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Capability-limited JSONL bridge for Minecraft Scientist",
+  "main": "server.cjs",
+  "scripts": {
+    "check": "node --check server.cjs",
+    "ping": "node ping.cjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "mineflayer": "4.39.0",
+    "mineflayer-pathfinder": "2.4.5"
+  },
+  "overrides": {
+    "uuid": "11.1.1"
+  }
+}
