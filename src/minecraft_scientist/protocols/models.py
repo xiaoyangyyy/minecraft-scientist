@@ -158,6 +158,7 @@ class RunConfig(FrozenModel):
     intervention_budget: int = Field(default=80, ge=1)
     change_episode: int | None = Field(default=1, ge=1)
     library_learning: bool = True
+    theory_crisis: bool = True
     hypothesis_generator: str = "heuristic"
     planner: str = "information_gain"
     planner_checkpoint: str | None = None

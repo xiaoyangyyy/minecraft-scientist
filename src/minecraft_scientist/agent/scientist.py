@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -59,6 +60,7 @@ class ScientistAgent:
         self.registry = TheoryRegistry()
         self.executor = ExperimentExecutor(self.bundle.agent_view)
         self.experiments: list[ExperimentResult] = []
+        self._random = random.Random(config.seed)
         if config.hypothesis_generator == "heuristic":
             self.generator = HeuristicHypothesisGenerator()
         elif config.hypothesis_generator == "openai":
@@ -83,7 +85,7 @@ class ScientistAgent:
             self._neural_planner = NeuralExperimentPlanner(
                 Path(config.planner_checkpoint)
             )
-        elif config.planner != "information_gain":
+        elif config.planner not in {"information_gain", "random"}:
             raise ValueError(f"unknown planner: {config.planner}")
 
     def run(self) -> ScientistRun:
@@ -123,9 +125,14 @@ class ScientistAgent:
         delay: int | None = None
         revision_experiments = 0
         if self.config.change_episode is not None:
-            delay, revision_experiments = self._revise_after_change(
-                tuple(groups["tools"]), tuple(groups["targets"])
-            )
+            if self.config.theory_crisis:
+                delay, revision_experiments = self._revise_after_change(
+                    tuple(groups["tools"]), tuple(groups["targets"])
+                )
+            else:
+                delay = self._challenge_without_revision(
+                    tuple(groups["tools"]), tuple(groups["targets"])
+                )
 
         accepted_for_library = tuple(
             theory
@@ -189,6 +196,8 @@ class ScientistAgent:
     def _next_tool_experiment(self, space: ToolVersionSpace) -> tuple[str, str] | None:
         if self._neural_planner is not None:
             return self._neural_planner.select_tool_experiment(space)
+        if self.config.planner == "random":
+            return self._select_random_experiment(space)
         return space.next_experiment()
 
     def _discover_machine(
@@ -196,11 +205,12 @@ class ScientistAgent:
     ) -> MachineVersionSpace:
         space = MachineVersionSpace(resources)
         while not space.resolved():
-            candidate = (
-                self._neural_planner.select_machine_experiment(space)
-                if self._neural_planner is not None
-                else space.next_experiment()
-            )
+            if self._neural_planner is not None:
+                candidate = self._neural_planner.select_machine_experiment(space)
+            elif self.config.planner == "random":
+                candidate = self._select_random_experiment(space)
+            else:
+                candidate = space.next_experiment()
             if candidate is None:
                 break
             self._require_budget()
@@ -251,11 +261,14 @@ class ScientistAgent:
         learner = TransformationLearner(processors, resources)
         protocol = ("place", "activate", "wait:1", "interact")
         while not learner.resolved():
-            candidate = (
-                self._neural_planner.select_transformation_experiment(learner)
-                if self._neural_planner is not None
-                else learner.next_experiment()
-            )
+            if self._neural_planner is not None:
+                candidate = self._neural_planner.select_transformation_experiment(
+                    learner
+                )
+            elif self.config.planner == "random":
+                candidate = self._select_random_experiment(learner)
+            else:
+                candidate = learner.next_experiment()
             if candidate is None:
                 break
             self._require_budget()
@@ -491,6 +504,55 @@ class ScientistAgent:
             TheoryStatus.SUPERSEDED,
         )
         return delay, len(self.experiments) - before
+
+    def _challenge_without_revision(
+        self, tools: tuple[str, ...], targets: tuple[str, ...]
+    ) -> int:
+        """Detect a rule shift but withhold the Theory Crisis repair stage."""
+
+        assert self.config.change_episode is not None
+        self.bundle.controller.begin_episode(self.config.change_episode)
+        old = self.registry.latest("tool-capability")
+        delay = 0
+        for tool in sorted(tools):
+            for target in sorted(targets):
+                self._require_budget()
+                prediction = TheoryInterpreter.predict(
+                    old.ir, tool_id=tool, target_id=target
+                )
+                result = self.executor.run_tool_test(
+                    tool,
+                    target,
+                    predicted_outcomes={"success": bool(prediction["success"])},
+                )
+                self.experiments.append(result)
+                delay += 1
+                if not result.compliant:
+                    continue
+                if bool(prediction["success"]) is not bool(result.outcome["success"]):
+                    self.registry.transition(
+                        old.theory_id,
+                        old.version,
+                        TheoryStatus.CHALLENGED,
+                        counterexample_ids=(result.experiment_id,),
+                    )
+                    return delay
+        return delay
+
+    def _select_random_experiment(self, space):
+        """Choose a deterministic random informative intervention for ablation."""
+
+        pairs, features = space.experiment_features()
+        options = [
+            pair
+            for pair, row in zip(pairs, features, strict=True)
+            if float(row[2]) == 0.0 and float(row[1]) > 0.0
+        ]
+        if options:
+            return self._random.choice(options)
+        # Transformation spaces can have a uniquely predicted edge whose terminal
+        # opaque ID is not instantiated yet. Preserve that necessary fallback.
+        return space.next_experiment()
 
     def _collect_library_validation(
         self, transform_ir: TheoryIR

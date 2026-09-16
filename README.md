@@ -20,6 +20,16 @@ Live execution still requires the user's explicit Minecraft EULA acceptance.
     uv run minecraft-scientist benchmark --suite full --seed 0
     uv run minecraft-scientist benchmark-baselines --seed 0 --seeds 10
 
+With the training extra installed, run the paired component ablations:
+
+    uv run minecraft-scientist benchmark-ablations --seed 0 --seeds 10
+
+This compares informative random selection, disabled theory repair, disabled library
+learning, withheld cross-world symbols, and the trained planner against matched
+references. Results include per-seed samples and approximate 95% intervals in
+`runs/strict-ablations/ablation-matrix.json`. The transfer probe executes the source
+world's learned transform primitive. Each condition has the same intervention cap.
+
 Use --overwrite when intentionally re-running into the same output directory.
 Run artifacts contain config.json, events.jsonl, theories.jsonl, symbols.json,
 and report.json.

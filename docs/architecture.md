@@ -164,3 +164,15 @@ Context-only DeepSeek, Voyager-style cross-world memory, and the finite symbolic
 posterior are scored against the same tool, machine, and transformation interventions.
 Each completed source/target pair is checkpointed before the next paid request; the
 usage ledger also records failed structured responses and bounded retries.
+
+## Paired component ablations
+
+`benchmark-ablations` fixes world seed and intervention cap within each pair.
+The random selector samples untested informative actions. The theory-repair ablation
+retains anomaly detection but leaves the old theory challenged. Library learning is
+disabled independently; a separate transfer probe withholds the source's accepted
+transform primitive and measures downstream discovery cost. The learned-planner pair
+compares the checkpoint against the information-gain selector. The checkpoint hash,
+per-seed results, and normal-approximation intervals of paired differences are saved.
+These are component-specific pairs, not a factorial experiment. Equal caps do not
+mean equal realized experiment counts; symbol validation costs remain included.

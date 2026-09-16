@@ -36,6 +36,11 @@ treated as proof of live Minecraft behavior.
 
 ## Current external gates
 
+The component-ablation follow-up passes 79 tests and the ten-seed paired matrix.
+Theory repair recovers 0.1481 post-change accuracy; learned symbols remove 13
+description units, and transfer of the learned transform program saves eight
+interventions. Planner efficiency intervals cross zero in this sample.
+
 1. An OpenAI-provider comparison remains optional and requires separate credentials
    and explicit cost authorization; the external-provider path is measured with
    DeepSeek rather than inferred from an offline substitute.

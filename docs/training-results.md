@@ -206,3 +206,24 @@ All methods had complete intervention coverage. The result demonstrates that the
 symbolic version spaces are substantially more accurate and less variable under the
 same evidence; the particular cross-world text memory used here did not improve the
 DeepSeek aggregate over context-only inference.
+
+## Paired component ablations
+
+Seeds 0–9 used an 80-intervention cap per condition. Positive savings mean fewer
+experiments with the named component. Intervals use a normal approximation of
+paired seed differences.
+
+| Component | Mean paired effect | Approximate 95% interval |
+|---|---:|---:|
+| Active information-gain selection | 0.4 experiments saved | [-4.3402, 5.1402] |
+| Theory Crisis repair | 0.1481 post-change accuracy recovered | [0.1481, 0.1481] |
+| Library learning | 13 description units removed; 3 symbols learned | Constant in sample |
+| Cross-world transform reuse | 8 transfer experiments saved | [8, 8] |
+| Learned planner | 0.7 experiments saved | [-1.8813, 3.2813] |
+
+Reference agents repaired 10/10 rule shifts; agents with repair disabled retained
+challenged theories and repaired none. Both planner comparisons preserved perfect
+accuracy, but their efficiency intervals cross zero: this sample does not establish
+a stable efficiency advantage. Random selection here excludes already resolved
+actions. Cross-world reuse measures the learned transform program, not arbitrary
+text memory. Full results: `runs/strict-ablations/ablation-matrix.json`.

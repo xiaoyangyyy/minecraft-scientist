@@ -71,11 +71,17 @@ def run(
             "--no-library-learning", help="Disable abstraction learning for ablation"
         ),
     ] = False,
+    no_theory_crisis: Annotated[
+        bool,
+        typer.Option(
+            "--no-theory-crisis", help="Detect rule changes but disable theory repair"
+        ),
+    ] = False,
     hypothesis_generator: Annotated[
         str | None, typer.Option(help="Override with heuristic or openai")
     ] = None,
     planner: Annotated[
-        str | None, typer.Option(help="Override with information_gain or learned")
+        str | None, typer.Option(help="Override with information_gain, learned, or random")
     ] = None,
     planner_checkpoint: Annotated[
         Path | None, typer.Option(help="Checkpoint required by the learned planner")
@@ -99,6 +105,8 @@ def run(
         updates["change_episode"] = None
     if no_library_learning:
         updates["library_learning"] = False
+    if no_theory_crisis:
+        updates["theory_crisis"] = False
     if hypothesis_generator is not None:
         updates["hypothesis_generator"] = hypothesis_generator
     if planner is not None:
@@ -187,6 +195,39 @@ def benchmark_baselines(
         overwrite=overwrite,
     )
     console.print_json(json.dumps(payload, sort_keys=True))
+    console.print(f"Artifacts: {output.resolve()}")
+
+
+@app.command("benchmark-ablations")
+def benchmark_ablations(
+    seed: Annotated[int, typer.Option(help="First deterministic paired seed")] = 0,
+    seeds: Annotated[
+        int, typer.Option(min=1, help="Number of paired randomized-ID worlds")
+    ] = 10,
+    intervention_budget: Annotated[
+        int, typer.Option(min=1, help="Same experiment budget for every condition")
+    ] = 80,
+    planner_checkpoint: Annotated[
+        Path, typer.Option(help="Trained planner checkpoint used by the full pair")
+    ] = Path("checkpoints/four-form-experiment-policy.pt"),
+    output: Annotated[
+        Path, typer.Option(help="Strict ablation artifact directory")
+    ] = Path("runs/strict-ablations"),
+    overwrite: Annotated[
+        bool, typer.Option(help="Replace the known ablation report")
+    ] = False,
+) -> None:
+    from minecraft_scientist.evaluation.ablations import run_ablation_suite
+
+    payload = run_ablation_suite(
+        seed=seed,
+        seeds=seeds,
+        intervention_budget=intervention_budget,
+        planner_checkpoint=planner_checkpoint,
+        output=output,
+        overwrite=overwrite,
+    )
+    console.print_json(json.dumps(payload["effects"], sort_keys=True))
     console.print(f"Artifacts: {output.resolve()}")
 
 
