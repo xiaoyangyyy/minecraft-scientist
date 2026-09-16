@@ -31,11 +31,11 @@ from minecraft_scientist.protocols import (
 
 
 class MineStudioSimulator(Protocol):
-    def reset(self) -> tuple[np.ndarray, dict[str, Any]]: ...
+    def reset(self) -> tuple[dict[str, Any] | np.ndarray, dict[str, Any]]: ...
 
     def step(
         self, action: Any
-    ) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]: ...
+    ) -> tuple[dict[str, Any] | np.ndarray, float, bool, bool, dict[str, Any]]: ...
 
     def noop_action(self) -> dict[str, Any]: ...
 
@@ -365,7 +365,13 @@ class MineStudioVisualAdapter:
     def __exit__(self, *_: object) -> None:
         self.close()
 
-    def _encode(self, frame: np.ndarray, info: dict[str, Any]) -> Observation:
+    def _encode(self, frame: dict[str, Any] | np.ndarray, info: dict[str, Any]) -> Observation:
+        # MinecraftSim returns an observation mapping; only its RGB payload is
+        # input to perception. Retain array support for lightweight simulators.
+        if isinstance(frame, dict):
+            if "image" not in frame:
+                raise ValueError("MineStudio observation is missing image")
+            frame = frame["image"]
         array = np.asarray(frame)
         if array.ndim not in {2, 3}:
             raise ValueError("MineStudio observation frame must be a 2D or 3D array")

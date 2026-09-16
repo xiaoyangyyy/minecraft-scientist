@@ -60,6 +60,26 @@ class FakeVisualController:
         return {"kind": action.kind.value, **scene.controller_state}
 
 
+def test_real_observation_mapping_is_unwrapped_on_reset_and_step() -> None:
+    class MappingSimulator(FakeSimulator):
+        def reset(self):
+            frame, info = super().reset()
+            return {"image": frame, "private_label": "diamond_ore"}, info
+
+        def step(self, action):
+            frame, reward, terminated, truncated, info = super().step(action)
+            return {"image": frame}, reward, terminated, truncated, info
+
+    with MineStudioVisualAdapter(
+        FakeVisualController(), simulator_factory=lambda config: MappingSimulator()
+    ) as world:
+        initial = world.reset(7)
+        assert initial.agent_state["frame_width"] == 5
+        assert "diamond_ore" not in initial.model_dump_json()
+        result = world.step(PrimitiveAction(kind=ActionKind.WAIT))
+        assert result.observed_delta["frame_changed"]
+
+
 def test_minestudio_adapter_exposes_pixels_only_through_opaque_perception() -> None:
     simulator = FakeSimulator()
     world = MineStudioVisualAdapter(
