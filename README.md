@@ -165,10 +165,27 @@ evidence. Reports retain response IDs, prompt hashes, and provider usage, but ne
 the API key. A usage ledger is flushed after every response, so a later failure
 cannot hide already consumed calls or tokens.
 
+The multi-mechanism shared-evidence benchmark adds tool capability, hidden machine,
+and transformation-chain predictions, a same-evidence symbolic posterior, per-pair
+checkpoints, bounded transient retries, and 95% confidence intervals:
+
+    uv run minecraft-scientist benchmark-external-llm-expanded --pairs 20 --evidence-budget 6 --max-transient-retries 6 --confirm-api-cost
+
+On Windows, DeepSeek credentials can be resolved from the generic Credential Manager
+target `minecraft-scientist/deepseek` when `DEEPSEEK_API_KEY` is absent. The key is
+never written to run artifacts. Environment variables and explicit test injection
+remain supported.
+
 The recorded DeepSeek acceptance run at seeds 0–5 used nine successful calls and
 9,897 total tokens. Context-only accuracy was 0.7407; Voyager-style cross-world
 memory accuracy was 0.8889, with 1.0 coverage for both. The artifact is written to
 `runs/deepseek-external-baselines` and remains ignored by Git like all run data.
+
+The recorded 20-pair shared-evidence run used 63 calls including three audited
+retries and 305,554 tokens. Mean exact intervention accuracy was 0.8000 for
+context-only DeepSeek, 0.7280 for Voyager-style transfer, and 0.9646 for the
+symbolic posterior. The conservative peak/cache-miss estimate was ¥0.9877. Artifacts
+are in `runs/deepseek-expanded-baselines`.
 
 ## Optional MineStudio visual boundary
 

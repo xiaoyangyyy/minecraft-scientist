@@ -154,3 +154,13 @@ scientist. Frame bytes become a digest plus dimensions; private controller state
 never serialized. The adapter rejects non-opaque IDs and common semantic-name leaks.
 This contract is fake-simulator tested, but no claim of visual recognition accuracy
 is made until the isolated Linux/JDK8 simulator is run.
+
+## Shared-evidence external evaluation
+
+`benchmark-external-llm-expanded` constructs candidate interventions and active
+evidence entirely through the public `AgentWorldView`. Privileged evaluator truth is
+kept in a separate in-memory scoring object and is never serialized into prompts.
+Context-only DeepSeek, Voyager-style cross-world memory, and the finite symbolic
+posterior are scored against the same tool, machine, and transformation interventions.
+Each completed source/target pair is checkpointed before the next paid request; the
+usage ledger also records failed structured responses and bounded retries.

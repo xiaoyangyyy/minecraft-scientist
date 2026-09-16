@@ -30,7 +30,7 @@ treated as proof of live Minecraft behavior.
 | Live rule/state/program discovery loop | 42 real interventions; accuracy 1.0; detection delay 1; 3 symbols/13 reuse | Complete on local Fabric server |
 | Live continuous equation curriculum | 3 opaque tokens, 10 heights, transfer 1.0, v1 superseded/v2 accepted | Complete on local Fabric server |
 | Offline baseline matrix | random, stateless context, Voyager-style skill memory, fixed DSL, full library over 10 seeds | Complete for documented offline scope |
-| Context-only/Voyager LLM harness | DeepSeek `deepseek-flash`: 9/9 successful calls, 9,897 tokens, context-only 0.7407, Voyager transfer 0.8889, both coverage 1.0 | Complete for the three-pair DeepSeek acceptance run |
+| Context-only/Voyager LLM harness | 20 shared-evidence pairs across tool/machine/transform: context 0.8000, Voyager 0.7280, symbolic 0.9646; 95% CIs and cost ledger | Complete for expanded DeepSeek evaluation |
 | MineStudio/visual observation path | opaque RGB adapter, concrete label-free grid controller, isolated manifest, fake simulator tests | Implemented; live visual quality not verified |
 | Trained planner in live Minecraft loop | `runs/minecraft-live-benchmark-learned`: 47 experiments, all metrics 1.0, checkpoint recorded in both sub-runs | Complete on local Fabric server |
 
@@ -62,3 +62,9 @@ package builds, an npm audit of 92 packages with zero vulnerabilities, and a cle
 Fabric build. Its separate live external baseline used non-thinking structured
 responses, provider-stateless storage semantics, public opaque evidence only, and
 hard call/token limits.
+
+The expanded three-mechanism release gate completed with 78 tests. Its 20-pair run
+used per-pair durable checkpoints, three bounded JSON retries, 63 total calls, and
+305,554 tokens under the configured hard caps. Both exposed credentials were deleted;
+the replacement is stored in Windows Credential Manager and absent from Git and run
+artifacts.

@@ -10,6 +10,7 @@ from minecraft_scientist.evaluation.external_llm import (
     ExternalLLMAuthorizationError,
     ExternalLLMConfig,
     _decode_structured_object,
+    resolve_external_api_key,
     run_external_llm_baselines,
 )
 
@@ -158,3 +159,20 @@ def test_structured_decoder_audits_trailing_provider_output() -> None:
     assert normalization["mode"] == "first-json-object"
     assert normalization["trailing_bytes"] == len("provider footer")
     assert len(normalization["trailing_sha256"]) == 64
+
+
+def test_deepseek_key_can_fall_back_to_windows_credential_manager(
+    monkeypatch,
+) -> None:
+    import minecraft_scientist.evaluation.external_llm as external_llm
+
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.setattr(external_llm, "read_deepseek_api_key", lambda: "vault-key")
+
+    key, source = resolve_external_api_key(
+        ExternalLLMConfig(provider="deepseek"),
+        None,
+    )
+
+    assert key == "vault-key"
+    assert source == "windows-credential-manager"

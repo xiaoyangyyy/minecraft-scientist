@@ -184,5 +184,25 @@ three source/target pairs (seeds 0–5), with six public interventions per world
 All nine requests completed and used 9,897 total tokens, below the configured
 50,000-token and nine-call hard caps. The model received only opaque public evidence;
 ground truth was used afterward by the local evaluator. The provider is stateless,
-the key is never persisted, and the per-response ledger and report are in
+the key is never persisted in run artifacts, and the per-response ledger and report are in
 `runs/deepseek-external-baselines`.
+
+### Twenty-pair shared-evidence result
+
+The expanded run evaluated all three discrete mechanisms on target seeds 1–39.
+Context-only, Voyager-style transfer, and the finite symbolic posterior received the
+same public intervention evidence in every target world.
+
+| Method | Overall mean | Standard deviation | 95% confidence interval | Tool | Machine | Transform |
+|---|---:|---:|---:|---:|---:|---:|
+| Context-only DeepSeek | 0.8000 | 0.0958 | [0.7580, 0.8420] | 0.76 | 0.85 | 0.74 |
+| Voyager-style DeepSeek | 0.7280 | 0.1458 | [0.6642, 0.7919] | 0.77 | 0.75 | 0.66 |
+| Symbolic shared-evidence posterior | 0.9646 | 0.0244 | [0.9540, 0.9753] | 0.93 | 0.98 | 0.97 |
+
+The run completed 20/20 pair checkpoints. Sixty planned calls plus three audited
+JSON retries used 242,789 input and 62,765 output tokens (305,554 total). Treating
+every input token as a peak-period cache miss gives a conservative ¥0.9877 estimate.
+All methods had complete intervention coverage. The result demonstrates that the
+symbolic version spaces are substantially more accurate and less variable under the
+same evidence; the particular cross-world text memory used here did not improve the
+DeepSeek aggregate over context-only inference.

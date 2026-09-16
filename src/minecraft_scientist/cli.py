@@ -263,6 +263,94 @@ def benchmark_external_llm(
     console.print(f"Artifacts: {output.resolve()}")
 
 
+@app.command("benchmark-external-llm-expanded")
+def benchmark_external_llm_expanded(
+    provider: Annotated[
+        str, typer.Option(help="openai or deepseek")
+    ] = "deepseek",
+    model: Annotated[
+        str, typer.Option(help="Responses API model identifier")
+    ] = "deepseek-flash",
+    seed: Annotated[int, typer.Option(help="First deterministic source-world seed")] = 0,
+    pairs: Annotated[
+        int, typer.Option(min=1, help="Number of source/target world pairs")
+    ] = 20,
+    evidence_budget: Annotated[
+        int, typer.Option(min=0, help="Shared interventions per mechanism and world")
+    ] = 6,
+    max_api_calls: Annotated[
+        int | None,
+        typer.Option(min=1, help="Hard cap; defaults to exactly three calls per pair"),
+    ] = None,
+    max_transient_retries: Annotated[
+        int,
+        typer.Option(min=0, help="Audited retries for completed but invalid JSON"),
+    ] = 6,
+    max_output_tokens: Annotated[
+        int, typer.Option(min=1, help="Per-request output-token cap")
+    ] = 4_000,
+    max_total_tokens: Annotated[
+        int, typer.Option(min=1, help="Conservative total input/output-token cap")
+    ] = 1_500_000,
+    request_timeout_seconds: Annotated[
+        float, typer.Option(min=1, help="Per-request network timeout")
+    ] = 120.0,
+    reasoning_effort: Annotated[
+        str | None,
+        typer.Option(help="Optional Responses API reasoning effort: none/low/high/max"),
+    ] = "none",
+    confirm_api_cost: Annotated[
+        bool,
+        typer.Option(
+            "--confirm-api-cost",
+            help="Explicitly authorize API usage within the supplied hard caps",
+        ),
+    ] = False,
+    output: Annotated[
+        Path, typer.Option(help="Expanded external baseline artifact directory")
+    ] = Path("runs/deepseek-expanded-baselines"),
+    overwrite: Annotated[
+        bool, typer.Option(help="Replace the known expanded baseline artifacts")
+    ] = False,
+    resume: Annotated[
+        bool, typer.Option(help="Resume from the per-pair progress checkpoint")
+    ] = False,
+) -> None:
+    from minecraft_scientist.evaluation.expanded_external_llm import (
+        run_expanded_external_llm_baselines,
+    )
+    from minecraft_scientist.evaluation.external_llm import (
+        ExternalLLMAuthorizationError,
+        ExternalLLMConfig,
+    )
+
+    required_calls = pairs * 3
+    try:
+        payload = run_expanded_external_llm_baselines(
+            config=ExternalLLMConfig(
+                provider=provider,
+                model=model,
+                first_seed=seed,
+                seeds=pairs,
+                evidence_budget=evidence_budget,
+                max_api_calls=max_api_calls or required_calls + max_transient_retries,
+                max_output_tokens=max_output_tokens,
+                max_total_tokens=max_total_tokens,
+                request_timeout_seconds=request_timeout_seconds,
+                reasoning_effort=reasoning_effort,
+            ),
+            output=output,
+            confirm_api_cost=confirm_api_cost,
+            overwrite=overwrite,
+            resume=resume,
+            max_transient_retries=max_transient_retries,
+        )
+    except (ExternalLLMAuthorizationError, ValueError, FileExistsError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    console.print_json(json.dumps(payload, sort_keys=True))
+    console.print(f"Artifacts: {output.resolve()}")
+
+
 @app.command("inspect-theory")
 def inspect_theory(
     run_directory: Annotated[Path, typer.Argument(help="Completed run directory")],

@@ -15,6 +15,7 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from minecraft_scientist.credentials import read_deepseek_api_key
 from minecraft_scientist.protocols import ActionKind, Observation, PrimitiveAction
 from minecraft_scientist.world import WorldFactory
 
@@ -29,6 +30,39 @@ class _Responses(Protocol):
 
 class _Client(Protocol):
     responses: _Responses
+
+
+def resolve_external_api_key(
+    config: "ExternalLLMConfig", api_key: str | None
+) -> tuple[str | None, str]:
+    """Resolve a provider credential without ever returning it in artifacts."""
+
+    key_name = (
+        "DEEPSEEK_API_KEY" if config.provider == "deepseek" else "OPENAI_API_KEY"
+    )
+    if api_key:
+        return api_key, "argument"
+    environment_key = os.getenv(key_name)
+    if environment_key:
+        return environment_key, "environment"
+    if config.provider == "deepseek":
+        return read_deepseek_api_key(), "windows-credential-manager"
+    return None, "unavailable"
+
+
+def create_responses_client(config: "ExternalLLMConfig", api_key: str) -> _Client:
+    """Create the provider-compatible Responses API client."""
+
+    try:
+        from openai import OpenAI
+    except ImportError as exc:
+        raise RuntimeError("OpenAI extra is missing; run: uv sync --extra openai") from exc
+    return OpenAI(
+        api_key=api_key,
+        base_url=(
+            "https://api.deepseek.com" if config.provider == "deepseek" else None
+        ),
+    )
 
 
 class Prediction(BaseModel):
@@ -348,7 +382,7 @@ def run_external_llm_baselines(
     key_name = (
         "DEEPSEEK_API_KEY" if config.provider == "deepseek" else "OPENAI_API_KEY"
     )
-    key = api_key or os.getenv(key_name)
+    key, credential_source = resolve_external_api_key(config, api_key)
     if not confirm_api_cost:
         raise ExternalLLMAuthorizationError(
             "API cost is not authorized; pass --confirm-api-cost explicitly"
@@ -362,20 +396,7 @@ def run_external_llm_baselines(
     if ledger_path.exists() and not overwrite:
         raise FileExistsError(f"external LLM usage ledger already exists: {ledger_path}")
     if client is None:
-        try:
-            from openai import OpenAI
-        except ImportError as exc:
-            raise RuntimeError(
-                "OpenAI extra is missing; run: uv sync --extra openai"
-            ) from exc
-        client = OpenAI(
-            api_key=key,
-            base_url=(
-                "https://api.deepseek.com"
-                if config.provider == "deepseek"
-                else None
-            ),
-        )
+        client = create_responses_client(config, key)
 
     output.mkdir(parents=True, exist_ok=True)
     ledger_path.write_text("", encoding="utf-8")
@@ -439,6 +460,7 @@ def run_external_llm_baselines(
             **asdict(config),
             "api_key_present": True,
             "api_key_persisted": False,
+            "credential_source": credential_source,
             "store": False,
             "storage_semantics": (
                 "provider-stateless"
