@@ -143,10 +143,9 @@ not Minecraft names.
 
 ## Remaining research layers
 
-The live code path is implemented and compiled but has not been executed in this
-workspace because EULA acceptance is deliberately user-controlled. Its live claims
-remain unverified until the smoke and discovery commands produce artifacts. The
-complete live baseline matrix still needs measured runs. Visual perception remains
+The Mineflayer/Fabric path has been executed against the local resettable server;
+its measured rule, state-machine, program, equation, mutation, and trained-planner
+results are recorded in `docs/completion-audit.md`. Visual perception remains
 intentionally separate from the structured protocol path. The optional
 `MineStudioVisualAdapter` now formalizes that boundary: `MinecraftSim` supplies RGB
 frames, an injected `PerceptionController` emits opaque detections and low-level

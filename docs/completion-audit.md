@@ -30,19 +30,21 @@ treated as proof of live Minecraft behavior.
 | Live rule/state/program discovery loop | 42 real interventions; accuracy 1.0; detection delay 1; 3 symbols/13 reuse | Complete on local Fabric server |
 | Live continuous equation curriculum | 3 opaque tokens, 10 heights, transfer 1.0, v1 superseded/v2 accepted | Complete on local Fabric server |
 | Offline baseline matrix | random, stateless context, Voyager-style skill memory, fixed DSL, full library over 10 seeds | Complete for documented offline scope |
-| Context-only/Voyager LLM harness | real Responses API runner, strict JSON schema, public-only prompts, non-storage, hard request/token gates | Implemented; not run without cost authorization |
+| Context-only/Voyager LLM harness | DeepSeek `deepseek-flash`: 9/9 successful calls, 9,897 tokens, context-only 0.7407, Voyager transfer 0.8889, both coverage 1.0 | Complete for the three-pair DeepSeek acceptance run |
 | MineStudio/visual observation path | opaque RGB adapter, concrete label-free grid controller, isolated manifest, fake simulator tests | Implemented; live visual quality not verified |
 | Trained planner in live Minecraft loop | `runs/minecraft-live-benchmark-learned`: 47 experiments, all metrics 1.0, checkpoint recorded in both sub-runs | Complete on local Fabric server |
 
 ## Current external gates
 
-1. An actual context-only OpenAI baseline requires explicit API credentials and cost
-   authorization; no API key is present in the current environment.
+1. An OpenAI-provider comparison remains optional and requires separate credentials
+   and explicit cost authorization; the external-provider path is measured with
+   DeepSeek rather than inferred from an offline substitute.
 2. MineStudio's actual visual simulator requires a separate Linux/JDK8 runtime and
    Minecraft/EULA-compliant setup; this Windows host is not visual-ready.
 
-The local Fabric path is empirically verified. Paid external-LLM and MineStudio
-visual results remain separate optional gates and are not substituted by offline data.
+The local Fabric and DeepSeek external-LLM paths are empirically verified.
+MineStudio visual results remain a separate optional gate and are not substituted
+by offline data.
 
 ## Latest release gate
 
@@ -54,3 +56,9 @@ benchmarks both passed every metric at 1.0; the learned run used 47 experiments.
 The learned full suite reported 1.0 hidden accuracy and task success, three promoted
 symbols with 13 verified cross-world reuse records, and successful rule and equation
 theory revision.
+
+The follow-up DeepSeek integration release gate completed with 73 tests, Python
+package builds, an npm audit of 92 packages with zero vulnerabilities, and a clean
+Fabric build. Its separate live external baseline used non-thinking structured
+responses, provider-stateless storage semantics, public opaque evidence only, and
+hard call/token limits.

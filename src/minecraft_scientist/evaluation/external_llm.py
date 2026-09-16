@@ -54,6 +54,7 @@ class SkillMemory(BaseModel):
 
 @dataclass(frozen=True, slots=True)
 class ExternalLLMConfig:
+    provider: str = "openai"
     model: str = "gpt-5.6-luna"
     first_seed: int = 0
     seeds: int = 3
@@ -62,8 +63,11 @@ class ExternalLLMConfig:
     max_output_tokens: int = 1_200
     max_total_tokens: int = 50_000
     request_timeout_seconds: float = 120.0
+    reasoning_effort: str | None = None
 
     def validate(self) -> None:
+        if self.provider not in {"openai", "deepseek"}:
+            raise ValueError("provider must be openai or deepseek")
         if self.seeds < 1:
             raise ValueError("seeds must be positive")
         if self.evidence_budget < 0:
@@ -72,6 +76,8 @@ class ExternalLLMConfig:
             raise ValueError("token limits must be positive")
         if self.request_timeout_seconds <= 0:
             raise ValueError("request_timeout_seconds must be positive")
+        if self.reasoning_effort not in {None, "none", "low", "high", "max"}:
+            raise ValueError("reasoning_effort must be none, low, high, or max")
         required = self.seeds * 3
         if self.max_api_calls < required:
             raise ValueError(
@@ -109,21 +115,27 @@ class _BudgetedResponses:
             raise ExternalLLMAuthorizationError(
                 "the next request could exceed max_total_tokens"
             )
-        response = self._client.responses.create(
-            model=self._config.model,
-            store=False,
-            instructions=instructions,
-            input=serialized,
-            max_output_tokens=self._config.max_output_tokens,
-            timeout=self._config.request_timeout_seconds,
-            text={
+        request: dict[str, Any] = {
+            "model": self._config.model,
+            "instructions": instructions,
+            "input": serialized,
+            "max_output_tokens": self._config.max_output_tokens,
+            "timeout": self._config.request_timeout_seconds,
+            "text": {
                 "format": {
                     "type": "json_schema",
                     "name": schema_name,
                     "schema": schema,
-                    "strict": True,
                 }
             },
+        }
+        if self._config.provider == "openai":
+            request["store"] = False
+            request["text"]["format"]["strict"] = True
+        if self._config.reasoning_effort is not None:
+            request["reasoning"] = {"effort": self._config.reasoning_effort}
+        response = self._client.responses.create(
+            **request,
         )
         self.calls += 1
         usage = _usage(response)
@@ -137,23 +149,50 @@ class _BudgetedResponses:
             raise RuntimeError("Responses API result did not contain output_text")
         record = {
             "purpose": purpose,
+            "provider": self._config.provider,
             "response_id": str(getattr(response, "id", "unknown")),
             "model": str(getattr(response, "model", self._config.model)),
             "status": str(getattr(response, "status", "completed")),
             "usage": usage,
             "prompt_sha256": hashlib.sha256(serialized.encode()).hexdigest(),
         }
-        self.records.append(record)
-        with self._ledger_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(record, sort_keys=True) + "\n")
         if record["status"] != "completed":
+            self._record(record)
             raise RuntimeError(
                 f"Responses API request ended with status {record['status']}"
             )
-        value = json.loads(output_text)
-        if not isinstance(value, dict):
-            raise RuntimeError("structured model output must be a JSON object")
+        try:
+            value, normalization = _decode_structured_object(output_text)
+        except (json.JSONDecodeError, RuntimeError) as exc:
+            record["parse_error"] = type(exc).__name__
+            self._record(record)
+            raise
+        record["structured_output_normalization"] = normalization
+        self._record(record)
         return value
+
+    def _record(self, record: dict[str, Any]) -> None:
+        self.records.append(record)
+        with self._ledger_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, sort_keys=True) + "\n")
+
+
+def _decode_structured_object(output_text: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Decode one JSON object while auditing non-schema trailing provider output."""
+
+    leading_trimmed = output_text.lstrip()
+    value, end = json.JSONDecoder().raw_decode(leading_trimmed)
+    if not isinstance(value, dict):
+        raise RuntimeError("structured model output must be a JSON object")
+    trailing = leading_trimmed[end:].strip()
+    if not trailing:
+        return value, {"mode": "exact"}
+    encoded = trailing.encode("utf-8")
+    return value, {
+        "mode": "first-json-object",
+        "trailing_bytes": len(encoded),
+        "trailing_sha256": hashlib.sha256(encoded).hexdigest(),
+    }
 
 
 def _usage(response: Any) -> dict[str, int]:
@@ -306,13 +345,16 @@ def run_external_llm_baselines(
     """Run context-only and Voyager-style baselines behind explicit cost gates."""
 
     config.validate()
-    key = api_key or os.getenv("OPENAI_API_KEY")
+    key_name = (
+        "DEEPSEEK_API_KEY" if config.provider == "deepseek" else "OPENAI_API_KEY"
+    )
+    key = api_key or os.getenv(key_name)
     if not confirm_api_cost:
         raise ExternalLLMAuthorizationError(
             "API cost is not authorized; pass --confirm-api-cost explicitly"
         )
     if not key:
-        raise ExternalLLMAuthorizationError("OPENAI_API_KEY is not configured")
+        raise ExternalLLMAuthorizationError(f"{key_name} is not configured")
     report_path = output / "external-llm-baselines.json"
     ledger_path = output / "api-usage.jsonl"
     if report_path.exists() and not overwrite:
@@ -326,7 +368,14 @@ def run_external_llm_baselines(
             raise RuntimeError(
                 "OpenAI extra is missing; run: uv sync --extra openai"
             ) from exc
-        client = OpenAI(api_key=key)
+        client = OpenAI(
+            api_key=key,
+            base_url=(
+                "https://api.deepseek.com"
+                if config.provider == "deepseek"
+                else None
+            ),
+        )
 
     output.mkdir(parents=True, exist_ok=True)
     ledger_path.write_text("", encoding="utf-8")
@@ -391,6 +440,11 @@ def run_external_llm_baselines(
             "api_key_present": True,
             "api_key_persisted": False,
             "store": False,
+            "storage_semantics": (
+                "provider-stateless"
+                if config.provider == "deepseek"
+                else "store-disabled"
+            ),
         },
         "context_only_llm": aggregate(context_results),
         "voyager_style_llm": aggregate(voyager_results),

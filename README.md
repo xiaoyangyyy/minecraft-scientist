@@ -144,7 +144,8 @@ length reduction and downstream experiment savings from the learned primitive.
 `benchmark-baselines` adds a ten-world matrix for random exploration, a stateless
 context-only prior, Voyager-style opaque skill memory, fixed symbolic DSL, and the
 full evolving-library system. Paid context-only and Voyager-style LLM rows remain
-explicitly `not_run` unless separate credentials and cost authorization are given.
+explicitly `not_run` inside that offline matrix; the separate cost-gated harness
+produces measured external-provider artifacts.
 
 The real comparison harness is available behind fail-closed request/token limits:
 
@@ -152,12 +153,22 @@ The real comparison harness is available behind fail-closed request/token limits
     set OPENAI_API_KEY=your-key
     uv run minecraft-scientist benchmark-external-llm --seeds 3 --max-api-calls 9 --max-total-tokens 50000 --confirm-api-cost
 
+DeepSeek's stateless Responses API is supported through the same gates:
+
+    set DEEPSEEK_API_KEY=your-key
+    uv run minecraft-scientist benchmark-external-llm --provider deepseek --model deepseek-flash --reasoning-effort none --seeds 3 --max-api-calls 9 --max-total-tokens 50000 --confirm-api-cost
+
 It makes three non-stored Responses API calls per seed pair: a context-only target
 prediction, a source-world skill-memory extraction, and a Voyager-style transfer
 prediction. Prompts contain only public opaque observations and experimental
 evidence. Reports retain response IDs, prompt hashes, and provider usage, but never
 the API key. A usage ledger is flushed after every response, so a later failure
 cannot hide already consumed calls or tokens.
+
+The recorded DeepSeek acceptance run at seeds 0–5 used nine successful calls and
+9,897 total tokens. Context-only accuracy was 0.7407; Voyager-style cross-world
+memory accuracy was 0.8889, with 1.0 coverage for both. The artifact is written to
+`runs/deepseek-external-baselines` and remains ignored by Git like all run data.
 
 ## Optional MineStudio visual boundary
 

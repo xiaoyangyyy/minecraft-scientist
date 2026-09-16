@@ -9,6 +9,7 @@ import pytest
 from minecraft_scientist.evaluation.external_llm import (
     ExternalLLMAuthorizationError,
     ExternalLLMConfig,
+    _decode_structured_object,
     run_external_llm_baselines,
 )
 
@@ -104,3 +105,56 @@ def test_external_baseline_uses_structured_nonstored_responses(tmp_path, monkeyp
 def test_external_baseline_requires_capacity_for_three_calls_per_seed() -> None:
     with pytest.raises(ValueError, match="required 6"):
         ExternalLLMConfig(seeds=2, max_api_calls=5).validate()
+
+
+def test_deepseek_baseline_uses_provider_stateless_responses(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    client = FakeClient()
+    payload = run_external_llm_baselines(
+        config=ExternalLLMConfig(
+            provider="deepseek",
+            model="deepseek-flash",
+            seeds=1,
+            max_api_calls=3,
+            max_total_tokens=20_000,
+            reasoning_effort="none",
+        ),
+        output=tmp_path,
+        confirm_api_cost=True,
+        api_key="test-deepseek-key",
+        client=client,
+    )
+
+    assert payload["configuration"]["provider"] == "deepseek"
+    assert payload["configuration"]["storage_semantics"] == "provider-stateless"
+    assert all("store" not in request for request in client.responses.requests)
+    assert all(
+        "strict" not in request["text"]["format"]
+        for request in client.responses.requests
+    )
+    assert all(
+        request["reasoning"] == {"effort": "none"}
+        for request in client.responses.requests
+    )
+    assert all(
+        record["provider"] == "deepseek"
+        for record in payload["api_usage"]["records"]
+    )
+
+
+def test_external_baseline_rejects_unknown_reasoning_effort() -> None:
+    with pytest.raises(ValueError, match="reasoning_effort"):
+        ExternalLLMConfig(reasoning_effort="ultra").validate()
+
+
+def test_structured_decoder_audits_trailing_provider_output() -> None:
+    value, normalization = _decode_structured_object(
+        '{"predictions": [], "summary": "ok"}\nprovider footer'
+    )
+
+    assert value["summary"] == "ok"
+    assert normalization["mode"] == "first-json-object"
+    assert normalization["trailing_bytes"] == len("provider footer")
+    assert len(normalization["trailing_sha256"]) == 64

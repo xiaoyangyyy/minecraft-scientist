@@ -168,6 +168,21 @@ The deterministic ten-seed baseline gate (`seed=0..9`) produced:
 | Fixed DSL symbol count / reuse | 0 / 0 |
 | Full symbol count / verified cross-world reuse | 3 / 13 |
 
-This matrix isolates the mechanisms that can be evaluated offline. Context-only and
-Voyager-style runs backed by a paid external LLM remain explicitly unmeasured; the
-report does not substitute the deterministic prior or skill-memory rows for them.
+This matrix isolates the mechanisms that can be evaluated offline. Its deterministic
+prior and skill-memory rows are not presented as paid-model results.
+
+## External DeepSeek baseline
+
+A separate cost-gated acceptance run used `deepseek-flash` in non-thinking mode on
+three source/target pairs (seeds 0–5), with six public interventions per world:
+
+| Baseline | Accuracy | Coverage |
+|---|---:|---:|
+| Context-only DeepSeek | 0.7407 | 1.0000 |
+| Voyager-style DeepSeek memory transfer | 0.8889 | 1.0000 |
+
+All nine requests completed and used 9,897 total tokens, below the configured
+50,000-token and nine-call hard caps. The model received only opaque public evidence;
+ground truth was used afterward by the local evaluator. The provider is stateless,
+the key is never persisted, and the per-response ledger and report are in
+`runs/deepseek-external-baselines`.

@@ -192,6 +192,9 @@ def benchmark_baselines(
 
 @app.command("benchmark-external-llm")
 def benchmark_external_llm(
+    provider: Annotated[
+        str, typer.Option(help="openai or deepseek")
+    ] = "openai",
     model: Annotated[
         str, typer.Option(help="Responses API model identifier")
     ] = "gpt-5.6-luna",
@@ -212,6 +215,10 @@ def benchmark_external_llm(
     request_timeout_seconds: Annotated[
         float, typer.Option(min=1, help="Per-request network timeout")
     ] = 120.0,
+    reasoning_effort: Annotated[
+        str | None,
+        typer.Option(help="Optional Responses API reasoning effort: none/low/high/max"),
+    ] = None,
     confirm_api_cost: Annotated[
         bool,
         typer.Option(
@@ -235,6 +242,7 @@ def benchmark_external_llm(
     try:
         payload = run_external_llm_baselines(
             config=ExternalLLMConfig(
+                provider=provider,
                 model=model,
                 first_seed=seed,
                 seeds=seeds,
@@ -243,6 +251,7 @@ def benchmark_external_llm(
                 max_output_tokens=max_output_tokens,
                 max_total_tokens=max_total_tokens,
                 request_timeout_seconds=request_timeout_seconds,
+                reasoning_effort=reasoning_effort,
             ),
             output=output,
             confirm_api_cost=confirm_api_cost,
