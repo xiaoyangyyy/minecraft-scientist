@@ -10,7 +10,10 @@ import sys
 import shutil
 
 from minecraft_scientist.discovery.visual_tools import discover_visual_tools
-from minecraft_scientist.minecraft.visual_evidence import load_grounding_evidence
+from minecraft_scientist.minecraft.visual_evidence import (
+    load_grounding_evidence,
+    visual_region_iou,
+)
 from minecraft_scientist.theory.ir import TheoryInterpreter
 
 
@@ -65,6 +68,7 @@ def main():
         shutil.copy2(ROOT / name, destination)
 
     control_audits = []
+    grounding_records = {}
 
     def run_probe(tool_id, target_id, index, seed, phase):
         if target_id != TARGET:
@@ -93,6 +97,9 @@ def main():
             != grounding.selected_cell_id
         ):
             raise RuntimeError(f"grounding report mismatch: {directory}")
+        if grounding.evidence.changed is True and grounding.selected_region_id is None:
+            raise RuntimeError(f"changed evidence lacks a visual region: {directory}")
+        grounding_records[(phase, tool_id)] = grounding
         control_audits.append({
             "phase": phase,
             "experiment": index,
@@ -101,6 +108,7 @@ def main():
             "grounding_sha256": hashlib.sha256(
                 grounding_path.read_bytes()
             ).hexdigest(),
+            "selected_region_id": grounding.selected_region_id,
             "valid": True,
         })
         return directory.name, grounding.evidence
@@ -120,8 +128,21 @@ def main():
     predictions = {tool: TheoryInterpreter.predict(
         result.theory, tool_id=tool, target_id=TARGET, execution_context=CONTEXT
     )["success"] for tool in FIXTURE_BINDINGS}
+    positive_discovery = [
+        grounding for (phase, _), grounding in grounding_records.items()
+        if phase == "discovery" and grounding.evidence.changed is True
+    ]
+    if len(positive_discovery) != 1:
+        raise RuntimeError("expected exactly one grounded positive discovery probe")
+    reference_region = next(
+        region for region in positive_discovery[0].regions
+        if region.object_id == positive_discovery[0].selected_region_id
+    )
+    region_iou_threshold = 0.5
     save(output / "preregistered.json", {"predictions": predictions, "seed": args.validation_seed,
          "candidate_space": "ordered_tools_with_unreachable_targets",
+         "reference_change_region": asdict(reference_region),
+         "region_iou_threshold": region_iou_threshold,
          "execution_context": CONTEXT, "theory": result.theory.model_dump(mode="json")})
     digest = hashlib.sha256((output / "preregistered.json").read_bytes()).hexdigest()
     results = []
@@ -133,6 +154,29 @@ def main():
                         "correct": observed.changed is not None and
                                    observed.changed == predictions[tool]})
         save(output / f"validation-{index}.json", results[-1])
+    region_matches = []
+    for item in results:
+        if item["observed"] is not True:
+            continue
+        grounding = grounding_records[("validation", item["tool_id"])]
+        region = next(
+            region for region in grounding.regions
+            if region.object_id == grounding.selected_region_id
+        )
+        overlap = visual_region_iou(reference_region, region)
+        region_matches.append({
+            "tool_id": item["tool_id"],
+            "reference_region_id": reference_region.object_id,
+            "validation_region_id": region.object_id,
+            "iou": overlap,
+            "threshold": region_iou_threshold,
+            "matched": overlap >= region_iou_threshold,
+        })
+    persistent_regions = bool(region_matches) and all(
+        item["matched"] for item in region_matches
+    )
+    if not persistent_regions:
+        raise RuntimeError("held-out visual region did not match preregistered identity")
     assert digest == hashlib.sha256((output / "preregistered.json").read_bytes()).hexdigest()
     report = {"discovery_experiments": len(result.experiments),
               "validation": results, "preregistration_sha256": digest,
@@ -143,6 +187,8 @@ def main():
               "active_selection": True,
               "tool_selection_via_adapter": True,
               "automatic_change_localization": True,
+              "persistent_change_region": persistent_regions,
+              "region_matches": region_matches,
               "identity_source": "fixture bindings",
               "scope": (
                   "Two interventions, one fixture-aimed target, fixed camera, "

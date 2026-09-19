@@ -45,13 +45,14 @@ Remaining work:
 Latest verified controlled gate (2026-09-19):
 
 - Backend readiness reports Linux, MineStudio 1.1.6 and OpenJDK 1.8.0_502 ready.
-- `runs/active-visual-grounded-evidence-seeds20-21` completed two active discovery
+- `runs/active-visual-persistent-region-seeds22-23` completed two active discovery
   probes and two independently seeded holdouts with 1.0 accuracy and coverage.
 - Four successful opaque `SELECT` events and four equipment traces passed;
   four automatic grid-grounding artifacts also passed integrity audit.
 - Frozen prediction SHA256:
-  `036500506e9503ec156b3b160bd8537b983eb7721cabaf4626cf807dd958c579`.
-- Windows 116-test suite and Linux 40-test visual subset pass; lock check and both
+  `981759aef3c79308305f71db7477ede40719ac4c1896dd9edd6eaa0707d03d08`.
+- The preregistered changed-region IoU threshold was 0.5; held-out IoU was 0.857.
+- Windows 119-test suite and Linux 43-test visual subset pass; lock check and both
   sdist/wheel builds pass. The offline MVP benchmark remains fully successful.
 - This is a controlled, fixture-bound result—not autonomous object grounding,
   navigation, or a full visual Minecraft scientific-discovery benchmark.

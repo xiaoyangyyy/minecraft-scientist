@@ -7,6 +7,7 @@ from pathlib import Path
 from minecraft_scientist.minecraft.visual_evidence import (
     load_grounding_evidence,
     successful_select_count,
+    visual_region_iou,
 )
 
 
@@ -42,6 +43,8 @@ def main() -> None:
             "valid": isinstance(expected_hash, str) and expected_hash == actual_hash,
         })
     equipment = []
+    discovery_regions = []
+    validation_regions = []
     for directory in sorted(path for path in root.iterdir() if path.is_dir()):
         path = directory / "equipment-audit.json"
         if not path.is_file():
@@ -60,6 +63,17 @@ def main() -> None:
             if grounding_path.is_file()
             else None
         )
+        if grounding and grounding.selected_region_id:
+            selected_region = next(
+                region for region in grounding.regions
+                if region.object_id == grounding.selected_region_id
+            )
+            target = (
+                discovery_regions
+                if directory.name.startswith("discovery-")
+                else validation_regions
+            )
+            target.append((directory.name, selected_region))
         equipment.append({
             "run": directory.name,
             "valid": payload.get("valid") is True,
@@ -75,6 +89,24 @@ def main() -> None:
         })
     selection_claimed = report.get("tool_selection_via_adapter") is True
     grounding_claimed = report.get("automatic_change_localization") is True
+    persistence_claimed = report.get("persistent_change_region") is True
+    threshold = float(
+        json.loads(preregistered.read_text(encoding="utf-8")).get(
+            "region_iou_threshold", 0.5
+        )
+    )
+    region_matches = []
+    if len(discovery_regions) == 1:
+        reference_name, reference_region = discovery_regions[0]
+        for candidate_name, candidate_region in validation_regions:
+            overlap = visual_region_iou(reference_region, candidate_region)
+            region_matches.append({
+                "reference": reference_name,
+                "candidate": candidate_name,
+                "iou": overlap,
+                "threshold": threshold,
+                "matched": overlap >= threshold,
+            })
     audit = {
         "run": str(root),
         "preregistration_sha256_expected": expected,
@@ -104,6 +136,16 @@ def main() -> None:
                 item["automatic_grounding"] for item in equipment
             ))
         ),
+        "persistent_change_region_claimed": persistence_claimed,
+        "region_matches": region_matches,
+        "all_claimed_persistent_regions_valid": (
+            not persistence_claimed
+            or (
+                len(discovery_regions) == 1
+                and bool(region_matches)
+                and all(item["matched"] for item in region_matches)
+            )
+        ),
         "report_accuracy": report.get("accuracy"),
         "report_coverage": report.get("coverage"),
     }
@@ -114,6 +156,7 @@ def main() -> None:
         audit["equipment_audit_count_complete"],
         audit["all_claimed_agent_selects_present"],
         audit["all_claimed_grounding_artifacts_valid"],
+        audit["all_claimed_persistent_regions_valid"],
         audit["report_accuracy"] == 1.0,
         audit["report_coverage"] == 1.0,
     ))

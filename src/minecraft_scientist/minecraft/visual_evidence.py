@@ -36,12 +36,35 @@ class VisualCellEvidence:
 
 
 @dataclass(frozen=True)
+class VisualChangeRegion:
+    object_id: str
+    cell_ids: tuple[str, ...]
+    top: int
+    left: int
+    bottom: int
+    right: int
+    total_intervention_mae: float
+
+
+@dataclass(frozen=True)
 class GridChangeEvidence:
     """Anonymous spatial grounding for a controlled pixel intervention."""
 
     evidence: PixelChangeEvidence
     selected_cell_id: str | None
     cells: tuple[VisualCellEvidence, ...]
+    selected_region_id: str | None = None
+    regions: tuple[VisualChangeRegion, ...] = ()
+
+
+def visual_region_iou(
+    reference: VisualChangeRegion, candidate: VisualChangeRegion
+) -> float:
+    """Return grid-cell intersection-over-union for two anonymous regions."""
+
+    left, right = set(reference.cell_ids), set(candidate.cell_ids)
+    union = left | right
+    return len(left & right) / len(union) if union else 0.0
 
 
 def load_grounding_evidence(path: Path) -> GridChangeEvidence:
@@ -51,6 +74,13 @@ def load_grounding_evidence(path: Path) -> GridChangeEvidence:
     evidence = PixelChangeEvidence(**payload["evidence"])
     cells = tuple(VisualCellEvidence(**cell) for cell in payload["cells"])
     selected = payload.get("selected_cell_id")
+    regions = tuple(
+        VisualChangeRegion(
+            **{**region, "cell_ids": tuple(region["cell_ids"])}
+        )
+        for region in payload.get("regions", ())
+    )
+    selected_region = payload.get("selected_region_id")
     ids = {cell.object_id for cell in cells}
     if not cells or len(ids) != len(cells) or any(
         not object_id.startswith("obj_") for object_id in ids
@@ -60,7 +90,66 @@ def load_grounding_evidence(path: Path) -> GridChangeEvidence:
         raise ValueError("changed grounding requires a selected cell")
     if evidence.changed is not True and selected is not None:
         raise ValueError("non-change grounding cannot select a cell")
-    return GridChangeEvidence(evidence, selected, cells)
+    region_ids = {region.object_id for region in regions}
+    if len(region_ids) != len(regions) or any(
+        not object_id.startswith("obj_") for object_id in region_ids
+    ):
+        raise ValueError("grounding regions require unique opaque identifiers")
+    if any(not region.cell_ids or not set(region.cell_ids) <= ids for region in regions):
+        raise ValueError("grounding region references unknown cells")
+    if payload.get("schema_version", 1) >= 2:
+        if evidence.changed is True and selected_region not in region_ids:
+            raise ValueError("changed grounding requires a selected region")
+        if evidence.changed is not True and selected_region is not None:
+            raise ValueError("non-change grounding cannot select a region")
+    return GridChangeEvidence(evidence, selected, cells, selected_region, regions)
+
+
+def _change_regions(
+    cells: tuple[VisualCellEvidence, ...], changed_ids: set[str]
+) -> tuple[VisualChangeRegion, ...]:
+    by_coordinate = {(cell.row, cell.column): cell for cell in cells}
+    remaining = {
+        coordinate for coordinate, cell in by_coordinate.items()
+        if cell.object_id in changed_ids
+    }
+    regions: list[VisualChangeRegion] = []
+    while remaining:
+        pending = [min(remaining)]
+        component: list[VisualCellEvidence] = []
+        while pending:
+            coordinate = pending.pop()
+            if coordinate not in remaining:
+                continue
+            remaining.remove(coordinate)
+            component.append(by_coordinate[coordinate])
+            row, column = coordinate
+            pending.extend(
+                neighbor for neighbor in (
+                    (row - 1, column),
+                    (row + 1, column),
+                    (row, column - 1),
+                    (row, column + 1),
+                )
+                if neighbor in remaining
+            )
+        component.sort(key=lambda cell: (cell.row, cell.column))
+        cell_ids = tuple(sorted(cell.object_id for cell in component))
+        raw = "visual-region:" + ":".join(cell_ids)
+        regions.append(VisualChangeRegion(
+            object_id="obj_" + hashlib.blake2s(
+                raw.encode(), digest_size=8
+            ).hexdigest(),
+            cell_ids=cell_ids,
+            top=min(cell.row for cell in component),
+            left=min(cell.column for cell in component),
+            bottom=max(cell.row for cell in component),
+            right=max(cell.column for cell in component),
+            total_intervention_mae=sum(
+                cell.intervention_mae for cell in component
+            ),
+        ))
+    return tuple(sorted(regions, key=lambda region: region.object_id))
 
 
 def hud_safe_view(frame: np.ndarray) -> np.ndarray:
@@ -161,6 +250,15 @@ def localize_change_grid(
     )
     if changed is False and confounded:
         changed = None
+    changed_ids = {
+        cell.object_id for cell in stable_cells
+        if cell.intervention_mae >= change_limit
+    } if changed is True else set()
+    regions = _change_regions(tuple(cells), changed_ids)
+    selected_region = next(
+        (region for region in regions if strongest.object_id in region.cell_ids),
+        None,
+    )
     return GridChangeEvidence(
         evidence=PixelChangeEvidence(
             control_mae=strongest.control_mae,
@@ -170,6 +268,8 @@ def localize_change_grid(
         ),
         selected_cell_id=strongest.object_id if changed is True else None,
         cells=tuple(cells),
+        selected_region_id=(selected_region.object_id if selected_region else None),
+        regions=regions,
     )
 
 

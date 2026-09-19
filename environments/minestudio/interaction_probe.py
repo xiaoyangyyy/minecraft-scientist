@@ -166,8 +166,11 @@ def main():
     (output / "grounding.json").write_text(
         json.dumps(
             {
+                "schema_version": 2,
                 "selected_cell_id": grounding.selected_cell_id,
                 "cells": [asdict(cell) for cell in grounding.cells],
+                "selected_region_id": grounding.selected_region_id,
+                "regions": [asdict(region) for region in grounding.regions],
                 "evidence": asdict(evidence),
             },
             indent=2,
@@ -186,6 +189,7 @@ def main():
         "selected_slot": args.select_slot,
         "automatic_change_localization": True,
         "localized_change_cell_id": grounding.selected_cell_id,
+        "localized_change_region_id": grounding.selected_region_id,
         "change_grid": {"rows": 4, "columns": 4},
         "scope": "Controlled visual intervention probe, not tool-tier discovery.",
         "pixel_only_perception": True,

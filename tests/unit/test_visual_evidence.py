@@ -9,6 +9,7 @@ from minecraft_scientist.minecraft.visual_evidence import (
     hud_safe_view,
     load_grounding_evidence,
     localize_change_grid,
+    visual_region_iou,
     verify_equipment_trace,
 )
 
@@ -38,6 +39,8 @@ def test_grid_grounding_localizes_strongest_change_with_opaque_id():
         cell for cell in grounded.cells if cell.object_id == grounded.selected_cell_id
     )
     assert (selected.row, selected.column) == (1, 0)
+    assert grounded.selected_region_id.startswith("obj_")
+    assert len(grounded.regions) == 1
 
 
 def test_grid_grounding_abstains_if_any_control_cell_is_unstable():
@@ -81,6 +84,34 @@ def test_grid_grounding_fails_closed_when_all_cells_are_unstable():
     assert grounded.selected_cell_id is None
 
 
+def test_adjacent_changed_cells_form_one_persistent_region():
+    frame = np.zeros((12, 12, 3), dtype=np.uint8)
+    after_a = frame.copy()
+    after_b = frame.copy()
+    after_a[4:, 4:] = 80
+    after_b[4:, 4:] = 90
+
+    first = localize_change_grid(frame, frame, after_a, rows=3, columns=3)
+    second = localize_change_grid(frame, frame, after_b, rows=3, columns=3)
+
+    assert len(first.regions) == len(second.regions) == 1
+    assert first.selected_region_id == second.selected_region_id
+    assert visual_region_iou(first.regions[0], second.regions[0]) == 1.0
+
+
+def test_visual_region_iou_tolerates_one_cell_boundary_drift():
+    frame = np.zeros((12, 12, 3), dtype=np.uint8)
+    after_a = frame.copy()
+    after_b = frame.copy()
+    after_a[4:, 4:] = 80
+    after_b[4:8, 4:] = 80
+
+    first = localize_change_grid(frame, frame, after_a, rows=3, columns=3)
+    second = localize_change_grid(frame, frame, after_b, rows=3, columns=3)
+
+    assert visual_region_iou(first.regions[0], second.regions[0]) == 0.5
+
+
 def test_grid_grounding_reports_stable_no_change_without_target_guess():
     frame = np.zeros((8, 8, 3), dtype=np.uint8)
     grounded = localize_change_grid(frame, frame, frame, rows=2, columns=2)
@@ -108,9 +139,12 @@ def test_grounding_artifact_round_trip_is_strict(tmp_path):
     grounded = localize_change_grid(frame, frame, after, rows=2, columns=2)
     path = tmp_path / "grounding.json"
     path.write_text(json.dumps({
+        "schema_version": 2,
         "evidence": asdict(grounded.evidence),
         "selected_cell_id": grounded.selected_cell_id,
         "cells": [asdict(cell) for cell in grounded.cells],
+        "selected_region_id": grounded.selected_region_id,
+        "regions": [asdict(region) for region in grounded.regions],
     }), encoding="utf-8")
 
     assert load_grounding_evidence(path) == grounded
@@ -136,6 +170,32 @@ def test_grounding_artifact_rejects_selected_cell_not_in_grid(tmp_path):
     }), encoding="utf-8")
 
     with pytest.raises(ValueError, match="selected cell"):
+        load_grounding_evidence(path)
+
+
+def test_grounding_schema_two_requires_selected_region(tmp_path):
+    path = tmp_path / "grounding.json"
+    path.write_text(json.dumps({
+        "schema_version": 2,
+        "evidence": {
+            "control_mae": 0.0,
+            "intervention_mae": 20.0,
+            "control_stable": True,
+            "changed": True,
+        },
+        "selected_cell_id": "obj_present",
+        "cells": [{
+            "object_id": "obj_present",
+            "row": 0,
+            "column": 0,
+            "control_mae": 0.0,
+            "intervention_mae": 20.0,
+        }],
+        "selected_region_id": None,
+        "regions": [],
+    }), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="selected region"):
         load_grounding_evidence(path)
 
 
