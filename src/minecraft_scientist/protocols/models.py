@@ -14,6 +14,7 @@ class FrozenModel(BaseModel):
 
 class ActionKind(StrEnum):
     SELECT = "select"
+    LOOK = "look"
     INTERACT = "interact"
     PLACE_INPUT = "place_input"
     ACTIVATE = "activate"

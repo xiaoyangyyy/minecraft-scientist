@@ -218,6 +218,13 @@ and fixture-supplied identity bindings. It is not general object recognition or 
 complete visual Minecraft scientist. Setup, exact evidence, and caveats are in
 `environments/minestudio/README.md` and `docs/completion-audit.md`.
 
+A separate preregistered seed-30 camera-search suite now exercises explicit
+`LOOK` actions over negative, center, and positive yaw views. The pixel-only
+selector found the fixture marker in all 3/3 independently seeded placements;
+15/15 camera actions passed, and the independent audit recomputed every score
+from the saved PNGs. This proves controlled active viewpoint search, while leaving
+free-form exploration and navigation open.
+
 A concrete label-free `GridVisualController` maps opaque screen regions and hotbar
 slots to MineStudio env actions. Tests verify action translation and semantic
 isolation; the accepted live experiment additionally audits successful opaque

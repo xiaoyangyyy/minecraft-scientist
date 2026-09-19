@@ -123,6 +123,7 @@ class GridVisualController:
                     ObjectObservation(
                         object_id=object_id,
                         affordances=(
+                            ActionKind.LOOK,
                             ActionKind.INTERACT,
                             ActionKind.PLACE_INPUT,
                             ActionKind.ACTIVATE,
@@ -162,6 +163,8 @@ class GridVisualController:
         if binding["kind"] != "cell":
             raise ValueError("action kind is incompatible with visual target")
         payload["camera"] = np.asarray(binding["camera"], dtype=np.float32)
+        if action.kind is ActionKind.LOOK:
+            return payload
         if action.kind is ActionKind.INTERACT:
             payload["attack"] = np.array(1)
         elif action.kind is ActionKind.PLACE_INPUT:

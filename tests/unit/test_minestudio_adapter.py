@@ -228,6 +228,9 @@ def test_grid_visual_controller_maps_pixels_to_env_actions_without_labels() -> N
     interact = controller.encode_action(
         PrimitiveAction(kind=ActionKind.INTERACT, target_id=cell.object_id), scene
     )
+    look = controller.encode_action(
+        PrimitiveAction(kind=ActionKind.LOOK, target_id=cell.object_id), scene
+    )
     activate = controller.encode_action(
         PrimitiveAction(kind=ActionKind.ACTIVATE, target_id=cell.object_id), scene
     )
@@ -235,4 +238,6 @@ def test_grid_visual_controller_maps_pixels_to_env_actions_without_labels() -> N
     assert sum(int(select[f"hotbar.{index}"]) for index in range(1, 10)) == 1
     assert int(interact["attack"]) == 1
     assert np.any(interact["camera"] != 0)
+    assert int(look["attack"]) == 0 and int(look["use"]) == 0
+    assert np.any(look["camera"] != 0)
     assert int(activate["use"]) == 1 and int(activate["sneak"]) == 1

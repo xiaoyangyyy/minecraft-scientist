@@ -6,6 +6,7 @@ import pytest
 
 from minecraft_scientist.minecraft.visual_evidence import (
     compare_regions,
+    central_view_salience,
     hud_safe_view,
     load_grounding_evidence,
     localize_change_grid,
@@ -130,6 +131,26 @@ def test_hud_safe_view_excludes_image_edges():
 
     assert view.shape == (90, 90, 3)
     assert not view.any()
+
+
+def test_central_view_salience_ignores_bright_edges():
+    frame = np.zeros((8, 8, 3), dtype=np.uint8)
+    frame[0] = 255
+    frame[-1] = 255
+    frame[:, 0] = 255
+    frame[:, -1] = 255
+    assert central_view_salience(frame) == 0.0
+
+    frame[2:6, 2:6] = 200
+    assert central_view_salience(frame) == 200.0
+
+
+def test_central_view_salience_is_symmetric_around_original_frame_center():
+    frame = np.zeros((16, 16, 3), dtype=np.uint8)
+    frame[4:12, 6:10] = 180
+    frame[4:12, 2:6] = 255
+
+    assert central_view_salience(frame) == 180.0
 
 
 def test_grounding_artifact_round_trip_is_strict(tmp_path):

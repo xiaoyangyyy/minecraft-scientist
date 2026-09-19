@@ -175,8 +175,17 @@ visual result. The camera remains fixture aimed, so viewpoint-independent object
 identity and navigation remain open. Evidence:
 `runs/active-visual-persistent-region-seeds22-23/{report.json,integrity-audit.json}`.
 
+The preregistered seed-30 camera-search suite adds camera-only `LOOK` actions and
+tests all three fixture placements (negative, center, and positive yaw). The
+pixel-only argmax rule selects 3/3 correctly with 15/15 compliant LOOK transitions.
+Independent audit recomputes every score from saved PNGs, verifies case reports
+and events, confirms the preregistration hash, and matches all five source snapshot
+hashes. This proves controlled active viewpoint search, not unconstrained object
+detection, locomotion, or path planning. Evidence:
+`runs/camera-search-suite-seed30/{report.json,integrity-audit.json}`.
+
 The evaluator equipment check now fails closed on empty/missing telemetry as well
-as wrong items. Windows full regression passes 119 tests; Linux passes all 43
+as wrong items. Windows full regression passes 122 tests; Linux passes all 48
 visual adapter/evidence/active-learning/scope tests. The offline MVP benchmark
 still reports 1.0 hidden intervention accuracy and task success, 47 experiments,
 one-step change detection, eight revision experiments, three symbols and 13 reuse
@@ -202,7 +211,7 @@ hard call/token limits.
 
 The 2026-09-19 controlled visual gate additionally passed dependency-lock checking,
 Python sdist/wheel builds, WSL backend readiness (MineStudio 1.1.6, Python 3.11.16,
-OpenJDK 1.8.0_502), 119 Windows tests, 43 Linux visual tests, and the MVP benchmark.
+OpenJDK 1.8.0_502), 122 Windows tests, 48 Linux visual tests, and the MVP benchmark.
 The visual result remains scoped as documented above; it does not replace the
 structured-world evidence for hidden state machines or conversion chains.
 

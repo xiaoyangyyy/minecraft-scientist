@@ -64,6 +64,20 @@ The fixture still aims the camera and supplies opaque candidate identity binding
 this is persistent change-region matching, not general object identity or
 autonomous navigation.
 
+`camera_search_benchmark.py` separately verifies active viewpoint control. Before
+launching Minecraft it preregisters negative/center/positive yaw placements and
+the label-free argmax brightness rule. The accepted run is
+`runs/camera-search-suite-seed30`: all 3/3 placements were selected correctly and
+15/15 explicit `LOOK` transitions succeeded. `audit_camera_search.py` independently
+recomputes every score from the saved PNGs, verifies every event and report hash,
+and checks the five-file source snapshot. This is a controlled marker-search task,
+not free-form object detection or navigation.
+
+```powershell
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/camera_search_benchmark.py --seed 30 --output /mnt/d/minecraft-scientist/runs/camera-search-suite-seed30
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/audit_camera_search.py /mnt/d/minecraft-scientist/runs/camera-search-suite-seed30
+```
+
 MineStudio is deliberately excluded from the root `uv` environment. Its simulator
 documentation targets Linux, Python 3.10+, JDK 8, VirtualGL/Xvfb, and a separate
 Minecraft runtime; mixing those dependencies into the deterministic Windows test

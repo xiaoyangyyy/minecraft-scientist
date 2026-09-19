@@ -169,6 +169,27 @@ def hud_safe_view(frame: np.ndarray) -> np.ndarray:
     return view
 
 
+def central_view_salience(frame: np.ndarray) -> float:
+    """Return a label-free brightness score around the camera crosshair.
+
+    The vertical middle half excludes most HUD bands. The narrower, symmetric
+    horizontal band remains centered in the original camera frame; callers must
+    not pass the asymmetric HUD-safe localization crop.
+    """
+
+    array = np.asarray(frame, dtype=float)
+    if array.ndim not in {2, 3} or not array.size or not np.isfinite(array).all():
+        raise ValueError("view must be a finite, nonempty 2D or 3D image")
+    height, width = array.shape[:2]
+    if height < 4 or width < 4:
+        raise ValueError("view must be at least 4x4")
+    center = array[
+        height // 4:height * 3 // 4,
+        width * 3 // 8:width * 5 // 8,
+    ]
+    return float(center.mean())
+
+
 def localize_change_grid(
     control: np.ndarray,
     before: np.ndarray,

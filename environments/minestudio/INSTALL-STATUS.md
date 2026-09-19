@@ -52,7 +52,10 @@ Latest verified controlled gate (2026-09-19):
 - Frozen prediction SHA256:
   `981759aef3c79308305f71db7477ede40719ac4c1896dd9edd6eaa0707d03d08`.
 - The preregistered changed-region IoU threshold was 0.5; held-out IoU was 0.857.
-- Windows 119-test suite and Linux 43-test visual subset pass; lock check and both
+- `runs/camera-search-suite-seed30` correctly selected all three preregistered yaw
+  placements using 15/15 successful `LOOK` actions; PNG score recomputation and
+  five-file source-snapshot audit pass.
+- Windows 122-test suite and Linux 48-test visual subset pass; lock check and both
   sdist/wheel builds pass. The offline MVP benchmark remains fully successful.
 - This is a controlled, fixture-bound result—not autonomous object grounding,
   navigation, or a full visual Minecraft scientific-discovery benchmark.

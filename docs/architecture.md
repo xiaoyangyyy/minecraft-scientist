@@ -131,6 +131,7 @@ and v2 promotion used in the structured full benchmark.
 action vocabulary:
 
 - `select` equips an opaque inventory object;
+- `look` applies a camera-only delta toward an opaque screen handle;
 - `interact` digs an opaque block or attacks an opaque entity;
 - `place_input` equips its opaque input and uses an experimental fixture;
 - `activate` performs a distinct sneak-modulated fixture activation;
