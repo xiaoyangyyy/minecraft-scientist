@@ -82,7 +82,15 @@ GridVisualController 仅将画面分区映射为动作目标，不具备对象�
 证据：`runs/active-visual-discovery-seeds7-8/{report.json,integrity-audit.json}`。
 截图人工检查也确认空手目标保留、铁镐目标消失。该结论严格限定为固定相机、
 单一场景目标、生存模式和 20 帧攻击；物体身份仍由 fixture 绑定，不代表自主
-对象识别。Windows 全量 106 项测试与 Linux 视觉相关 30 项测试均通过。
+对象识别。Windows 全量 108 项测试与 Linux 视觉相关 32 项测试均通过。
+
+进一步的 seed 12/13 运行消除了“夹具直接装备工具”的捷径：夹具只把候选放入
+快捷栏槽位，Agent 随后通过生产适配器对不透明槽位目标执行 `SELECT`，再执行
+交互。独立审计确认 4/4 事件日志均包含成功选择、4/4 选择后装备轨迹正确，且
+两项留出预测仍全部命中。冻结预测 SHA256 为
+`6558fa9de4faa87f484c45213a12035320881f1bcac88a4273078ec63804ebd3`；证据位于
+`runs/active-visual-agent-select-seeds12-13/{report.json,integrity-audit.json}`。
+这加强了动作闭环证据，但候选身份和目标区域仍由 fixture 提供。
 
 ## 可复现入口
 

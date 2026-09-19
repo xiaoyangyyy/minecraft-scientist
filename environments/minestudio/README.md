@@ -42,14 +42,16 @@ unreachable targets (including both tools failing), requires competing evidence,
 and leaves budget-exhausted or unstable experiments unresolved. The default
 structured-world learner retains its original world-specific prior.
 
-The accepted controlled run is `runs/active-visual-discovery-seeds7-8`. It used
-the corrected unreachable-target candidate space, two seed-7 discovery probes and
-two seed-8 holdouts. All four equipment traces passed after disabling tile drops,
-removing dropped entities, clearing inventory and explicitly equipping each
-intervention. Holdout accuracy and coverage were both 1.0. The frozen prediction
-hash is `381d48f5170f2914285d20b05298505d5826f6b78d8cb87691ee0b9a3277a873`.
-`audit_visual_run.py` independently verifies that hash, all four equipment audits,
-and the reported metrics. Future runs also snapshot the exact source files used.
+The accepted controlled run is `runs/active-visual-agent-select-seeds12-13`. It
+used the corrected unreachable-target candidate space, two seed-12 discovery
+probes and two seed-13 holdouts. Each probe placed a fixture-bound candidate in a
+different hotbar slot and made the Agent issue an opaque `SELECT` action through
+`MineStudioVisualAdapter` before interaction. All four action logs and equipment
+traces passed. Holdout accuracy and coverage were both 1.0. The frozen prediction
+hash is `6558fa9de4faa87f484c45213a12035320881f1bcac88a4273078ec63804ebd3`.
+`audit_visual_run.py` independently verifies that hash, all four successful select
+events, all four equipment audits, and the reported metrics. The run also snapshots
+the exact source files used.
 The fixture still supplies opaque identity bindings and a fixed target crop; this
 run therefore validates active intervention and scoped theory induction, not
 autonomous visual object discovery.

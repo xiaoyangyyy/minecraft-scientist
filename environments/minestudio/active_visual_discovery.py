@@ -15,7 +15,10 @@ from validate_visual_theory import evidence
 
 
 ROOT = Path(__file__).resolve().parents[2]
-BINDINGS = {"obj_7d318f": "air", "obj_09c51a": "iron_pickaxe"}
+FIXTURE_BINDINGS = {
+    "obj_7d318f": {"tool": "air", "slot": 2},
+    "obj_09c51a": {"tool": "iron_pickaxe", "slot": 3},
+}
 TARGET = "obj_b3c807"
 CONTEXT = {"mode": "survival", "attack_frames": 20,
            "outcome": "fixed_camera_roi_appearance_change"}
@@ -68,7 +71,9 @@ def main():
         subprocess.run([
             sys.executable, str(Path(__file__).with_name("interaction_probe.py")),
             "--seed", str(seed), "--block", "stone", "--mode", "survival",
-            "--attack-frames", "20", "--tool", BINDINGS[tool_id],
+            "--attack-frames", "20",
+            "--tool", FIXTURE_BINDINGS[tool_id]["tool"],
+            "--select-slot", str(FIXTURE_BINDINGS[tool_id]["slot"]),
             "--output", str(directory),
         ], check=True, timeout=180)
         audit_path = directory / "equipment-audit.json"
@@ -85,7 +90,7 @@ def main():
         return directory.name, evidence(directory)
 
     result = discover_visual_tools(
-        tuple(BINDINGS), (TARGET,),
+        tuple(FIXTURE_BINDINGS), (TARGET,),
         lambda tool, target, index: run_probe(tool, target, index, args.train_seed, "discovery"),
         budget=4, execution_context=CONTEXT,
     )
@@ -98,13 +103,13 @@ def main():
         raise RuntimeError("visual theory unresolved within intervention budget")
     predictions = {tool: TheoryInterpreter.predict(
         result.theory, tool_id=tool, target_id=TARGET, execution_context=CONTEXT
-    )["success"] for tool in BINDINGS}
+    )["success"] for tool in FIXTURE_BINDINGS}
     save(output / "preregistered.json", {"predictions": predictions, "seed": args.validation_seed,
          "candidate_space": "ordered_tools_with_unreachable_targets",
          "execution_context": CONTEXT, "theory": result.theory.model_dump(mode="json")})
     digest = hashlib.sha256((output / "preregistered.json").read_bytes()).hexdigest()
     results = []
-    for index, tool in enumerate(BINDINGS):
+    for index, tool in enumerate(FIXTURE_BINDINGS):
         evidence_id, observed = run_probe(tool, TARGET, index, args.validation_seed, "validation")
         results.append({"tool_id": tool, "evidence_id": evidence_id,
                         "predicted": predictions[tool], "observed": observed.changed,
@@ -119,7 +124,9 @@ def main():
               "coverage": sum(item["observed"] is not None for item in results) / len(results),
               "equipment_controls": control_audits,
               "all_equipment_controls_valid": all(item["valid"] for item in control_audits),
-              "active_selection": True, "identity_source": "fixture bindings",
+              "active_selection": True,
+              "tool_selection_via_adapter": True,
+              "identity_source": "fixture bindings",
               "scope": "Two interventions, one fixed-camera target, appearance change only"}
     save(output / "report.json", report)
     print(json.dumps(report), flush=True)

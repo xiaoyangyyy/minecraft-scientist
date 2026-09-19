@@ -45,13 +45,14 @@ Remaining work:
 Latest verified controlled gate (2026-09-19):
 
 - Backend readiness reports Linux, MineStudio 1.1.6 and OpenJDK 1.8.0_502 ready.
-- `runs/active-visual-discovery-seeds7-8` completed two active discovery probes
-  and two independently seeded holdouts with 1.0 accuracy and coverage.
-- Four equipment traces passed; integrity audit and screenshot inspection confirm
-  the empty-hand block remains while the iron-pickaxe block disappears.
+- `runs/active-visual-agent-select-seeds12-13` completed two active discovery
+  probes and two independently seeded holdouts with 1.0 accuracy and coverage.
+- Four successful opaque `SELECT` events and four equipment traces passed;
+  integrity audit confirms the empty-hand block remains while the selected
+  iron-pickaxe block disappears.
 - Frozen prediction SHA256:
-  `381d48f5170f2914285d20b05298505d5826f6b78d8cb87691ee0b9a3277a873`.
-- Windows 106-test suite and Linux 30-test visual subset pass; lock check and both
+  `6558fa9de4faa87f484c45213a12035320881f1bcac88a4273078ec63804ebd3`.
+- Windows 108-test suite and Linux 32-test visual subset pass; lock check and both
   sdist/wheel builds pass. The offline MVP benchmark remains fully successful.
 - This is a controlled, fixture-bound result—not autonomous object grounding,
   navigation, or a full visual Minecraft scientific-discovery benchmark.

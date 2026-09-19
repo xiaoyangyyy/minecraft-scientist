@@ -1,5 +1,7 @@
 """Conservative pixel change evidence; does not infer semantic action success."""
 from dataclasses import dataclass
+import json
+from pathlib import Path
 from typing import Iterable
 
 import numpy as np
@@ -21,6 +23,25 @@ class EquipmentAudit:
     observed: tuple[str | None, ...]
     verified_from_frame: int
     valid: bool
+
+
+def successful_select_count(path: Path) -> int:
+    """Count only fully compliant, successful SELECT transitions in a JSONL log."""
+
+    if not path.is_file():
+        return 0
+    count = 0
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        event = json.loads(line)
+        if (
+            event.get("executed_action", {}).get("kind") == "select"
+            and event.get("intervention_compliance") is True
+            and event.get("event", {}).get("success") is True
+        ):
+            count += 1
+    return count
 
 
 def verify_equipment_trace(

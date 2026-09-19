@@ -208,8 +208,9 @@ current machine without launching anything:
 The isolated WSL runtime on this host is now verified with Ubuntu 22.04, JDK 8,
 MineStudio 1.1.6 and a persistent simulator engine. Real RGB reset/step and a
 strictly controlled active stone-interaction experiment have completed. The
-accepted seeds-7/8 run used two opaque interventions, froze predictions before the
-holdout, passed 4/4 equipment controls, and predicted both holdout outcomes. Its
+accepted seeds-12/13 run used two opaque interventions, selected both through the
+production adapter, froze predictions before the holdout, passed 4/4 equipment
+and action-log controls, and predicted both holdout outcomes. Its
 scope is intentionally narrow: fixed camera, one fixture target, 20 attack frames,
 and fixture-supplied identity bindings. It is not general object recognition or a
 complete visual Minecraft scientist. Setup, exact evidence, and caveats are in
@@ -217,8 +218,9 @@ complete visual Minecraft scientist. Setup, exact evidence, and caveats are in
 
 A concrete label-free `GridVisualController` maps opaque screen regions and hotbar
 slots to MineStudio env actions. Tests verify action translation and semantic
-isolation; the accepted live experiment additionally audits held equipment and
-uses only the central RGB target crop for Agent-visible outcome evidence.
+isolation; the accepted live experiment additionally audits successful opaque
+`SELECT` events and held equipment, and uses only the central RGB target crop for
+Agent-visible outcome evidence.
 
 ## Architecture and extension boundary
 

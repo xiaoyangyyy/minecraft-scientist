@@ -146,8 +146,19 @@ frozen prediction hash
 `381d48f5170f2914285d20b05298505d5826f6b78d8cb87691ee0b9a3277a873`.
 Evidence: `runs/active-visual-discovery-seeds7-8/{report.json,integrity-audit.json}`.
 
+The subsequent seeds-12/13 run closes one more control gap. Instead of directly
+equipping the fixture tool, each probe places the candidate in a hotbar slot and
+the Agent executes `SELECT` against the slot's opaque visual handle through the
+production adapter. The independent audit finds one successful select event in
+each of the four logs, validates every post-select equipment trace, verifies the
+frozen prediction hash
+`6558fa9de4faa87f484c45213a12035320881f1bcac88a4273078ec63804ebd3`, and confirms
+1.0 holdout accuracy and coverage. This is now the accepted controlled visual
+result. Evidence:
+`runs/active-visual-agent-select-seeds12-13/{report.json,integrity-audit.json}`.
+
 The evaluator equipment check now fails closed on empty/missing telemetry as well
-as wrong items. Windows full regression passes 106 tests; Linux passes all 30
+as wrong items. Windows full regression passes 108 tests; Linux passes all 32
 visual adapter/evidence/active-learning/scope tests. The offline MVP benchmark
 still reports 1.0 hidden intervention accuracy and task success, 47 experiments,
 one-step change detection, eight revision experiments, three symbols and 13 reuse
@@ -173,7 +184,7 @@ hard call/token limits.
 
 The 2026-09-19 controlled visual gate additionally passed dependency-lock checking,
 Python sdist/wheel builds, WSL backend readiness (MineStudio 1.1.6, Python 3.11.16,
-OpenJDK 1.8.0_502), 106 Windows tests, 30 Linux visual tests, and the MVP benchmark.
+OpenJDK 1.8.0_502), 108 Windows tests, 32 Linux visual tests, and the MVP benchmark.
 The visual result remains scoped as documented above; it does not replace the
 structured-world evidence for hidden state machines or conversion chains.
 
