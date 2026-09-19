@@ -52,12 +52,37 @@
 ## 视觉接入状态
 
 适配器已支持 MineStudio 返回的 `image` 观测字典，reset/step 路径通过模拟器
-回归测试。当前主机为 Windows，Java 21，未安装 MineStudio 或可用 WSL Linux。
-因此尚无真实 RGB 运行结果、感知准确率或视觉发现成功率。
+回归测试。当前已安装 WSL Ubuntu 22.04、JDK 8、隔离 Python 3.11 和 MineStudio
+1.1.6。真实 RGB 首帧及 select/interact/wait 适配器运行通过，保存了图像和事件。
+这不构成感知准确率或视觉发现成功率证据。
 GridVisualController 仅将画面分区映射为动作目标，不具备对象识别能力。
 
-完成视觉阶段需要 Linux/JDK 8 运行环境、真实模拟器启动、RGB 动作轨迹和
-独立任务评测。WSL 安装可能涉及系统组件及重启，目前等待用户确认。
+完成视觉阶段仍需要稳定的受控场景、对象感知和独立任务评测。
+首次 creative 方块交互探针正常退出，但截图显示目标未稳定在准星前，
+因此 ROI 差异不计为有效破坏证据。原始产物保存在
+`runs/minestudio-interaction-probe`，需要先修复初始化与位置稳定性。
+
+后续通过日志定位到 absolute-origin 区块未加载，改为在玩家已加载区块内建场。
+`runs/minestudio-interaction-probe-loaded` 的静止对照 ROI MAE 为 0，交互后为
+45.4381；人工检查前后截图确认目标方块消失。这是单个 creative 受控场景的
+动作效果证据，不能替代工具等级、状态机、转换链的视觉发现评测。
+
+在 seed 0 的空手/铁镐石头实验中，按图像区域变化拟合现有 ToolVersionSpace，
+生成匿名 ID 的可执行 TheoryIR，并在运行 seed 2 前保存预测。独立验证两项均
+命中，覆盖率 2/2，截图核验空手目标保留、铁镐目标消失；预测文件 SHA256
+保持不变。证据：`runs/visual-theory-holdout-seed2/report.json`。
+此结果仅为固定相机、20 帧、生存模式的探索性验证：对应身份由实验场景提供，
+实验选择预先固定，阈值并非普适校准，不能宣称自主视觉科学发现已经完成。
+后续解释器增加 `required_context` 范围校验；历史预注册文件保持原样不回写。
+
+修正不可达目标先验并清除掉落物污染后，seed 7 主动实验实际测试了两个匿名工具；
+系统形成唯一候选理论，再在 seed 8 前冻结预测。两项保留预测均命中，覆盖率 2/2。
+四个发现/验证运行的手持物遥测全部通过，完整性审计确认预注册 SHA256 为
+`381d48f5170f2914285d20b05298505d5826f6b78d8cb87691ee0b9a3277a873`。
+证据：`runs/active-visual-discovery-seeds7-8/{report.json,integrity-audit.json}`。
+截图人工检查也确认空手目标保留、铁镐目标消失。该结论严格限定为固定相机、
+单一场景目标、生存模式和 20 帧攻击；物体身份仍由 fixture 绑定，不代表自主
+对象识别。Windows 全量 106 项测试与 Linux 视觉相关 30 项测试均通过。
 
 ## 可复现入口
 

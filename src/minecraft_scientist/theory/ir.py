@@ -11,6 +11,14 @@ from minecraft_scientist.protocols import TheoryIR
 class TheoryInterpreter:
     @staticmethod
     def predict(ir: TheoryIR, **inputs: Any) -> dict[str, Any]:
+        required_context = ir.scope.get("required_context")
+        if required_context is not None:
+            actual_context = inputs.get("execution_context")
+            if not isinstance(required_context, dict) or not isinstance(actual_context, dict):
+                raise ValueError("scoped theory requires an execution_context mapping")
+            if any(key not in actual_context or actual_context[key] != value
+                   for key, value in required_context.items()):
+                raise ValueError("execution context is outside the theory scope")
         mechanism = ir.mechanism
         if mechanism == "tool_capability":
             tool_id = str(inputs["tool_id"])

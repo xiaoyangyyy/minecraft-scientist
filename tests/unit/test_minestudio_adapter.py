@@ -60,6 +60,29 @@ class FakeVisualController:
         return {"kind": action.kind.value, **scene.controller_state}
 
 
+@pytest.mark.parametrize("terminal_at,expected", [(None, 5), (2, 2)])
+def test_wait_runs_requested_frames_and_stops_at_terminal(terminal_at, expected):
+    class TerminalSimulator(FakeSimulator):
+        def step(self, action):
+            frame, reward, _, truncated, info = super().step(action)
+            return frame, reward, self.counter == terminal_at, truncated, info
+
+    simulator = TerminalSimulator()
+    with MineStudioVisualAdapter(
+        FakeVisualController(), simulator_factory=lambda config: simulator
+    ) as world:
+        world.reset(0)
+        transition = world.step(PrimitiveAction(kind=ActionKind.WAIT, ticks=5))
+        assert len(simulator.actions) == expected
+        assert transition.event.duration == expected
+        assert transition.observed_delta["reward"] == expected * 0.25
+        assert transition.intervention_compliance is (terminal_at is None)
+        if terminal_at is not None:
+            assert world.available_actions() == ()
+            with pytest.raises(RuntimeError, match="episode has ended"):
+                world.step(PrimitiveAction(kind=ActionKind.WAIT))
+
+
 def test_real_observation_mapping_is_unwrapped_on_reset_and_step() -> None:
     class MappingSimulator(FakeSimulator):
         def reset(self):
@@ -78,6 +101,42 @@ def test_real_observation_mapping_is_unwrapped_on_reset_and_step() -> None:
         assert "diamond_ore" not in initial.model_dump_json()
         result = world.step(PrimitiveAction(kind=ActionKind.WAIT))
         assert result.observed_delta["frame_changed"]
+
+
+def test_wait_preserves_control_failure_and_stops_immediately() -> None:
+    class FailingSimulator(FakeSimulator):
+        def step(self, action):
+            frame, reward, terminated, truncated, info = super().step(action)
+            info["controller_failure"] = "input_not_applied"
+            return frame, reward, terminated, truncated, info
+
+    simulator = FailingSimulator()
+    with MineStudioVisualAdapter(
+        FakeVisualController(), simulator_factory=lambda config: simulator
+    ) as world:
+        world.reset(0)
+        result = world.step(PrimitiveAction(kind=ActionKind.WAIT, ticks=5))
+        assert simulator.counter == 1
+        assert result.controller_failure == "input_not_applied"
+        assert not result.intervention_compliance
+        assert not result.event.success
+
+
+def test_reset_reopens_actions_after_terminal_episode() -> None:
+    class EndingSimulator(FakeSimulator):
+        def step(self, action):
+            frame, reward, _, truncated, info = super().step(action)
+            return frame, reward, True, truncated, info
+
+    with MineStudioVisualAdapter(
+        FakeVisualController(), simulator_factory=lambda config: EndingSimulator()
+    ) as world:
+        world.reset(0)
+        result = world.step(PrimitiveAction(kind=ActionKind.WAIT))
+        assert result.intervention_compliance  # Full requested duration completed.
+        assert world.available_actions() == ()
+        world.reset(1)
+        assert world.available_actions()
 
 
 def test_minestudio_adapter_exposes_pixels_only_through_opaque_perception() -> None:
@@ -157,6 +216,8 @@ def test_grid_visual_controller_maps_pixels_to_env_actions_without_labels() -> N
     )
 
     assert len(scene.objects) == 6
+    assert scene.inventory == {}
+    assert scene.agent_state["inventory_observed"] is False
     assert all(item.object_id.startswith("obj_") for item in scene.objects)
     assert "forbidden" not in repr(scene.objects)
     slot = next(item for item in scene.objects if item.affordances == (ActionKind.SELECT,))

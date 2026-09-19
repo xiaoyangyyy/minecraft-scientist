@@ -95,16 +95,14 @@ class GridVisualController:
         height, width, _ = array.shape
         objects: list[ObjectObservation] = []
         bindings: dict[str, dict[str, Any]] = {}
-        inventory: dict[str, int] = {}
         for slot in range(1, self.hotbar_slots + 1):
             object_id = self._opaque(seed, "hotbar", slot)
-            inventory[object_id] = 1
             bindings[object_id] = {"kind": "hotbar", "slot": slot}
             objects.append(
                 ObjectObservation(
                     object_id=object_id,
                     affordances=(ActionKind.SELECT,),
-                    observable_features={"slot": slot},
+                    observable_features={"slot": slot, "slot_handle": True},
                 )
             )
         for row in range(self.rows):
@@ -139,8 +137,9 @@ class GridVisualController:
                 )
         return VisualScene(
             objects=tuple(objects),
-            inventory=inventory,
+            inventory={},
             agent_state={
+                "inventory_observed": False,
                 "frame_mean": float(array.mean()),
                 "frame_contrast": float(array.std()),
             },
@@ -270,12 +269,14 @@ class MineStudioVisualAdapter:
         self._seed = self.config.seed
         self._episode = 0
         self._step = 0
+        self._done = False
 
     def reset(self, seed: int) -> Observation:
         self.close()
         self._seed = seed
         self._episode += 1
         self._step = 0
+        self._done = False
         self._simulator = self._simulator_factory(
             self.config.model_copy(update={"seed": seed})
         )
@@ -290,6 +291,8 @@ class MineStudioVisualAdapter:
     def available_actions(self) -> tuple[PrimitiveAction, ...]:
         if self._scene is None:
             raise RuntimeError("world must be reset before requesting actions")
+        if self._done:
+            return ()
         actions: list[PrimitiveAction] = [
             PrimitiveAction(kind=ActionKind.WAIT, ticks=1)
         ]
@@ -301,6 +304,8 @@ class MineStudioVisualAdapter:
     def step(self, action: PrimitiveAction) -> TransitionRecord:
         if self._simulator is None or self._scene is None or self._observation is None:
             raise RuntimeError("world must be reset before stepping")
+        if self._done:
+            raise RuntimeError("episode has ended; reset before stepping")
         before = self._observation
         payload = self._controller.encode_action(action, self._scene)
         noop = getattr(self._simulator, "noop_action", None)
@@ -308,19 +313,34 @@ class MineStudioVisualAdapter:
             complete_payload = noop()
             complete_payload.update(payload)
             payload = complete_payload
-        frame, reward, terminated, truncated, info = self._simulator.step(payload)
+        # WAIT is a duration, not a single simulator frame. Other actions remain
+        # single controller interventions (repeating camera deltas would drift).
+        requested_steps = action.ticks if action.kind is ActionKind.WAIT else 1
+        reward = 0.0
+        executed_steps = 0
+        for _ in range(requested_steps):
+            frame, step_reward, terminated, truncated, info = self._simulator.step(payload)
+            reward += float(step_reward)
+            executed_steps += 1
+            if terminated or truncated or info.get("controller_failure"):
+                break
         self._step += 1
+        self._done = bool(terminated or truncated)
         after = self._encode(frame, info)
-        success = not bool(info.get("controller_failure", False))
+        failure = info.get("controller_failure")
+        if not failure and executed_steps < requested_steps:
+            failure = "episode_ended_before_requested_duration"
+        success = not bool(failure)
         event = WorldEvent(
             event_type=f"minestudio_{action.kind.value}",
             target_id=action.target_id,
             success=success,
-            duration=action.ticks,
+            duration=executed_steps,
             details={
                 "reward": float(reward),
                 "terminated": bool(terminated),
                 "truncated": bool(truncated),
+                "simulator_steps": executed_steps,
             },
         )
         return TransitionRecord(
@@ -340,11 +360,7 @@ class MineStudioVisualAdapter:
                 ),
             },
             event=event,
-            controller_failure=(
-                str(info["controller_failure"])
-                if info.get("controller_failure")
-                else None
-            ),
+            controller_failure=str(failure) if failure else None,
             provenance={
                 "backend": "minestudio",
                 "episode": self._episode,

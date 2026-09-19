@@ -1,0 +1,9 @@
+# MineStudio 1.1.6 pins a yanked OpenCV wheel; use its replacement patch release.
+opencv-python-headless==4.8.0.76
+# Keep both OpenCV distributions on the same ABI-compatible patch.
+opencv-python==4.8.0.76
+# Legacy pyrender pins networkx 2.2, which cannot import under Python 3.11.
+networkx>=3.3,<4
+# Visual simulation does not require CUDA policy training packages.
+torch==2.8.0+cpu
+torchvision==0.23.0+cpu

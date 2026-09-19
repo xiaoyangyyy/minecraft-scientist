@@ -30,14 +30,16 @@ class ToolHypothesis:
 
 
 class ToolVersionSpace:
-    def __init__(self, tools: tuple[str, ...], targets: tuple[str, ...]) -> None:
+    def __init__(self, tools: tuple[str, ...], targets: tuple[str, ...], *,
+                 include_unreachable: bool = False) -> None:
         self.tools = tuple(sorted(tools))
         self.targets = tuple(sorted(targets))
+        self._requirement_count = len(self.tools) + int(include_unreachable)
         candidates: list[ToolHypothesis] = []
         for order in itertools.permutations(self.tools):
             ranks = {tool: rank for rank, tool in enumerate(order)}
             for requirements in itertools.product(
-                range(len(self.tools)), repeat=len(self.targets)
+                range(self._requirement_count), repeat=len(self.targets)
             ):
                 candidates.append(
                     ToolHypothesis(
@@ -88,7 +90,7 @@ class ToolVersionSpace:
         initial_count = max(
             1,
             len(tuple(itertools.permutations(self.tools)))
-            * (len(self.tools) ** len(self.targets)),
+            * (self._requirement_count ** len(self.targets)),
         )
         posterior_fraction = len(self.candidates) / initial_count
         for tool in self.tools:

@@ -1,2 +1,2 @@
-# Install only in the isolated Linux/Python 3.10 environment described in README.md.
+# Install only in isolated Linux/Python 3.11 with the overrides and index in README.md.
 minestudio==1.1.6

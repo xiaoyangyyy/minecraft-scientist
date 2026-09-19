@@ -13,6 +13,7 @@ node_modules/
 
 # Experiment outputs
 runs/
+logs/mc_*.log
 checkpoints/*
 !checkpoints/four-form-experiment-policy.pt
 !checkpoints/four-form-experiment-policy.json
