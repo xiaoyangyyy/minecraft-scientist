@@ -1,7 +1,16 @@
+from dataclasses import asdict
+import json
+
 import numpy as np
 import pytest
 
-from minecraft_scientist.minecraft.visual_evidence import compare_regions, verify_equipment_trace
+from minecraft_scientist.minecraft.visual_evidence import (
+    compare_regions,
+    hud_safe_view,
+    load_grounding_evidence,
+    localize_change_grid,
+    verify_equipment_trace,
+)
 
 
 def test_stable_control_distinguishes_change_from_no_change():
@@ -13,6 +22,121 @@ def test_stable_control_distinguishes_change_from_no_change():
 def test_unstable_control_abstains():
     frame = np.zeros((4, 4, 3))
     assert compare_regions(frame, frame + 20, frame + 100).changed is None
+
+
+def test_grid_grounding_localizes_strongest_change_with_opaque_id():
+    control = np.zeros((8, 8, 3), dtype=np.uint8)
+    before = control.copy()
+    after = control.copy()
+    after[4:8, 0:4] = 80
+
+    grounded = localize_change_grid(control, before, after, rows=2, columns=2)
+
+    assert grounded.evidence.changed is True
+    assert grounded.selected_cell_id.startswith("obj_")
+    selected = next(
+        cell for cell in grounded.cells if cell.object_id == grounded.selected_cell_id
+    )
+    assert (selected.row, selected.column) == (1, 0)
+
+
+def test_grid_grounding_abstains_if_any_control_cell_is_unstable():
+    control = np.zeros((8, 8, 3), dtype=np.uint8)
+    before = control.copy()
+    before[:4, :4] = 20
+    after = before.copy()
+    after[:4, :4] = 100
+
+    grounded = localize_change_grid(control, before, after, rows=2, columns=2)
+
+    assert grounded.evidence.changed is None
+    assert grounded.selected_cell_id is None
+
+
+def test_grid_grounding_ignores_low_amplitude_drift_outside_stable_change():
+    control = np.zeros((8, 8, 3), dtype=np.uint8)
+    before = control.copy()
+    before[:4, :4] = 3
+    after = before.copy()
+    after[:4, :4] = 7
+    after[4:, 4:] = 80
+
+    grounded = localize_change_grid(control, before, after, rows=2, columns=2)
+
+    assert grounded.evidence.changed is True
+    selected = next(
+        cell for cell in grounded.cells if cell.object_id == grounded.selected_cell_id
+    )
+    assert (selected.row, selected.column) == (1, 1)
+
+
+def test_grid_grounding_fails_closed_when_all_cells_are_unstable():
+    control = np.zeros((8, 8, 3), dtype=np.uint8)
+    before = np.full_like(control, 5)
+    after = np.full_like(control, 80)
+
+    grounded = localize_change_grid(control, before, after, rows=2, columns=2)
+
+    assert grounded.evidence.changed is None
+    assert grounded.selected_cell_id is None
+
+
+def test_grid_grounding_reports_stable_no_change_without_target_guess():
+    frame = np.zeros((8, 8, 3), dtype=np.uint8)
+    grounded = localize_change_grid(frame, frame, frame, rows=2, columns=2)
+    assert grounded.evidence.changed is False
+    assert grounded.selected_cell_id is None
+
+
+def test_hud_safe_view_excludes_image_edges():
+    frame = np.zeros((140, 140, 3), dtype=np.uint8)
+    frame[:20] = 255
+    frame[-20:] = 255
+    frame[:, :5] = 255
+    frame[:, -30:] = 255
+
+    view = hud_safe_view(frame)
+
+    assert view.shape == (90, 90, 3)
+    assert not view.any()
+
+
+def test_grounding_artifact_round_trip_is_strict(tmp_path):
+    frame = np.zeros((8, 8, 3), dtype=np.uint8)
+    after = frame.copy()
+    after[4:, 4:] = 80
+    grounded = localize_change_grid(frame, frame, after, rows=2, columns=2)
+    path = tmp_path / "grounding.json"
+    path.write_text(json.dumps({
+        "evidence": asdict(grounded.evidence),
+        "selected_cell_id": grounded.selected_cell_id,
+        "cells": [asdict(cell) for cell in grounded.cells],
+    }), encoding="utf-8")
+
+    assert load_grounding_evidence(path) == grounded
+
+
+def test_grounding_artifact_rejects_selected_cell_not_in_grid(tmp_path):
+    path = tmp_path / "grounding.json"
+    path.write_text(json.dumps({
+        "evidence": {
+            "control_mae": 0.0,
+            "intervention_mae": 20.0,
+            "control_stable": True,
+            "changed": True,
+        },
+        "selected_cell_id": "obj_missing",
+        "cells": [{
+            "object_id": "obj_present",
+            "row": 0,
+            "column": 0,
+            "control_mae": 0.0,
+            "intervention_mae": 20.0,
+        }],
+    }), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="selected cell"):
+        load_grounding_evidence(path)
 
 
 @pytest.mark.parametrize("bad", [np.array([]), np.array([float('nan')])])

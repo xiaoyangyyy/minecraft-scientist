@@ -10,8 +10,8 @@ import sys
 import shutil
 
 from minecraft_scientist.discovery.visual_tools import discover_visual_tools
+from minecraft_scientist.minecraft.visual_evidence import load_grounding_evidence
 from minecraft_scientist.theory.ir import TheoryInterpreter
-from validate_visual_theory import evidence
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -20,8 +20,11 @@ FIXTURE_BINDINGS = {
     "obj_09c51a": {"tool": "iron_pickaxe", "slot": 3},
 }
 TARGET = "obj_b3c807"
-CONTEXT = {"mode": "survival", "attack_frames": 20,
-           "outcome": "fixed_camera_roi_appearance_change"}
+CONTEXT = {
+    "mode": "survival",
+    "attack_frames": 20,
+    "outcome": "fixed_camera_automatic_grid_change",
+}
 
 
 def save(path, payload):
@@ -80,14 +83,27 @@ def main():
         audit = json.loads(audit_path.read_text(encoding="utf-8"))
         if audit.get("valid") is not True:
             raise RuntimeError(f"equipment audit failed: {audit_path}")
+        probe_report = json.loads((directory / "report.json").read_text(encoding="utf-8"))
+        grounding_path = directory / "grounding.json"
+        grounding = load_grounding_evidence(grounding_path)
+        if probe_report.get("automatic_change_localization") is not True:
+            raise RuntimeError(f"automatic grounding was not used: {directory}")
+        if (
+            probe_report.get("localized_change_cell_id")
+            != grounding.selected_cell_id
+        ):
+            raise RuntimeError(f"grounding report mismatch: {directory}")
         control_audits.append({
             "phase": phase,
             "experiment": index,
             "tool_id": tool_id,
             "audit_sha256": hashlib.sha256(audit_path.read_bytes()).hexdigest(),
+            "grounding_sha256": hashlib.sha256(
+                grounding_path.read_bytes()
+            ).hexdigest(),
             "valid": True,
         })
-        return directory.name, evidence(directory)
+        return directory.name, grounding.evidence
 
     result = discover_visual_tools(
         tuple(FIXTURE_BINDINGS), (TARGET,),
@@ -126,8 +142,12 @@ def main():
               "all_equipment_controls_valid": all(item["valid"] for item in control_audits),
               "active_selection": True,
               "tool_selection_via_adapter": True,
+              "automatic_change_localization": True,
               "identity_source": "fixture bindings",
-              "scope": "Two interventions, one fixed-camera target, appearance change only"}
+              "scope": (
+                  "Two interventions, one fixture-aimed target, fixed camera, "
+                  "automatically localized grid appearance change only"
+              )}
     save(output / "report.json", report)
     print(json.dumps(report), flush=True)
 

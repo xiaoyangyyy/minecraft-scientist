@@ -42,19 +42,25 @@ unreachable targets (including both tools failing), requires competing evidence,
 and leaves budget-exhausted or unstable experiments unresolved. The default
 structured-world learner retains its original world-specific prior.
 
-The accepted controlled run is `runs/active-visual-agent-select-seeds12-13`. It
-used the corrected unreachable-target candidate space, two seed-12 discovery
-probes and two seed-13 holdouts. Each probe placed a fixture-bound candidate in a
+The accepted controlled run is `runs/active-visual-grounded-evidence-seeds20-21`.
+It used the corrected unreachable-target candidate space, two seed-20 discovery
+probes and two seed-21 holdouts. Each probe placed a fixture-bound candidate in a
 different hotbar slot and made the Agent issue an opaque `SELECT` action through
 `MineStudioVisualAdapter` before interaction. All four action logs and equipment
-traces passed. Holdout accuracy and coverage were both 1.0. The frozen prediction
-hash is `6558fa9de4faa87f484c45213a12035320881f1bcac88a4273078ec63804ebd3`.
+traces passed. A HUD-safe world viewport was divided into anonymous cells and the
+strongest controlled change was localized automatically; no fixed target crop was
+used for outcome evidence. Holdout accuracy and coverage were both 1.0. The frozen
+prediction hash is
+`036500506e9503ec156b3b160bd8537b983eb7721cabaf4626cf807dd958c579`.
 `audit_visual_run.py` independently verifies that hash, all four successful select
-events, all four equipment audits, and the reported metrics. The run also snapshots
-the exact source files used.
-The fixture still supplies opaque identity bindings and a fixed target crop; this
-run therefore validates active intervention and scoped theory induction, not
-autonomous visual object discovery.
+events, all four equipment audits, all four grounding artifacts, and the reported
+metrics. The learner directly consumes strictly schema-validated grounding
+artifacts; it does not recompute the legacy central crop. The run also snapshots
+the exact source files used, and the independent audit verifies every snapshot
+hash against the runtime manifest. The fixture still
+aims the camera and supplies opaque candidate identity bindings; adjacent cells
+can win across seeds, so this is change-region grounding rather than persistent
+object identity or autonomous navigation.
 
 MineStudio is deliberately excluded from the root `uv` environment. Its simulator
 documentation targets Linux, Python 3.10+, JDK 8, VirtualGL/Xvfb, and a separate

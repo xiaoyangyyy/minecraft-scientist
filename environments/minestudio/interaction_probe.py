@@ -1,4 +1,5 @@
 """Controlled live visual intervention; privileged setup never enters perception."""
+from dataclasses import asdict
 import json
 import argparse
 import os
@@ -12,7 +13,11 @@ from minestudio.simulator import MinecraftSim
 from minestudio.simulator.callbacks.commands import CommandsCallback
 from minecraft_scientist.minecraft import GridVisualController, MineStudioVisualAdapter
 from minecraft_scientist.protocols import ActionKind, PrimitiveAction
-from minecraft_scientist.minecraft.visual_evidence import compare_regions, verify_equipment_trace
+from minecraft_scientist.minecraft.visual_evidence import (
+    hud_safe_view,
+    localize_change_grid,
+    verify_equipment_trace,
+)
 
 
 class PixelRecorder:
@@ -27,9 +32,9 @@ class PixelRecorder:
         value = equipped.get("type") if isinstance(equipped, dict) else None
         self.equipment.append(str(value) if value is not None else None)
         # Deliberately discard privileged info, including evaluator labels.
-        # Only the fixed target crop enters Agent perception. Full evaluator
+        # Only a HUD-safe world viewport enters Agent perception. Full evaluator
         # screenshots may contain recipe toasts and translated item-name HUD text.
-        return self.grid.perceive(np.asarray(frame)[80:144, 80:144], {}, seed=seed)
+        return self.grid.perceive(hud_safe_view(np.asarray(frame)), {}, seed=seed)
 
     def encode_action(self, action, scene):
         return self.grid.encode_action(action, scene)
@@ -121,6 +126,13 @@ def main():
                 )
             )
             equipment_verified_from = len(recorder.equipment) - 1
+            # The SELECT frame can include a hand/tool transition. Establish a
+            # matched post-selection no-action control instead of relaxing the
+            # stability threshold around that animation.
+            for _ in range(2):
+                records.append(
+                    world.step(PrimitiveAction(kind=ActionKind.WAIT, ticks=10))
+                )
         baseline = recorder.frames[-1].copy()
         control = recorder.frames[-2].copy()
         action = next(a for a in world.available_actions() if a.kind is ActionKind.INTERACT)
@@ -145,8 +157,23 @@ def main():
     }, indent=2), encoding="utf-8")
     if not equipment.valid:
         raise RuntimeError("held-item control failed or could not be verified; see equipment-audit.json")
-    roi = np.s_[80:144, 80:144, :]
-    evidence = compare_regions(control[roi], baseline[roi], after[roi])
+    grounding = localize_change_grid(
+        hud_safe_view(control),
+        hud_safe_view(baseline),
+        hud_safe_view(after),
+    )
+    evidence = grounding.evidence
+    (output / "grounding.json").write_text(
+        json.dumps(
+            {
+                "selected_cell_id": grounding.selected_cell_id,
+                "cells": [asdict(cell) for cell in grounding.cells],
+                "evidence": asdict(evidence),
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
     report = {
         "seed": args.seed, "backend": "real-minestudio",
         "mode": args.mode, "attack_frames": args.attack_frames,
@@ -157,6 +184,9 @@ def main():
         "equipment_audit_passed": equipment.valid,
         "tool_selection_via_adapter": args.select_slot is not None,
         "selected_slot": args.select_slot,
+        "automatic_change_localization": True,
+        "localized_change_cell_id": grounding.selected_cell_id,
+        "change_grid": {"rows": 4, "columns": 4},
         "scope": "Controlled visual intervention probe, not tool-tier discovery.",
         "pixel_only_perception": True,
     }

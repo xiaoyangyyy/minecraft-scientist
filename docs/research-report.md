@@ -92,6 +92,18 @@ GridVisualController 仅将画面分区映射为动作目标，不具备对象�
 `runs/active-visual-agent-select-seeds12-13/{report.json,integrity-audit.json}`。
 这加强了动作闭环证据，但候选身份和目标区域仍由 fixture 提供。
 
+seed 20/21 又移除了固定中央目标裁剪：系统先删除 HUD/提示区域，再把世界视野
+划分为匿名网格，逐格比较无操作控制漂移与干预变化。低幅背景漂移不会否决另一
+稳定单元中的强变化；若不稳定单元本身出现阈值级变化则弃权。四次新实验的自动
+定位产物、选择事件和装备轨迹全部通过独立审计，留出准确率与覆盖率仍为 1.0。
+冻结预测 SHA256 为
+`036500506e9503ec156b3b160bd8537b983eb7721cabaf4626cf807dd958c579`；证据位于
+`runs/active-visual-grounded-evidence-seeds20-21/{report.json,integrity-audit.json}`。
+发现器直接消费经过严格模式校验的定位产物，不再重新计算旧中央裁剪。
+独立审计同时逐文件核对运行时清单与源码快照哈希，六个源码文件全部一致。
+不同 seed 的最强变化可能落在相邻格，因此这里只证明变化区域自动定位，尚未
+证明持久对象身份跟踪。当前门禁为 Windows 116 项、Linux 40 项视觉测试。
+
 ## 可复现入口
 
 ```powershell

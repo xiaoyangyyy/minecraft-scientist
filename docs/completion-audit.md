@@ -157,8 +157,24 @@ frozen prediction hash
 result. Evidence:
 `runs/active-visual-agent-select-seeds12-13/{report.json,integrity-audit.json}`.
 
+The seeds-20/21 run removes the fixed central evidence crop. A HUD-safe world
+viewport is partitioned into opaque cells; matched control and intervention
+differences are evaluated per cell, with abstention when threshold-scale change
+is itself control-unstable. All four grounding artifacts, successful select
+events, and equipment traces pass independent audit. Both preregistered holdouts
+are correct with full coverage, and prediction SHA256 is
+`036500506e9503ec156b3b160bd8537b983eb7721cabaf4626cf807dd958c579`.
+The discovery loop directly consumes the schema-validated grounding artifact;
+the legacy central-crop evidence function is absent from this path. The independent
+audit also verifies all six runtime-manifest source hashes against the saved source
+snapshot.
+This is now the accepted controlled visual result. The camera remains fixture
+aimed, and the strongest changed cell can move between adjacent cells across
+seeds, so persistent object identity and navigation remain open. Evidence:
+`runs/active-visual-grounded-evidence-seeds20-21/{report.json,integrity-audit.json}`.
+
 The evaluator equipment check now fails closed on empty/missing telemetry as well
-as wrong items. Windows full regression passes 108 tests; Linux passes all 32
+as wrong items. Windows full regression passes 116 tests; Linux passes all 40
 visual adapter/evidence/active-learning/scope tests. The offline MVP benchmark
 still reports 1.0 hidden intervention accuracy and task success, 47 experiments,
 one-step change detection, eight revision experiments, three symbols and 13 reuse
@@ -184,7 +200,7 @@ hard call/token limits.
 
 The 2026-09-19 controlled visual gate additionally passed dependency-lock checking,
 Python sdist/wheel builds, WSL backend readiness (MineStudio 1.1.6, Python 3.11.16,
-OpenJDK 1.8.0_502), 108 Windows tests, 32 Linux visual tests, and the MVP benchmark.
+OpenJDK 1.8.0_502), 116 Windows tests, 40 Linux visual tests, and the MVP benchmark.
 The visual result remains scoped as documented above; it does not replace the
 structured-world evidence for hidden state machines or conversion chains.
 

@@ -1,5 +1,6 @@
 """Conservative pixel change evidence; does not infer semantic action success."""
 from dataclasses import dataclass
+import hashlib
 import json
 from pathlib import Path
 from typing import Iterable
@@ -23,6 +24,153 @@ class EquipmentAudit:
     observed: tuple[str | None, ...]
     verified_from_frame: int
     valid: bool
+
+
+@dataclass(frozen=True)
+class VisualCellEvidence:
+    object_id: str
+    row: int
+    column: int
+    control_mae: float
+    intervention_mae: float
+
+
+@dataclass(frozen=True)
+class GridChangeEvidence:
+    """Anonymous spatial grounding for a controlled pixel intervention."""
+
+    evidence: PixelChangeEvidence
+    selected_cell_id: str | None
+    cells: tuple[VisualCellEvidence, ...]
+
+
+def load_grounding_evidence(path: Path) -> GridChangeEvidence:
+    """Load and validate the Agent-visible grounding artifact used by discovery."""
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    evidence = PixelChangeEvidence(**payload["evidence"])
+    cells = tuple(VisualCellEvidence(**cell) for cell in payload["cells"])
+    selected = payload.get("selected_cell_id")
+    ids = {cell.object_id for cell in cells}
+    if not cells or len(ids) != len(cells) or any(
+        not object_id.startswith("obj_") for object_id in ids
+    ):
+        raise ValueError("grounding cells require unique opaque identifiers")
+    if evidence.changed is True and selected not in ids:
+        raise ValueError("changed grounding requires a selected cell")
+    if evidence.changed is not True and selected is not None:
+        raise ValueError("non-change grounding cannot select a cell")
+    return GridChangeEvidence(evidence, selected, cells)
+
+
+def hud_safe_view(frame: np.ndarray) -> np.ndarray:
+    """Remove common HUD/toast bands while retaining the central world view."""
+
+    array = np.asarray(frame)
+    if array.ndim not in {2, 3} or array.shape[0] < 96 or array.shape[1] < 96:
+        raise ValueError("frame must be a 2D or 3D image of at least 96x96")
+    height, width = array.shape[:2]
+    top = height * 1 // 7
+    bottom = height * 11 // 14
+    left = width * 1 // 14
+    right = width * 5 // 7
+    view = array[top:bottom, left:right]
+    if not view.size:
+        raise ValueError("HUD-safe view is empty")
+    return view
+
+
+def localize_change_grid(
+    control: np.ndarray,
+    before: np.ndarray,
+    after: np.ndarray,
+    *,
+    rows: int = 4,
+    columns: int = 4,
+    stability_limit: float = 1.0,
+    change_limit: float = 10.0,
+) -> GridChangeEvidence:
+    """Ground the strongest stable intervention change to an opaque grid cell.
+
+    The function fails closed when a threshold-scale change occurs in a cell whose
+    control is itself unstable. Low-amplitude drift elsewhere cannot veto a strong
+    change in a separately stable cell. Coordinates are retained only as
+    nonsemantic provenance; discovery consumes the opaque cell identifier.
+    """
+
+    arrays = [np.asarray(frame, dtype=float) for frame in (control, before, after)]
+    if not arrays[0].size or any(array.shape != arrays[0].shape for array in arrays):
+        raise ValueError("regions must have the same nonempty shape")
+    if any(array.ndim not in {2, 3} for array in arrays):
+        raise ValueError("regions must be 2D or 3D images")
+    if any(not np.isfinite(array).all() for array in arrays):
+        raise ValueError("regions must contain finite values")
+    if rows < 1 or columns < 1:
+        raise ValueError("grid dimensions must be positive")
+    height, width = arrays[0].shape[:2]
+    if rows > height or columns > width:
+        raise ValueError("grid dimensions cannot exceed image dimensions")
+    if not 0 <= stability_limit < change_limit:
+        raise ValueError("thresholds require 0 <= stability_limit < change_limit")
+
+    cells: list[VisualCellEvidence] = []
+    for row in range(rows):
+        top, bottom = row * height // rows, (row + 1) * height // rows
+        for column in range(columns):
+            left, right = column * width // columns, (column + 1) * width // columns
+            control_mae = float(
+                np.abs(
+                    arrays[1][top:bottom, left:right]
+                    - arrays[0][top:bottom, left:right]
+                ).mean()
+            )
+            intervention_mae = float(
+                np.abs(
+                    arrays[2][top:bottom, left:right]
+                    - arrays[1][top:bottom, left:right]
+                ).mean()
+            )
+            raw = f"visual-change:{rows}:{columns}:{row}:{column}"
+            cells.append(
+                VisualCellEvidence(
+                    object_id="obj_" + hashlib.blake2s(
+                        raw.encode(), digest_size=8
+                    ).hexdigest(),
+                    row=row,
+                    column=column,
+                    control_mae=control_mae,
+                    intervention_mae=intervention_mae,
+                )
+            )
+
+    stable_cells = tuple(
+        cell for cell in cells if cell.control_mae <= stability_limit
+    )
+    strongest = (
+        max(stable_cells, key=lambda cell: cell.intervention_mae)
+        if stable_cells
+        else min(cells, key=lambda cell: cell.control_mae)
+    )
+    changed = (
+        strongest.intervention_mae >= change_limit if stable_cells else None
+    )
+    confounded = any(
+        cell.control_mae > stability_limit
+        and cell.intervention_mae >= change_limit
+        for cell in cells
+    )
+    if changed is False and confounded:
+        changed = None
+    return GridChangeEvidence(
+        evidence=PixelChangeEvidence(
+            control_mae=strongest.control_mae,
+            intervention_mae=strongest.intervention_mae,
+            control_stable=changed is not None,
+            changed=changed,
+        ),
+        selected_cell_id=strongest.object_id if changed is True else None,
+        cells=tuple(cells),
+    )
 
 
 def successful_select_count(path: Path) -> int:
