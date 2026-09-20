@@ -132,6 +132,7 @@ action vocabulary:
 
 - `select` equips an opaque inventory object;
 - `look` applies a camera-only delta toward an opaque screen handle;
+- `move` holds one opaque locomotion control for an explicit number of frames;
 - `interact` digs an opaque block or attacks an opaque entity;
 - `place_input` equips its opaque input and uses an experimental fixture;
 - `activate` performs a distinct sneak-modulated fixture activation;
@@ -153,8 +154,11 @@ frames, an injected `PerceptionController` emits opaque detections and low-level
 actions, and only normalized `Observation`/`TransitionRecord` objects reach the
 scientist. Frame bytes become a digest plus dimensions; private controller state is
 never serialized. The adapter rejects non-opaque IDs and common semantic-name leaks.
-This contract is fake-simulator tested, but no claim of visual recognition accuracy
-is made until the isolated Linux/JDK8 simulator is run.
+This contract is fake-simulator tested and has also run against the isolated
+Linux/JDK8 simulator. Controlled evidence now covers opaque tool selection,
+anonymous change-region matching, active camera search, and one-direction
+closed-loop visual approach. These fixtures do not establish natural-scene object
+recognition, obstacle avoidance, cognitive mapping, or general path planning.
 
 ## Shared-evidence external evaluation
 

@@ -78,6 +78,29 @@ wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/pyt
 wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/audit_camera_search.py /mnt/d/minecraft-scientist/runs/camera-search-suite-seed30
 ```
 
+`navigation_benchmark.py` tests the next deliberately narrow layer: visual approach
+along a reset-controlled straight corridor. The controller exposes one opaque
+`MOVE` handle; its private binding maps to MineStudio's forward action, while the
+policy sees only RGB and repeats four-frame moves until the preregistered central
+salience score first reaches 150. The accepted `runs/navigation-suite-seed49`
+suite passed all 3/3 seeds. Each run stopped after seven moves, and independent
+position telemetry measured 7.504 blocks of displacement. The wrapper records the
+privileged source, strips all position fields before the adapter, and the RGB
+controller fails closed if any survive. The audit verifies both sides of that
+boundary and confirms that no `location_stats` or coordinate field appears in the
+Agent event log. It also recomputes every score from saved PNGs and checks the first
+threshold crossing, action duration and compliance, report hashes, preregistration
+hash, and five source snapshots.
+
+```powershell
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/navigation_benchmark.py --seed 49 --cases 3 --output /mnt/d/minecraft-scientist/runs/navigation-suite-seed49
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/audit_navigation.py /mnt/d/minecraft-scientist/runs/navigation-suite-seed49
+```
+
+This fixture proves closed-loop locomotion and visual stopping in one known-safe
+direction. It does not prove direction discovery, obstacle avoidance, mapping,
+free-form exploration, or path planning.
+
 MineStudio is deliberately excluded from the root `uv` environment. Its simulator
 documentation targets Linux, Python 3.10+, JDK 8, VirtualGL/Xvfb, and a separate
 Minecraft runtime; mixing those dependencies into the deterministic Windows test
@@ -119,7 +142,8 @@ tests establish visual recognition quality or general Minecraft performance.
 
 `GridVisualController` is the concrete dependency-free baseline. It exposes nine
 stable screen regions with mean-intensity/contrast features and opaque hotbar slots,
-then maps the scientific primitives to MineStudio's documented `env` action keys.
-It intentionally uses no labels or privileged voxel names. It can aim and interact
-with a reset-controlled fixture, but it is not an object detector or navigation
-policy; stronger vision models can implement the same `PerceptionController`.
+plus opt-in opaque movement handles, then maps the scientific primitives to
+MineStudio's documented `env` action keys. It intentionally uses no labels or
+privileged voxel names. It can aim, interact, and perform controlled locomotion in
+reset fixtures, but it is not an object detector or general navigation policy;
+stronger vision models can implement the same `PerceptionController`.

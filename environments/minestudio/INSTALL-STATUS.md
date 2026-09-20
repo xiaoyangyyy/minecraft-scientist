@@ -42,7 +42,7 @@ Remaining work:
 3. Replace screen-cell targeting with grounded perception before claiming visual
    scientific discovery. Simulator startup is not evidence of mechanism recovery.
 
-Latest verified controlled gate (2026-09-19):
+Latest verified controlled gate (2026-09-20):
 
 - Backend readiness reports Linux, MineStudio 1.1.6 and OpenJDK 1.8.0_502 ready.
 - `runs/active-visual-persistent-region-seeds22-23` completed two active discovery
@@ -55,10 +55,16 @@ Latest verified controlled gate (2026-09-19):
 - `runs/camera-search-suite-seed30` correctly selected all three preregistered yaw
   placements using 15/15 successful `LOOK` actions; PNG score recomputation and
   five-file source-snapshot audit pass.
-- Windows 122-test suite and Linux 48-test visual subset pass; lock check and both
+- `runs/navigation-suite-seed49` completed 3/3 real closed-loop corridor cases.
+  Each used seven four-frame `MOVE` actions and evaluator-only telemetry measured
+  7.504 blocks. Position fields were stripped before the adapter; the independent
+  audit passed every pixel, event, source-presence, non-leakage, hash and
+  displacement check.
+- Windows 128-test suite and Linux 54-test visual subset pass; lock check and both
   sdist/wheel builds pass. The offline MVP benchmark remains fully successful.
 - This is a controlled, fixture-bound result—not autonomous object grounding,
-  navigation, or a full visual Minecraft scientific-discovery benchmark.
+  multi-direction navigation, path planning, or a full visual Minecraft
+  scientific-discovery benchmark.
 
 Reproduction (PowerShell):
 

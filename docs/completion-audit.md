@@ -184,13 +184,28 @@ hashes. This proves controlled active viewpoint search, not unconstrained object
 detection, locomotion, or path planning. Evidence:
 `runs/camera-search-suite-seed30/{report.json,integrity-audit.json}`.
 
+The preregistered seed-49 navigation suite adds duration-aware opaque `MOVE`
+actions and a pixel-only closed-loop stopping rule in a straight fixture corridor.
+All 3/3 real MineStudio cases stopped on the first central-salience threshold
+crossing after seven four-frame moves. An evaluator-only location channel measured
+7.504 blocks of displacement per case. The simulator wrapper strips all position
+fields before the adapter, and RGB perception fails closed if any survive.
+Independent audit confirms that the privileged source existed while public Agent
+logs contain no coordinates; it also recomputes every score from the saved PNGs,
+verifies first-crossing behavior, all MOVE durations and compliance, report and
+preregistration hashes, source snapshots, and displacement.
+This proves controlled one-direction visual approach, not multi-direction
+navigation, obstacle avoidance, mapping, or path planning. Evidence:
+`runs/navigation-suite-seed49/{report.json,integrity-audit.json}`.
+
 The evaluator equipment check now fails closed on empty/missing telemetry as well
-as wrong items. Windows full regression passes 122 tests; Linux passes all 48
+as wrong items. Windows full regression passes 128 tests; Linux passes all 54
 visual adapter/evidence/active-learning/scope tests. The offline MVP benchmark
 still reports 1.0 hidden intervention accuracy and task success, 47 experiments,
 one-step change detection, eight revision experiments, three symbols and 13 reuse
-records. Remaining visual scope is explicit: fixture-provided identity and target
-crop, one material, two interventions, fixed camera and no autonomous navigation.
+records. Remaining visual scope is explicit: fixture-provided identity and
+controlled geometry, one material and narrow interventions, no natural-scene
+object recognition, multi-direction navigation, obstacle avoidance, or path planning.
 
 ## Latest release gate
 
@@ -209,9 +224,10 @@ Fabric build. Its separate live external baseline used non-thinking structured
 responses, provider-stateless storage semantics, public opaque evidence only, and
 hard call/token limits.
 
-The 2026-09-19 controlled visual gate additionally passed dependency-lock checking,
+The 2026-09-20 controlled visual/navigation gate additionally passed
+dependency-lock checking,
 Python sdist/wheel builds, WSL backend readiness (MineStudio 1.1.6, Python 3.11.16,
-OpenJDK 1.8.0_502), 122 Windows tests, 48 Linux visual tests, and the MVP benchmark.
+OpenJDK 1.8.0_502), 128 Windows tests, 54 Linux visual tests, and the MVP benchmark.
 The visual result remains scoped as documented above; it does not replace the
 structured-world evidence for hidden state machines or conversion chains.
 

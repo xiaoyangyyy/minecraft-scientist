@@ -80,10 +80,17 @@ class GridVisualController:
     rows: int = 3
     columns: int = 3
     hotbar_slots: int = 9
+    movement_controls: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.rows < 1 or self.columns < 1 or not 1 <= self.hotbar_slots <= 9:
             raise ValueError("grid dimensions must be positive and hotbar_slots in 1..9")
+        allowed_movement = {"forward", "back", "left", "right"}
+        if (
+            len(set(self.movement_controls)) != len(self.movement_controls)
+            or any(control not in allowed_movement for control in self.movement_controls)
+        ):
+            raise ValueError("movement controls must be unique cardinal env actions")
 
     def perceive(
         self, frame: np.ndarray, info: dict[str, Any], *, seed: int
@@ -95,6 +102,16 @@ class GridVisualController:
         height, width, _ = array.shape
         objects: list[ObjectObservation] = []
         bindings: dict[str, dict[str, Any]] = {}
+        for index, control in enumerate(self.movement_controls):
+            object_id = self._opaque(seed, "movement", index)
+            bindings[object_id] = {"kind": "movement", "control": control}
+            objects.append(
+                ObjectObservation(
+                    object_id=object_id,
+                    affordances=(ActionKind.MOVE,),
+                    observable_features={"motion_handle": True},
+                )
+            )
         for slot in range(1, self.hotbar_slots + 1):
             object_id = self._opaque(seed, "hotbar", slot)
             bindings[object_id] = {"kind": "hotbar", "slot": slot}
@@ -159,6 +176,9 @@ class GridVisualController:
         binding = bindings[action.target_id]
         if action.kind is ActionKind.SELECT and binding["kind"] == "hotbar":
             payload[f"hotbar.{int(binding['slot'])}"] = np.array(1)
+            return payload
+        if action.kind is ActionKind.MOVE and binding["kind"] == "movement":
+            payload[str(binding["control"])] = np.array(1)
             return payload
         if binding["kind"] != "cell":
             raise ValueError("action kind is incompatible with visual target")
@@ -316,9 +336,13 @@ class MineStudioVisualAdapter:
             complete_payload = noop()
             complete_payload.update(payload)
             payload = complete_payload
-        # WAIT is a duration, not a single simulator frame. Other actions remain
-        # single controller interventions (repeating camera deltas would drift).
-        requested_steps = action.ticks if action.kind is ActionKind.WAIT else 1
+        # WAIT and MOVE express frame durations. Other actions remain single
+        # controller interventions (repeating camera deltas would drift).
+        requested_steps = (
+            action.ticks
+            if action.kind in {ActionKind.WAIT, ActionKind.MOVE}
+            else 1
+        )
         reward = 0.0
         executed_steps = 0
         for _ in range(requested_steps):

@@ -24,3 +24,9 @@ def test_look_action_round_trips_through_public_schema() -> None:
     restored = PrimitiveAction.model_validate_json(action.model_dump_json())
     assert restored.kind is ActionKind.LOOK
     assert restored.target_id == "obj_view"
+
+
+def test_move_action_supports_explicit_duration() -> None:
+    action = PrimitiveAction(kind="move", target_id="obj_motion", ticks=6)
+    assert action.kind is ActionKind.MOVE
+    assert action.ticks == 6

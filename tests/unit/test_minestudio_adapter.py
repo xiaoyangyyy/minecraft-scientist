@@ -241,3 +241,98 @@ def test_grid_visual_controller_maps_pixels_to_env_actions_without_labels() -> N
     assert int(look["attack"]) == 0 and int(look["use"]) == 0
     assert np.any(look["camera"] != 0)
     assert int(activate["use"]) == 1 and int(activate["sneak"]) == 1
+
+
+def test_grid_visual_controller_exposes_opaque_movement_handles() -> None:
+    controller = GridVisualController(
+        rows=1,
+        columns=1,
+        hotbar_slots=1,
+        movement_controls=("forward", "left"),
+    )
+    scene = controller.perceive(np.zeros((8, 8, 3), dtype=np.uint8), {}, seed=9)
+    handles = [
+        item for item in scene.objects if item.affordances == (ActionKind.MOVE,)
+    ]
+
+    assert len(handles) == 2
+    assert all(item.object_id.startswith("obj_") for item in handles)
+    assert "forward" not in repr(handles) and "left" not in repr(handles)
+    payloads = [
+        controller.encode_action(
+            PrimitiveAction(kind=ActionKind.MOVE, target_id=item.object_id), scene
+        )
+        for item in handles
+    ]
+    assert {
+        key
+        for payload in payloads
+        for key in ("forward", "left")
+        if int(payload[key]) == 1
+    } == {"forward", "left"}
+    assert all(
+        int(payload["attack"]) == int(payload["use"]) == 0
+        for payload in payloads
+    )
+
+
+@pytest.mark.parametrize(
+    "controls",
+    [("forward", "forward"), ("jump",)],
+)
+def test_grid_visual_controller_rejects_invalid_movement_controls(controls) -> None:
+    with pytest.raises(ValueError, match="unique cardinal env actions"):
+        GridVisualController(movement_controls=controls)
+
+
+def test_move_repeats_requested_simulator_frames() -> None:
+    simulator = FakeSimulator()
+    controller = GridVisualController(
+        rows=1, columns=1, hotbar_slots=1, movement_controls=("forward",)
+    )
+    world = MineStudioVisualAdapter(
+        controller, simulator_factory=lambda config: simulator
+    )
+    world.reset(2)
+    handle = next(
+        item for item in world.observe().objects
+        if item.affordances == (ActionKind.MOVE,)
+    )
+
+    result = world.step(
+        PrimitiveAction(kind=ActionKind.MOVE, target_id=handle.object_id, ticks=4)
+    )
+
+    assert len(simulator.actions) == 4
+    assert result.event.duration == 4
+    assert result.intervention_compliance
+
+
+def test_move_stops_if_episode_ends_before_requested_duration() -> None:
+    class TerminalSimulator(FakeSimulator):
+        def step(self, action):
+            frame, reward, _, truncated, info = super().step(action)
+            return frame, reward, self.counter == 2, truncated, info
+
+    simulator = TerminalSimulator()
+    controller = GridVisualController(
+        rows=1, columns=1, hotbar_slots=1, movement_controls=("forward",)
+    )
+    world = MineStudioVisualAdapter(
+        controller, simulator_factory=lambda config: simulator
+    )
+    world.reset(3)
+    handle = next(
+        item
+        for item in world.observe().objects
+        if item.affordances == (ActionKind.MOVE,)
+    )
+
+    result = world.step(
+        PrimitiveAction(kind=ActionKind.MOVE, target_id=handle.object_id, ticks=4)
+    )
+
+    assert len(simulator.actions) == 2
+    assert result.event.duration == 2
+    assert not result.intervention_compliance
+    assert result.controller_failure == "episode_ended_before_requested_duration"

@@ -223,7 +223,17 @@ A separate preregistered seed-30 camera-search suite now exercises explicit
 selector found the fixture marker in all 3/3 independently seeded placements;
 15/15 camera actions passed, and the independent audit recomputed every score
 from the saved PNGs. This proves controlled active viewpoint search, while leaving
-free-form exploration and navigation open.
+free-form exploration, natural-scene detection, and path planning open.
+
+The preregistered seed-49 navigation suite adds an opaque `MOVE` handle and a
+closed-loop RGB stopping policy. In all 3/3 real MineStudio runs, the Agent stopped
+at the first preregistered central-view threshold crossing after seven four-frame
+moves. An evaluator-only telemetry channel independently measured 7.504 blocks of
+displacement in every case; those fields were stripped before the adapter. The
+audit recomputed every PNG score, verified all movement events, and confirmed that
+no coordinates entered the Agent event log.
+This is evidence for controlled straight-corridor visual approach, not arbitrary
+multi-direction navigation, obstacle avoidance, or general path planning.
 
 A concrete label-free `GridVisualController` maps opaque screen regions and hotbar
 slots to MineStudio env actions. Tests verify action translation and semantic
