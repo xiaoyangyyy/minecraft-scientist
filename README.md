@@ -244,7 +244,20 @@ indices (3 and 1), both matched evaluator-measured progress toward the target, a
 both completed the 7.504-block approach. The independent audit recomputed all
 calibration and approach PNG scores and confirmed no direction labels or coordinates
 entered public Agent artifacts. This is active visual motor calibration in a
-controlled corridor, not obstacle avoidance or general path planning.
+controlled corridor.
+
+The seed-88/89 obstacle-replanning suite adds a visible, physical fixture obstacle
+after the same four-handle RGB calibration. In each continuous execution episode,
+the Agent detects central obstacle-color occupancy, selects a learned lateral
+handle until the direct corridor is clear, follows the learned target handle past
+a preregistered safety gate, and recenters from the marker centroid. Both 2/2
+independently permuted cases passed: 7.594 blocks of target-axis progress, 2.584
+blocks of maximum lateral excursion, and 0.066 blocks of final lateral offset.
+The independent audit recomputed every calibration and route PNG, verified every
+MOVE event and source hash, confirmed the two paths never entered the obstacle
+volume, and found no direction or coordinate leakage in public artifacts. This is
+online visual detour selection around one color-coded fixture obstacle; it is not
+natural-scene obstacle recognition, a learned metric map, or general path planning.
 
 A concrete label-free `GridVisualController` maps opaque screen regions and hotbar
 slots to MineStudio env actions. Tests verify action translation and semantic

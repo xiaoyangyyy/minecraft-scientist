@@ -159,8 +159,12 @@ Linux/JDK8 simulator. Controlled evidence now covers opaque tool selection,
 anonymous change-region matching, active camera search, and one-direction
 closed-loop visual approach. A reset-controlled motor-calibration suite additionally
 tests four independently permuted opaque MOVE handles and selects the target-directed
-effect using RGB only. These fixtures do not establish natural-scene object
-recognition, online obstacle avoidance, cognitive mapping, or general path planning.
+effect using RGB only. A subsequent continuous-execution fixture uses the learned
+effects, a color-mask occupancy signal, and marker-centroid feedback to detour around
+one physical obstacle and recenter; evaluator-only coordinates audit collision-free
+geometry after the episode. These fixtures do not establish natural-scene object
+recognition, a learned metric cognitive map, arbitrary-layout route search, or
+general path planning.
 
 ## Shared-evidence external evaluation
 

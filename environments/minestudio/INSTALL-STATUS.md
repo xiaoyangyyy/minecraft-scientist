@@ -39,8 +39,9 @@ Remaining work:
    `runs/minestudio-adapter-smoke/report.json` and `events.jsonl`.
    The Windows default suite also passed all 82 tests after the wait-duration fix.
 2. Keep monitoring disk space before downloading additional models.
-3. Replace screen-cell targeting with grounded perception before claiming visual
-   scientific discovery. Simulator startup is not evidence of mechanism recovery.
+3. Generalize beyond the verified controlled fixtures before claiming natural-scene
+   object identity or open-world visual scientific discovery. Simulator startup by
+   itself is still not evidence of mechanism recovery.
 
 Latest verified controlled gate (2026-09-23):
 
@@ -65,11 +66,17 @@ Latest verified controlled gate (2026-09-23):
   RGB winners occupied different anonymous indices (3 and 1), matched evaluator
   goal progress, moved 7.504 blocks, and passed the full semantic/coordinate leak
   audit.
-- Windows 128-test suite and Linux 54-test visual subset pass; lock check and both
-  sdist/wheel builds pass. The offline MVP benchmark remains fully successful.
+- `runs/obstacle-replanning-suite-seed88-map940` passed 2/2 independently
+  permuted, continuous RGB-only detour cases. Each route advanced 7.594 blocks,
+  detoured 2.584 blocks laterally, returned within 0.066 blocks of center, avoided
+  the physical obstacle volume, and passed the full PNG/event/hash/non-leakage
+  audit.
+- Windows all-130-test suite passes; the full Linux suite records 128 passed and
+  two platform-specific skips. Lock check and both sdist/wheel builds pass. The
+  offline MVP benchmark remains fully successful.
 - This is a controlled, fixture-bound result—not autonomous object grounding,
-  online obstacle avoidance, route planning, or a full visual Minecraft
-  scientific-discovery benchmark.
+  natural-scene obstacle recognition, learned-map route planning, or a full visual
+  Minecraft scientific-discovery benchmark.
 
 Reproduction (PowerShell):
 

@@ -120,8 +120,32 @@ wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/pyt
 ```
 
 Calibration uses controlled resets and the execution phase repeats one selected
-control. It is evidence for active motor-effect discovery, not online obstacle
-avoidance, route replanning, or a general spatial cognitive map.
+control. It is evidence for active motor-effect discovery, not by itself online
+obstacle avoidance, route replanning, or a general spatial cognitive map.
+
+`obstacle_replanning_benchmark.py` builds on that calibration with a physical
+one-block-high, color-coded obstacle. Execution is one continuous episode: an RGB
+mask detects occupancy in the direct corridor, marker-centroid effects select a
+lateral handle, a preregistered seven-move clearance gate carries the Agent past
+the obstacle, and the opposite learned effect recenters it. The accepted
+`runs/obstacle-replanning-suite-seed88-map940` suite passed 2/2 independently
+permuted cases. Each route advanced 7.594 blocks, reached 2.584 blocks of lateral
+excursion, and finished within 0.066 blocks of its original centerline.
+`audit_obstacle_replanning.py` independently recomputes all saved PNG features,
+verifies every event and hash, checks that the execution events share one episode,
+proves from evaluator-only coordinates that the path never intersects the fixture
+volume, and confirms public artifacts contain no direction binding or coordinate.
+
+```powershell
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/obstacle_replanning_benchmark.py --seed 88 --mapping-seed 940 --mapping-seed-stride 3 --cases 2 --output /mnt/d/minecraft-scientist/runs/obstacle-replanning-suite-seed88-map940
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/audit_obstacle_replanning.py /mnt/d/minecraft-scientist/runs/obstacle-replanning-suite-seed88-map940
+```
+
+This result remains deliberately narrow. Motor calibration uses controlled resets;
+the obstacle cue is a preregistered fixture color; the clearance gate is fixed for
+this obstacle depth; and the camera remains fixed. It does not establish natural-
+scene obstacle recognition, arbitrary layouts, route search over a learned map, or
+a general spatial cognitive map.
 
 MineStudio is deliberately excluded from the root `uv` environment. Its simulator
 documentation targets Linux, Python 3.10+, JDK 8, VirtualGL/Xvfb, and a separate

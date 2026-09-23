@@ -31,7 +31,7 @@ treated as proof of live Minecraft behavior.
 | Live continuous equation curriculum | 3 opaque tokens, 10 heights, transfer 1.0, v1 superseded/v2 accepted | Complete on local Fabric server |
 | Offline baseline matrix | random, stateless context, Voyager-style skill memory, fixed DSL, full library over 10 seeds | Complete for documented offline scope |
 | Context-only/Voyager LLM harness | 20 shared-evidence pairs across tool/machine/transform: context 0.8000, Voyager 0.7280, symbolic 0.9646; 95% CIs and cost ledger | Complete for expanded DeepSeek evaluation |
-| MineStudio/visual observation path | opaque RGB adapter, grid controller; real Linux simulator reset + five no-op steps and visually inspected RGB image | Runtime verified; grounded visual mechanism discovery not complete |
+| MineStudio/visual observation path | opaque RGB adapter; controlled tool-region transfer, camera search, motor-effect discovery, and audited continuous obstacle detour in real Linux simulator | Complete for documented fixtures; natural-scene generalization open |
 | Trained planner in live Minecraft loop | `runs/minecraft-live-benchmark-learned`: 47 experiments, all metrics 1.0, checkpoint recorded in both sub-runs | Complete on local Fabric server |
 
 ## Current external gates
@@ -44,9 +44,10 @@ interventions. Planner efficiency intervals cross zero in this sample.
 1. An OpenAI-provider comparison remains optional and requires separate credentials
    and explicit cost authorization; the external-provider path is measured with
    DeepSeek rather than inferred from an offline substitute.
-2. MineStudio now launches in the installed WSL/Linux/JDK8 runtime. Grounded visual
-   perception and real visual discovery remain unverified; screen cells are not
-   persistent object identities.
+2. MineStudio now launches in the installed WSL/Linux/JDK8 runtime. Controlled
+   grounded change regions, camera search, movement-effect discovery, and one
+   obstacle-detour fixture are verified; natural-scene object identity and learned-
+   map generalization remain open.
 
 The local Fabric and DeepSeek external-LLM paths are empirically verified.
 MineStudio visual results remain a separate optional gate and are not substituted
@@ -212,14 +213,28 @@ This proves reset-controlled active visual motor-effect discovery, not online
 obstacle avoidance, route replanning, or a general spatial cognitive map. Evidence:
 `runs/direction-discovery-suite-seed62-map700/{report.json,integrity-audit-v2.json}`.
 
+The preregistered seed-88/89 obstacle-replanning suite adds one physical,
+color-coded obstacle and a single continuous execution episode after reset-based
+motor calibration. The RGB-only policy detects central occupancy, selects a learned
+lateral effect, satisfies a seven-move bypass safety gate, and recenters from marker
+centroid feedback. Both 2/2 independent control mappings passed with 7.594 blocks
+of goal-axis progress, 2.584 blocks of maximum lateral excursion, and 0.066 blocks
+of final lateral offset. Independent audit recomputes all calibration and route PNG
+features, verifies events, episode continuity, hashes, privileged-source presence
+and public non-leakage, and proves the evaluator path never enters the obstacle
+volume. This proves fixture-bound online detour selection, not natural-scene
+obstacle recognition, arbitrary-layout search, or a general cognitive map. Evidence:
+`runs/obstacle-replanning-suite-seed88-map940/{report.json,integrity-audit.json}`.
+
 The evaluator equipment check now fails closed on empty/missing telemetry as well
-as wrong items. Windows full regression passes 128 tests; Linux passes all 54
-visual adapter/evidence/active-learning/scope tests. The offline MVP benchmark
+as wrong items. Windows full regression passes all 130 tests; the full Linux suite
+records 128 passed and two platform-specific skips. The offline MVP benchmark
 still reports 1.0 hidden intervention accuracy and task success, 47 experiments,
 one-step change detection, eight revision experiments, three symbols and 13 reuse
 records. Remaining visual scope is explicit: fixture-provided identity and
 controlled geometry, one material and narrow interventions, no natural-scene
-object recognition, multi-direction navigation, obstacle avoidance, or path planning.
+object recognition, arbitrary-layout navigation, learned-map routing, or general
+path planning.
 
 ## Latest release gate
 
@@ -238,10 +253,11 @@ Fabric build. Its separate live external baseline used non-thinking structured
 responses, provider-stateless storage semantics, public opaque evidence only, and
 hard call/token limits.
 
-The 2026-09-23 controlled visual/navigation gate additionally passed
+The 2026-09-23 controlled visual/navigation/replanning gate additionally passed
 dependency-lock checking,
 Python sdist/wheel builds, WSL backend readiness (MineStudio 1.1.6, Python 3.11.16,
-OpenJDK 1.8.0_502), 128 Windows tests, 54 Linux visual tests, and the MVP benchmark.
+OpenJDK 1.8.0_502), all 130 Windows tests, the full Linux suite with 128 passed and
+two platform-specific skips, and the MVP benchmark.
 The visual result remains scoped as documented above; it does not replace the
 structured-world evidence for hidden state machines or conversion chains.
 

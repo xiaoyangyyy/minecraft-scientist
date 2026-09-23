@@ -1,17 +1,18 @@
-from dataclasses import asdict
 import json
+from dataclasses import asdict
 
 import numpy as np
 import pytest
 
 from minecraft_scientist.minecraft.visual_evidence import (
-    compare_regions,
     central_view_salience,
+    compare_regions,
     hud_safe_view,
+    largest_achromatic_region,
     load_grounding_evidence,
     localize_change_grid,
-    visual_region_iou,
     verify_equipment_trace,
+    visual_region_iou,
 )
 
 
@@ -151,6 +152,28 @@ def test_central_view_salience_is_symmetric_around_original_frame_center():
     frame[4:12, 2:6] = 255
 
     assert central_view_salience(frame) == 180.0
+
+
+def test_largest_achromatic_region_returns_connected_geometry():
+    frame = np.zeros((100, 100, 3), dtype=np.uint8)
+    frame[20:50, 35:65] = 180
+    frame[25:30, 80:85] = 220
+
+    region = largest_achromatic_region(frame)
+
+    assert region is not None
+    assert region.pixel_count == 900
+    assert (region.left, region.top, region.right, region.bottom) == (35, 20, 64, 49)
+    assert region.centroid_x == 49.5
+    assert region.centroid_y == 34.5
+
+
+def test_largest_achromatic_region_rejects_chromatic_and_hud_pixels():
+    frame = np.zeros((100, 100, 3), dtype=np.uint8)
+    frame[20:40, 35:55] = (200, 20, 20)
+    frame[80:95, 35:65] = 200
+
+    assert largest_achromatic_region(frame) is None
 
 
 def test_grounding_artifact_round_trip_is_strict(tmp_path):

@@ -1,9 +1,9 @@
 """Conservative pixel change evidence; does not infer semantic action success."""
-from dataclasses import dataclass
 import hashlib
 import json
+from collections.abc import Iterable
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 import numpy as np
 
@@ -55,6 +55,19 @@ class GridChangeEvidence:
     cells: tuple[VisualCellEvidence, ...]
     selected_region_id: str | None = None
     regions: tuple[VisualChangeRegion, ...] = ()
+
+
+@dataclass(frozen=True)
+class VisualRegionGeometry:
+    """Geometry of one image-derived region, expressed without a class label."""
+
+    pixel_count: int
+    centroid_x: float
+    centroid_y: float
+    left: int
+    top: int
+    right: int
+    bottom: int
 
 
 def visual_region_iou(
@@ -188,6 +201,90 @@ def central_view_salience(frame: np.ndarray) -> float:
         width * 3 // 8:width * 5 // 8,
     ]
     return float(center.mean())
+
+
+def largest_achromatic_region(
+    frame: np.ndarray,
+    *,
+    luminance_floor: float = 100.0,
+    chroma_ceiling: float = 18.0,
+    top_fraction: float = 0.08,
+    bottom_fraction: float = 0.62,
+    side_fraction: float = 0.12,
+) -> VisualRegionGeometry | None:
+    """Locate the largest bright, low-chroma component in the world view.
+
+    This is deliberately a label-free fixture primitive: it has no knowledge of
+    blocks, goals, or movement directions.  Cropping removes the HUD and extreme
+    image edges, while connected-component selection prevents small bright scenery
+    fragments from being merged into the returned geometry.
+    """
+
+    array = np.asarray(frame, dtype=float)
+    if array.ndim != 3 or array.shape[2] < 3 or not array.size:
+        raise ValueError("frame must be a nonempty RGB-like image")
+    if not np.isfinite(array).all():
+        raise ValueError("frame must contain finite values")
+    if luminance_floor < 0 or chroma_ceiling < 0:
+        raise ValueError("color thresholds must be nonnegative")
+    if not 0 <= top_fraction < bottom_fraction <= 1:
+        raise ValueError("vertical crop fractions are invalid")
+    if not 0 <= side_fraction < 0.5:
+        raise ValueError("side fraction must be in [0, 0.5)")
+
+    height, width = array.shape[:2]
+    top = int(height * top_fraction)
+    bottom = int(height * bottom_fraction)
+    left = int(width * side_fraction)
+    right = int(width * (1 - side_fraction))
+    rgb = array[:, :, :3]
+    luminance = rgb.mean(axis=2)
+    chroma = rgb.max(axis=2) - rgb.min(axis=2)
+    mask = (luminance > luminance_floor) & (chroma < chroma_ceiling)
+    cropped = np.zeros_like(mask)
+    cropped[top:bottom, left:right] = mask[top:bottom, left:right]
+
+    seen = np.zeros_like(cropped, dtype=bool)
+    largest: list[tuple[int, int]] = []
+    for seed_y, seed_x in zip(*np.where(cropped), strict=True):
+        if seen[seed_y, seed_x]:
+            continue
+        seen[seed_y, seed_x] = True
+        pending = [(int(seed_y), int(seed_x))]
+        component: list[tuple[int, int]] = []
+        while pending:
+            y, x = pending.pop()
+            component.append((y, x))
+            for candidate_y, candidate_x in (
+                (y - 1, x),
+                (y + 1, x),
+                (y, x - 1),
+                (y, x + 1),
+            ):
+                if (
+                    0 <= candidate_y < height
+                    and 0 <= candidate_x < width
+                    and cropped[candidate_y, candidate_x]
+                    and not seen[candidate_y, candidate_x]
+                ):
+                    seen[candidate_y, candidate_x] = True
+                    pending.append((candidate_y, candidate_x))
+        if len(component) > len(largest):
+            largest = component
+
+    if not largest:
+        return None
+    ys = np.fromiter((item[0] for item in largest), dtype=float)
+    xs = np.fromiter((item[1] for item in largest), dtype=float)
+    return VisualRegionGeometry(
+        pixel_count=len(largest),
+        centroid_x=float(xs.mean()),
+        centroid_y=float(ys.mean()),
+        left=int(xs.min()),
+        top=int(ys.min()),
+        right=int(xs.max()),
+        bottom=int(ys.max()),
+    )
 
 
 def localize_change_grid(
