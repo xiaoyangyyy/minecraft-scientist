@@ -98,8 +98,30 @@ wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/pyt
 ```
 
 This fixture proves closed-loop locomotion and visual stopping in one known-safe
-direction. It does not prove direction discovery, obstacle avoidance, mapping,
-free-form exploration, or path planning.
+direction. By itself it does not prove direction discovery, obstacle avoidance,
+mapping, free-form exploration, or path planning.
+
+`direction_discovery_benchmark.py` removes the known-direction assumption. Each
+case uses a world seed and an independently generated mapping seed to permute four
+opaque MOVE handles. The RGB-only policy tests every handle in a reset-identical
+trial, chooses the unique maximum salience improvement, then repeats that handle in
+a fresh approach episode. The accepted
+`runs/direction-discovery-suite-seed62-map700` suite passed 2/2 cases; winners were
+at different anonymous indices (3 and 1), matched evaluator-recomputed positive
+target-axis progress, stopped at the first threshold crossing, and displaced 7.504
+blocks. `audit_direction_discovery.py` independently recomputes every calibration
+and trajectory PNG, checks all MOVE events and private control permutations, verifies
+world/mapping seed separation and source hashes, and proves public artifacts contain
+neither direction semantics nor coordinates.
+
+```powershell
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/direction_discovery_benchmark.py --seed 62 --mapping-seed 700 --mapping-seed-stride 2 --cases 2 --output /mnt/d/minecraft-scientist/runs/direction-discovery-suite-seed62-map700
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/audit_direction_discovery.py /mnt/d/minecraft-scientist/runs/direction-discovery-suite-seed62-map700
+```
+
+Calibration uses controlled resets and the execution phase repeats one selected
+control. It is evidence for active motor-effect discovery, not online obstacle
+avoidance, route replanning, or a general spatial cognitive map.
 
 MineStudio is deliberately excluded from the root `uv` environment. Its simulator
 documentation targets Linux, Python 3.10+, JDK 8, VirtualGL/Xvfb, and a separate

@@ -235,6 +235,17 @@ no coordinates entered the Agent event log.
 This is evidence for controlled straight-corridor visual approach, not arbitrary
 multi-direction navigation, obstacle avoidance, or general path planning.
 
+The stronger preregistered seed-62/63 direction-discovery suite removes the known
+safe-handle assumption. For each case it independently permutes four opaque MOVE
+handles, probes every handle in reset-identical RGB trials, selects the unique
+largest visual improvement, and then approaches with that handle. World seeds and
+mapping seeds are independent; the two winners occupied different anonymous list
+indices (3 and 1), both matched evaluator-measured progress toward the target, and
+both completed the 7.504-block approach. The independent audit recomputed all
+calibration and approach PNG scores and confirmed no direction labels or coordinates
+entered public Agent artifacts. This is active visual motor calibration in a
+controlled corridor, not obstacle avoidance or general path planning.
+
 A concrete label-free `GridVisualController` maps opaque screen regions and hotbar
 slots to MineStudio env actions. Tests verify action translation and semantic
 isolation; the accepted live experiment additionally audits successful opaque

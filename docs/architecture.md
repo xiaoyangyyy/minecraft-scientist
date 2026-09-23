@@ -157,8 +157,10 @@ never serialized. The adapter rejects non-opaque IDs and common semantic-name le
 This contract is fake-simulator tested and has also run against the isolated
 Linux/JDK8 simulator. Controlled evidence now covers opaque tool selection,
 anonymous change-region matching, active camera search, and one-direction
-closed-loop visual approach. These fixtures do not establish natural-scene object
-recognition, obstacle avoidance, cognitive mapping, or general path planning.
+closed-loop visual approach. A reset-controlled motor-calibration suite additionally
+tests four independently permuted opaque MOVE handles and selects the target-directed
+effect using RGB only. These fixtures do not establish natural-scene object
+recognition, online obstacle avoidance, cognitive mapping, or general path planning.
 
 ## Shared-evidence external evaluation
 

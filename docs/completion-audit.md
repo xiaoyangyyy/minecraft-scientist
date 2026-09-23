@@ -198,6 +198,20 @@ This proves controlled one-direction visual approach, not multi-direction
 navigation, obstacle avoidance, mapping, or path planning. Evidence:
 `runs/navigation-suite-seed49/{report.json,integrity-audit.json}`.
 
+The preregistered seed-62/63 motor-calibration suite removes the known-safe-handle
+assumption. Four low-level controls are independently permuted behind opaque MOVE
+handles using mapping seeds separate from world seeds. The Agent probes every handle
+from reset-identical RGB states, selects the unique maximum visual improvement, and
+uses it in a fresh closed-loop approach. Both 2/2 cases matched evaluator-recomputed
+positive target-axis progress, displaced 7.504 blocks, and stopped at the first
+threshold crossing; selected anonymous indices differed (3 and 1), excluding a
+fixed-index shortcut. Independent audit recomputes every calibration and approach
+PNG, verifies all action events, private permutations, hashes and privileged-source
+presence, and confirms public artifacts contain no direction label or coordinate.
+This proves reset-controlled active visual motor-effect discovery, not online
+obstacle avoidance, route replanning, or a general spatial cognitive map. Evidence:
+`runs/direction-discovery-suite-seed62-map700/{report.json,integrity-audit-v2.json}`.
+
 The evaluator equipment check now fails closed on empty/missing telemetry as well
 as wrong items. Windows full regression passes 128 tests; Linux passes all 54
 visual adapter/evidence/active-learning/scope tests. The offline MVP benchmark
@@ -224,7 +238,7 @@ Fabric build. Its separate live external baseline used non-thinking structured
 responses, provider-stateless storage semantics, public opaque evidence only, and
 hard call/token limits.
 
-The 2026-09-20 controlled visual/navigation gate additionally passed
+The 2026-09-23 controlled visual/navigation gate additionally passed
 dependency-lock checking,
 Python sdist/wheel builds, WSL backend readiness (MineStudio 1.1.6, Python 3.11.16,
 OpenJDK 1.8.0_502), 128 Windows tests, 54 Linux visual tests, and the MVP benchmark.
