@@ -24,6 +24,7 @@ from PIL import Image
 
 from minecraft_scientist.cognitive_map import VisualTopologicalMap
 from minecraft_scientist.minecraft import MineStudioVisualAdapter
+from minecraft_scientist.minecraft.visual_evidence import layout_landmark_signature
 from minecraft_scientist.protocols import ActionKind, PrimitiveAction
 
 
@@ -54,6 +55,8 @@ def run_replay(
     score_threshold: float,
     center_tolerance: float,
     obstacle_passed_pixels: int,
+    obstacle_offset: int,
+    signature_mode: str,
     output: Path,
 ) -> tuple[dict, dict]:
     output.mkdir(parents=True, exist_ok=False)
@@ -64,7 +67,10 @@ def run_replay(
     with MineStudioVisualAdapter(
         recorder,
         simulator_factory=lambda config: obstacle_factory(
-            config, audit, obstacle=True
+            config,
+            audit,
+            obstacle=True,
+            obstacle_offset=obstacle_offset,
         ),
     ) as world:
         world.reset(seed)
@@ -87,7 +93,12 @@ def run_replay(
             return item
 
         initial = observe(0, None)
-        source_signature = landmark_signature(initial)
+        signature_function = (
+            layout_landmark_signature
+            if signature_mode == "layout"
+            else landmark_signature
+        )
+        source_signature = signature_function(initial)
         matched_source_id = topology.match(source_signature)
         plan = topology.plan(source_signature, target_id)
         if plan is None:
@@ -167,6 +178,10 @@ def main() -> None:
     parser.add_argument("--score-threshold", type=float, default=150.0)
     parser.add_argument("--center-tolerance", type=float, default=6.0)
     parser.add_argument("--obstacle-passed-pixels", type=int, default=80)
+    parser.add_argument("--obstacle-offset", type=int, choices=(-1, 0, 1), default=0)
+    parser.add_argument(
+        "--signature-mode", choices=("legacy", "layout"), default="legacy"
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
@@ -201,6 +216,8 @@ def main() -> None:
         score_threshold=args.score_threshold,
         center_tolerance=args.center_tolerance,
         obstacle_passed_pixels=args.obstacle_passed_pixels,
+        obstacle_offset=args.obstacle_offset,
+        signature_mode=args.signature_mode,
         output=args.output / "replay",
     )
 
@@ -223,6 +240,8 @@ def main() -> None:
     evaluator = {
         "seed": args.seed,
         "mapping_seed": args.mapping_seed,
+        "obstacle_offset": args.obstacle_offset,
+        "signature_mode": args.signature_mode,
         "mapping_sha256": hashlib.sha256(
             json.dumps(private_trials, sort_keys=True).encode("utf-8")
         ).hexdigest(),
@@ -230,7 +249,10 @@ def main() -> None:
         "replay": private_replay,
         "fixture": {
             "goal_axis": "positive_z",
-            "obstacle_center_x_relative_to_start": [-1.5, 1.5],
+            "obstacle_center_x_relative_to_start": [
+                args.obstacle_offset - 1.5,
+                args.obstacle_offset + 1.5,
+            ],
             "obstacle_center_z_relative_to_start": [2.5, 4.5],
         },
     }
@@ -242,6 +264,8 @@ def main() -> None:
     report = {
         "seed": args.seed,
         "mapping_seed": args.mapping_seed,
+        "obstacle_offset": args.obstacle_offset,
+        "signature_mode": args.signature_mode,
         "backend": "real-minestudio",
         "map_sha256": hashlib.sha256(args.map.read_bytes()).hexdigest(),
         "roles": roles,

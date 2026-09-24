@@ -169,7 +169,12 @@ suite reloads one learned route and rebinds it to two independently permuted con
 maps; both evaluator paths avoid the obstacle. This is a coordinate-free topological
 memory for a controlled two-landmark fixture. These fixtures do not establish
 natural-scene object recognition, metric SLAM, arbitrary-layout route search, or
-general path planning.
+general path planning. The map's second format uses a `MultiDiGraph`, retaining
+competing programs between the same landmarks and choosing by confidence-adjusted
+cost. Landmark matching rejects equidistant/near-ambiguous candidates. A two-layout
+real-simulator suite learns mirror-image obstacle routes into one 3-node/2-edge map,
+selects the correct branch in held-out episodes, and rejects an unseen intermediate
+signature; it remains a fixed-camera controlled-fixture result.
 
 ## Shared-evidence external evaluation
 

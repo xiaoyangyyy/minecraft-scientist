@@ -76,7 +76,12 @@ Latest verified controlled gate (2026-09-23):
   Both replays used zero online route-exploration actions, followed the exact learned
   13-role program, avoided the obstacle, and passed the independent PNG/event/map/
   path/hash/non-leakage audit.
-- Windows all-135-test suite passes; the full Linux suite records 133 passed and
+- `runs/layout-route-branching-seed140-map1400` learned mirror-image programs for
+  two offset-obstacle layouts in one 3-node/2-edge map. Two held-out mappings
+  selected the correct branch with zero online exploration; a between-layout
+  signature was rejected, both dynamic paths avoided collision, and the independent
+  audit reports `valid=true`.
+- Windows all-140-test suite passes; the full Linux suite records 138 passed and
   two platform-specific skips. Lock check and both sdist/wheel builds pass. The
   offline MVP benchmark remains fully successful.
 - This is a controlled, fixture-bound result—not autonomous object grounding,

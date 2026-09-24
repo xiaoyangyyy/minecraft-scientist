@@ -9,11 +9,36 @@ from minecraft_scientist.minecraft.visual_evidence import (
     compare_regions,
     hud_safe_view,
     largest_achromatic_region,
+    layout_landmark_signature,
     load_grounding_evidence,
     localize_change_grid,
     verify_equipment_trace,
     visual_region_iou,
 )
+
+
+def test_layout_landmark_signature_distinguishes_central_obstacle_position():
+    base = {
+        "marker": {"centroid_x": 112.0, "pixel_count": 4000},
+        "central_obstacle_pixels": 1800,
+        "salience": 115.0,
+    }
+    left = {**base, "obstacle": {"centroid_x": 88.0, "pixel_count": 4000}}
+    right = {**base, "obstacle": {"centroid_x": 136.0, "pixel_count": 4000}}
+
+    assert layout_landmark_signature(left) != layout_landmark_signature(right)
+
+
+def test_layout_landmark_signature_ignores_peripheral_red_noise():
+    features = {
+        "marker": {"centroid_x": 112.0, "pixel_count": 20_000},
+        "obstacle": {"centroid_x": 180.0, "pixel_count": 150},
+        "central_obstacle_pixels": 0,
+        "salience": 180.0,
+    }
+    clean = {**features, "obstacle": None}
+
+    assert layout_landmark_signature(features) == layout_landmark_signature(clean)
 
 
 def test_stable_control_distinguishes_change_from_no_change():

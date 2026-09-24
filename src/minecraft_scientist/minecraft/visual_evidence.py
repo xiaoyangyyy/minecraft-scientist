@@ -8,6 +8,33 @@ from pathlib import Path
 import numpy as np
 
 
+def layout_landmark_signature(features: dict) -> tuple[int, ...]:
+    """Quantize a route view while ignoring peripheral color false positives.
+
+    The caller supplies only Agent-visible image features. A colored component is
+    treated as layout-defining only while it occupies the central corridor; this
+    prevents unrelated edge pixels seen later in a route from changing the goal
+    landmark. No metric world position or semantic object label is consumed.
+    """
+
+    marker = features.get("marker")
+    if not isinstance(marker, dict):
+        raise TypeError("route landmark requires visible marker geometry")
+    central_pixels = int(features.get("central_obstacle_pixels", 0))
+    obstacle = features.get("obstacle")
+    layout_visible = isinstance(obstacle, dict) and central_pixels >= 200
+    try:
+        return (
+            int(layout_visible),
+            int(obstacle["centroid_x"] // 8) if layout_visible else -1,
+            min(12, central_pixels // 200),
+            int(marker["centroid_x"] // 8),
+            int(marker["pixel_count"] // 500),
+        )
+    except (KeyError, TypeError, ValueError, ZeroDivisionError) as error:
+        raise ValueError("route landmark features are incomplete or invalid") from error
+
+
 @dataclass(frozen=True)
 class PixelChangeEvidence:
     control_mae: float

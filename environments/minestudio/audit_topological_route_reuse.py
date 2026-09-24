@@ -391,7 +391,7 @@ def main() -> None:
         "source_snapshot_complete": bool(source_snapshot)
         and all(item["valid"] for item in source_snapshot),
         "map_schema_strictly_loaded": map_payload["format_version"]
-        == VisualTopologicalMap.FORMAT_VERSION,
+        in {1, VisualTopologicalMap.FORMAT_VERSION},
         "map_hash_matches_suite": digest(map_path) == suite["map_sha256"],
         "source": source_audit,
         "source_valid": source_valid,

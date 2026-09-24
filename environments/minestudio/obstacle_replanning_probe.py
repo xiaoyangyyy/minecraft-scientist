@@ -38,7 +38,13 @@ def save_events(path: Path, records) -> None:
     )
 
 
-def obstacle_factory(config, audit: PositionAudit, *, obstacle: bool):
+def obstacle_factory(
+    config,
+    audit: PositionAudit,
+    *,
+    obstacle: bool,
+    obstacle_offset: int = 0,
+):
     commands = [
         "/gamerule sendCommandFeedback false",
         "/gamerule announceAdvancements false",
@@ -56,8 +62,11 @@ def obstacle_factory(config, audit: PositionAudit, *, obstacle: bool):
         "/execute at @p align xyz run fill ~-2 ~1 ~10 ~2 ~5 ~10 minecraft:white_wool",
     ]
     if obstacle:
+        left = obstacle_offset - 1
+        right = obstacle_offset + 1
         commands.append(
-            "/execute at @p align xyz run fill ~-1 ~ ~3 ~1 ~ ~4 minecraft:red_concrete"
+            "/execute at @p align xyz run fill "
+            f"~{left} ~ ~3 ~{right} ~ ~4 minecraft:red_concrete"
         )
     commands.extend((
         "/execute at @p align xyz run tp @p ~0.5 ~ ~0.5 0 0",
@@ -245,6 +254,7 @@ def run_route(
     max_bypass_moves: int,
     max_recenter_moves: int,
     max_final_moves: int,
+    obstacle_offset: int,
     output: Path,
 ) -> tuple[dict, dict]:
     output.mkdir(parents=True, exist_ok=False)
@@ -255,7 +265,12 @@ def run_route(
     private_actions = []
     with MineStudioVisualAdapter(
         recorder,
-        simulator_factory=lambda config: obstacle_factory(config, audit, obstacle=True),
+        simulator_factory=lambda config: obstacle_factory(
+            config,
+            audit,
+            obstacle=True,
+            obstacle_offset=obstacle_offset,
+        ),
     ) as world:
         world.reset(seed)
         for _ in range(2):
@@ -298,13 +313,17 @@ def run_route(
         initial_obstacle_area = (
             current["obstacle"]["pixel_count"] if current["obstacle"] else 0
         )
+        obstacle_center = current["obstacle"]["centroid_x"]
+        detour_role = (
+            "positive_shift" if obstacle_center > marker_center else "negative_shift"
+        )
 
         detour_moves = 0
         while (
             current["central_obstacle_pixels"] >= central_clear_pixels
             and detour_moves < max_detour_moves
         ):
-            current = move(roles["negative_shift"], "detour")
+            current = move(roles[detour_role], "detour")
             detour_moves += 1
 
         bypass_moves = 0
@@ -334,7 +353,7 @@ def run_route(
                 and current["obstacle"]["pixel_count"] >= obstacle_passed_pixels
                 and detour_moves + extra_detour_moves < max_detour_moves
             ):
-                current = move(roles["negative_shift"], "local-replan")
+                current = move(roles[detour_role], "local-replan")
                 extra_detour_moves += 1
                 marker = current["marker"]
             previous_marker = marker
@@ -380,6 +399,7 @@ def run_route(
     public = {
         "initial_obstacle_pixels": initial_obstacle_pixels,
         "initial_obstacle_area": initial_obstacle_area,
+        "detour_role": detour_role,
         "detour_moves": detour_moves,
         "extra_detour_moves": extra_detour_moves,
         "bypass_moves": bypass_moves,
@@ -430,6 +450,7 @@ def main() -> None:
     parser.add_argument("--max-bypass-moves", type=int, default=12)
     parser.add_argument("--max-recenter-moves", type=int, default=8)
     parser.add_argument("--max-final-moves", type=int, default=12)
+    parser.add_argument("--obstacle-offset", type=int, choices=(-1, 0, 1), default=0)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if min(
@@ -481,6 +502,7 @@ def main() -> None:
         max_bypass_moves=args.max_bypass_moves,
         max_recenter_moves=args.max_recenter_moves,
         max_final_moves=args.max_final_moves,
+        obstacle_offset=args.obstacle_offset,
         output=args.output / "route",
     )
 
@@ -513,7 +535,10 @@ def main() -> None:
         "route": private_route,
         "fixture": {
             "goal_axis": "positive_z",
-            "obstacle_center_x_relative_to_start": [-1.5, 1.5],
+            "obstacle_center_x_relative_to_start": [
+                args.obstacle_offset - 1.5,
+                args.obstacle_offset + 1.5,
+            ],
             "obstacle_center_z_relative_to_start": [2.5, 4.5],
         },
     }
@@ -535,6 +560,7 @@ def main() -> None:
     report = {
         "seed": args.seed,
         "mapping_seed": args.mapping_seed,
+        "obstacle_offset": args.obstacle_offset,
         "backend": "real-minestudio",
         "roles": roles,
         "calibration_valid": calibration_valid,

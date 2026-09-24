@@ -173,6 +173,31 @@ on reset-based per-episode motor calibration, a fixed camera, a color-coded obst
 and a route learned in the same geometry. It is not metric SLAM, natural-scene place
 recognition, route search across multiple layouts, or open-world navigation.
 
+`layout_route_branching_benchmark.py` upgrades the map to format version 2 and a
+multi-edge graph. Two source episodes place the same physical obstacle one block to
+opposite sides of the direct corridor. Their RGB geometry learns mirror-image route
+programs and distinct opaque start landmarks that share one goal landmark. The
+accepted `runs/layout-route-branching-seed140-map1400` suite then presents those
+layouts in reverse order under two new opaque-control permutations. Both held-out
+episodes select the correct stored branch with zero online route exploration,
+advance 7.594 blocks, reach 1.720 blocks of lateral excursion, return within 0.066
+blocks of center, and avoid the evaluator-only obstacle bounds. A synthetic visual
+signature centered between the two learned layout bins is rejected. The map also
+fails closed on equidistant landmarks and can retain competing programs between the
+same nodes; version-1 maps remain loadable.
+
+```powershell
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/layout_route_branching_benchmark.py --seed 140 --mapping-seed 1400 --output /mnt/d/minecraft-scientist/runs/layout-route-branching-seed140-map1400
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/audit_layout_route_branching.py /mnt/d/minecraft-scientist/runs/layout-route-branching-seed140-map1400
+```
+
+The independent audit recomputes both source programs and all held-out RGB
+features, verifies branch selection and current-episode handle binding, checks the
+dynamic obstacle volumes, validates the 3-node/2-edge map and unknown rejection,
+and confirms no layout offset, coordinates, raw direction binding, or source motor
+handle enters Agent artifacts. This remains two preregistered offsets of one
+fixture—not arbitrary obstacle geometry, a large-scale place graph, or SLAM.
+
 MineStudio is deliberately excluded from the root `uv` environment. Its simulator
 documentation targets Linux, Python 3.10+, JDK 8, VirtualGL/Xvfb, and a separate
 Minecraft runtime; mixing those dependencies into the deterministic Windows test

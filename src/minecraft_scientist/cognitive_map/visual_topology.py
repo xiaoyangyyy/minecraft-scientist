@@ -90,13 +90,21 @@ class VisualRoutePlan(BaseModel):
 class VisualTopologicalMap:
     """Persistent coordinate-free graph of visual landmarks and route programs."""
 
-    FORMAT_VERSION = 1
+    FORMAT_VERSION = 2
 
-    def __init__(self, *, match_tolerance: float = 0.0) -> None:
+    def __init__(
+        self,
+        *,
+        match_tolerance: float = 0.0,
+        ambiguity_margin: float = 0.0,
+    ) -> None:
         if not math.isfinite(match_tolerance) or match_tolerance < 0:
             raise ValueError("match_tolerance must be finite and nonnegative")
+        if not math.isfinite(ambiguity_margin) or ambiguity_margin < 0:
+            raise ValueError("ambiguity_margin must be finite and nonnegative")
         self.match_tolerance = float(match_tolerance)
-        self.graph: nx.DiGraph = nx.DiGraph()
+        self.ambiguity_margin = float(ambiguity_margin)
+        self.graph: nx.MultiDiGraph = nx.MultiDiGraph()
 
     @staticmethod
     def node_id_for(signature: Iterable[int]) -> str:
@@ -141,7 +149,15 @@ class VisualTopologicalMap:
             ))
             if distance <= self.match_tolerance:
                 candidates.append((distance, node_id))
-        return min(candidates, default=(0.0, None))[1]
+        candidates.sort()
+        if not candidates:
+            return None
+        if (
+            len(candidates) > 1
+            and candidates[1][0] - candidates[0][0] <= self.ambiguity_margin
+        ):
+            return None
+        return candidates[0][1]
 
     def record_route(
         self,
@@ -166,13 +182,9 @@ class VisualTopologicalMap:
             [source_id, target_id, roles], separators=(",", ":")
         ).encode("utf-8")
         route_id = "route_" + hashlib.blake2s(identity, digest_size=8).hexdigest()
-        existing = self.graph.get_edge_data(source_id, target_id)
+        existing = self.graph.get_edge_data(source_id, target_id, key=route_id)
         if existing is not None:
             previous: VisualRoute = existing["data"]
-            if previous.route_id != route_id:
-                raise ValueError(
-                    "a different program already connects these landmarks"
-                )
             trials = previous.trials + 1
             successes = previous.successes + int(success)
             mean_cost = (
@@ -191,7 +203,7 @@ class VisualTopologicalMap:
             successes=successes,
             mean_cost=mean_cost,
         )
-        self.graph.add_edge(source_id, target_id, data=route)
+        self.graph.add_edge(source_id, target_id, key=route_id, data=route)
         return route_id
 
     def plan(
@@ -209,15 +221,17 @@ class VisualTopologicalMap:
         if source_id is None or target_id not in self.graph:
             return None
         usable = nx.DiGraph()
-        for left, right, attributes in self.graph.edges(data=True):
+        for left, right, route_id, attributes in self.graph.edges(
+            keys=True, data=True
+        ):
             route: VisualRoute = attributes["data"]
             if route.successes and route.confidence >= minimum_confidence:
-                usable.add_edge(
-                    left,
-                    right,
-                    weight=route.mean_cost / route.confidence,
-                    data=route,
-                )
+                weight = route.mean_cost / route.confidence
+                existing = usable.get_edge_data(left, right)
+                if existing is None or (weight, route_id) < (
+                    existing["weight"], existing["data"].route_id
+                ):
+                    usable.add_edge(left, right, weight=weight, data=route)
         try:
             nodes = nx.shortest_path(usable, source_id, target_id, weight="weight")
         except (nx.NodeNotFound, nx.NetworkXNoPath):
@@ -239,13 +253,16 @@ class VisualTopologicalMap:
         payload = {
             "format_version": self.FORMAT_VERSION,
             "match_tolerance": self.match_tolerance,
+            "ambiguity_margin": self.ambiguity_margin,
             "nodes": [
                 attributes["data"].model_dump(mode="json")
                 for _, attributes in sorted(self.graph.nodes(data=True))
             ],
             "routes": [
                 attributes["data"].model_dump(mode="json")
-                for _, _, attributes in sorted(self.graph.edges(data=True))
+                for _, _, _, attributes in sorted(
+                    self.graph.edges(keys=True, data=True)
+                )
             ],
         }
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -257,13 +274,18 @@ class VisualTopologicalMap:
     @classmethod
     def load(cls, path: Path) -> VisualTopologicalMap:
         payload = json.loads(path.read_text(encoding="utf-8"))
-        if payload.get("format_version") != cls.FORMAT_VERSION:
+        format_version = payload.get("format_version")
+        if format_version not in {1, cls.FORMAT_VERSION}:
             raise ValueError("unsupported visual topological map format")
-        if set(payload) != {
-            "format_version", "match_tolerance", "nodes", "routes"
-        }:
+        expected_fields = {"format_version", "match_tolerance", "nodes", "routes"}
+        if format_version == cls.FORMAT_VERSION:
+            expected_fields.add("ambiguity_margin")
+        if set(payload) != expected_fields:
             raise ValueError("unexpected visual topological map fields")
-        result = cls(match_tolerance=float(payload["match_tolerance"]))
+        result = cls(
+            match_tolerance=float(payload["match_tolerance"]),
+            ambiguity_margin=float(payload.get("ambiguity_margin", 0.0)),
+        )
         for item in payload["nodes"]:
             node = VisualLandmark.model_validate(item)
             if node.node_id != result.node_id_for(node.signature):
@@ -284,7 +306,14 @@ class VisualTopologicalMap:
             ).hexdigest()
             if route.route_id != expected_id:
                 raise ValueError("visual route identifier does not match program")
-            if result.graph.has_edge(route.source_id, route.target_id):
+            if result.graph.has_edge(
+                route.source_id, route.target_id, key=route.route_id
+            ):
                 raise ValueError("duplicate visual route")
-            result.graph.add_edge(route.source_id, route.target_id, data=route)
+            result.graph.add_edge(
+                route.source_id,
+                route.target_id,
+                key=route.route_id,
+                data=route,
+            )
         return result

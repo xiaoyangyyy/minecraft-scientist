@@ -271,6 +271,18 @@ and non-leakage check; its result is valid with 2/2 replay success. This demonst
 fixture-bound topological route persistence and reuse, not arbitrary-layout route
 search, localization in natural scenes, or a general cognitive map.
 
+The seed-140/141 source and seed-142/143 held-out branching suite goes beyond a
+single stored route. Two offset-obstacle layouts produce distinct opaque start
+landmarks and mirror-image 11-step programs in one version-2 multi-edge topology.
+In held-out worlds, RGB signatures selected the correct branch under new control
+permutations; both routes succeeded without online exploration and avoided their
+layout-specific obstacle volumes. A deliberately unseen between-layout signature
+was rejected rather than mapped to the nearest route. Independent audit verified
+the 3-node/2-edge map, every PNG and action binding, both private paths, source
+snapshots, and public non-leakage. This is real visual layout-conditioned route
+selection with fail-closed novelty handling, still limited to two controlled,
+color-coded layouts under a fixed camera.
+
 A concrete label-free `GridVisualController` maps opaque screen regions and hotbar
 slots to MineStudio env actions. Tests verify action translation and semantic
 isolation; the accepted live experiment additionally audits successful opaque

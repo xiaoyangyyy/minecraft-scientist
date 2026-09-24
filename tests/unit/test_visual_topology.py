@@ -54,6 +54,35 @@ def test_visual_map_composes_successful_routes_by_expected_cost() -> None:
     )
 
 
+def test_visual_map_keeps_competing_programs_and_selects_lower_risk_cost() -> None:
+    topology = VisualTopologicalMap()
+    source, target = (1,), (2,)
+    expensive = topology.record_route(
+        source, target, ("careful",) * 4, success=True, cost=4
+    )
+    cheap = topology.record_route(
+        source, target, ("direct",), success=True, cost=1
+    )
+
+    plan = topology.plan(source, topology.node_id_for(target))
+
+    assert topology.graph.number_of_edges() == 2
+    assert plan is not None
+    assert plan.route_ids == (cheap,)
+    assert expensive != cheap
+    assert plan.action_roles == ("direct",)
+
+
+def test_ambiguous_landmark_match_fails_closed() -> None:
+    topology = VisualTopologicalMap(match_tolerance=3, ambiguity_margin=0.5)
+    first = topology.observe((0, 0))
+    second = topology.observe((4, 0))
+
+    assert first != second
+    assert topology.match((2, 0)) is None
+    assert topology.match((1, 0)) == first
+
+
 def test_failed_route_is_not_replayed() -> None:
     topology = VisualTopologicalMap()
     topology.record_route((1,), (2,), ("unsafe",), success=False)
@@ -72,6 +101,22 @@ def test_visual_map_rejects_tampered_route_identifier(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="identifier"):
         VisualTopologicalMap.load(path)
+
+
+def test_visual_map_loads_legacy_single_route_format(tmp_path: Path) -> None:
+    topology = VisualTopologicalMap(match_tolerance=0.25)
+    topology.record_route((1,), (2,), ("advance",), success=True)
+    path = tmp_path / "legacy-map.json"
+    topology.save(path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["format_version"] = 1
+    del payload["ambiguity_margin"]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    restored = VisualTopologicalMap.load(path)
+
+    assert restored.ambiguity_margin == 0
+    assert restored.plan((1,), restored.node_id_for((2,))) is not None
 
 
 def test_route_binding_fails_closed_when_episode_role_is_missing() -> None:
