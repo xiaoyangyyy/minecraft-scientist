@@ -162,8 +162,13 @@ tests four independently permuted opaque MOVE handles and selects the target-dir
 effect using RGB only. A subsequent continuous-execution fixture uses the learned
 effects, a color-mask occupancy signal, and marker-centroid feedback to detour around
 one physical obstacle and recenter; evaluator-only coordinates audit collision-free
-geometry after the episode. These fixtures do not establish natural-scene object
-recognition, a learned metric cognitive map, arbitrary-layout route search, or
+geometry after the episode. A separate `VisualTopologicalMap` now forms opaque nodes
+from quantized RGB landmark signatures and persists successful functional-role action
+programs without coordinates or raw motor handles. A preregistered source/held-out
+suite reloads one learned route and rebinds it to two independently permuted control
+maps; both evaluator paths avoid the obstacle. This is a coordinate-free topological
+memory for a controlled two-landmark fixture. These fixtures do not establish
+natural-scene object recognition, metric SLAM, arbitrary-layout route search, or
 general path planning.
 
 ## Shared-evidence external evaluation

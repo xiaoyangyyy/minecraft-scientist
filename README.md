@@ -259,6 +259,18 @@ volume, and found no direction or coordinate leakage in public artifacts. This i
 online visual detour selection around one color-coded fixture obstacle; it is not
 natural-scene obstacle recognition, a learned metric map, or general path planning.
 
+The seed-120 source episode and seed-121/122 held-out episodes add persistent,
+coordinate-free route memory. `VisualTopologicalMap` hashes quantized RGB landmark
+signatures into opaque nodes and stores the successful 13-step route as functional
+motor roles, never evaluator coordinates or episode-specific control handles. Both
+held-out episodes loaded the same map from disk, matched its source landmark, rebound
+the program to independently permuted opaque controls, and completed collision-free
+routes without online route exploration. The independent audit recomputed every PNG
+feature, role classification, action binding, route event, private path metric, hash,
+and non-leakage check; its result is valid with 2/2 replay success. This demonstrates
+fixture-bound topological route persistence and reuse, not arbitrary-layout route
+search, localization in natural scenes, or a general cognitive map.
+
 A concrete label-free `GridVisualController` maps opaque screen regions and hotbar
 slots to MineStudio env actions. Tests verify action translation and semantic
 isolation; the accepted live experiment additionally audits successful opaque

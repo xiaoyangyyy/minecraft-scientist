@@ -71,12 +71,17 @@ Latest verified controlled gate (2026-09-23):
   detoured 2.584 blocks laterally, returned within 0.066 blocks of center, avoided
   the physical obstacle volume, and passed the full PNG/event/hash/non-leakage
   audit.
-- Windows all-130-test suite passes; the full Linux suite records 128 passed and
+- `runs/topological-route-reuse-seed120-map1200` learned one coordinate-free,
+  two-landmark route and loaded it in two independently permuted held-out episodes.
+  Both replays used zero online route-exploration actions, followed the exact learned
+  13-role program, avoided the obstacle, and passed the independent PNG/event/map/
+  path/hash/non-leakage audit.
+- Windows all-135-test suite passes; the full Linux suite records 133 passed and
   two platform-specific skips. Lock check and both sdist/wheel builds pass. The
   offline MVP benchmark remains fully successful.
 - This is a controlled, fixture-bound result—not autonomous object grounding,
-  natural-scene obstacle recognition, learned-map route planning, or a full visual
-  Minecraft scientific-discovery benchmark.
+  natural-scene obstacle recognition, multi-layout map learning, metric SLAM, or a
+  full visual Minecraft scientific-discovery benchmark.
 
 Reproduction (PowerShell):
 

@@ -147,6 +147,32 @@ this obstacle depth; and the camera remains fixed. It does not establish natural
 scene obstacle recognition, arbitrary layouts, route search over a learned map, or
 a general spatial cognitive map.
 
+`topological_route_reuse_benchmark.py` adds the next narrow layer: persistent,
+coordinate-free route memory. One source episode learns a successful obstacle route.
+The Agent quantizes only marker/obstacle image geometry and salience into opaque
+landmark hashes, then stores the executed program as functional roles rather than
+raw motor handles. Two held-out episodes load that JSON map from disk, recognize the
+same source appearance, independently recalibrate a new opaque control permutation,
+bind the stored role program, and replay it with zero online route-exploration moves.
+The accepted `runs/topological-route-reuse-seed120-map1200` run passed 2/2 replays;
+each advanced 7.594 blocks, reached 2.584 blocks of lateral excursion, returned
+within 0.066 blocks of center, and avoided the exact evaluator-only obstacle volume.
+The two role permutations differed. `audit_topological_route_reuse.py` strictly
+reloads the map, derives its program from source events, recomputes all calibration
+and replay PNG features, verifies the held-out role rebinding and temporal obstacle-
+pass event, checks all hashes and paths, and scans public artifacts for coordinate or
+direction leakage.
+
+```powershell
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/topological_route_reuse_benchmark.py --seed 120 --mapping-seed 1200 --output /mnt/d/minecraft-scientist/runs/topological-route-reuse-seed120-map1200
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/audit_topological_route_reuse.py /mnt/d/minecraft-scientist/runs/topological-route-reuse-seed120-map1200
+```
+
+This is a two-node topological memory for one controlled fixture. It still depends
+on reset-based per-episode motor calibration, a fixed camera, a color-coded obstacle,
+and a route learned in the same geometry. It is not metric SLAM, natural-scene place
+recognition, route search across multiple layouts, or open-world navigation.
+
 MineStudio is deliberately excluded from the root `uv` environment. Its simulator
 documentation targets Linux, Python 3.10+, JDK 8, VirtualGL/Xvfb, and a separate
 Minecraft runtime; mixing those dependencies into the deterministic Windows test

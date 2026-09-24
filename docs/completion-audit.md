@@ -17,7 +17,7 @@ treated as proof of live Minecraft behavior.
 | Versioned Theory Crisis | challenged/superseded v1 and independently validated v2 | Complete in structured worlds |
 | Evolving symbol library | three primitives, namespaced cross-world intervention evidence, generation dependency, MDL gain | Complete for current theory set |
 | Experience database | append-only SQLite transition replay plus portable JSONL | Complete |
-| Space + knowledge cognitive map | spatial graph, theory/uncertainty overlays, routing, persistence | Complete at adapter layer |
+| Space + knowledge cognitive map | coordinate-backed spatial graph plus coordinate-free visual landmark/route graph, routing, persistence | Complete for adapter and controlled visual fixture layers |
 | Learned experiment planner | 15,000-world CUDA curriculum; independent 20,000 mechanism worlds plus 5,000 risk worlds; promoted hash locked | Complete for rule/state-machine/program/equation intervention families |
 | Reproducibility | byte-identical JSON/JSONL artifacts for repeated seeds | Complete for structured suites |
 | Six research metrics plus task utility | unified `full-benchmark.json` metrics | Complete for structured suites |
@@ -31,7 +31,7 @@ treated as proof of live Minecraft behavior.
 | Live continuous equation curriculum | 3 opaque tokens, 10 heights, transfer 1.0, v1 superseded/v2 accepted | Complete on local Fabric server |
 | Offline baseline matrix | random, stateless context, Voyager-style skill memory, fixed DSL, full library over 10 seeds | Complete for documented offline scope |
 | Context-only/Voyager LLM harness | 20 shared-evidence pairs across tool/machine/transform: context 0.8000, Voyager 0.7280, symbolic 0.9646; 95% CIs and cost ledger | Complete for expanded DeepSeek evaluation |
-| MineStudio/visual observation path | opaque RGB adapter; controlled tool-region transfer, camera search, motor-effect discovery, and audited continuous obstacle detour in real Linux simulator | Complete for documented fixtures; natural-scene generalization open |
+| MineStudio/visual observation path | opaque RGB adapter; controlled tool-region transfer, camera search, motor-effect discovery, continuous detour, and persisted route reuse in real Linux simulator | Complete for documented fixtures; natural-scene generalization open |
 | Trained planner in live Minecraft loop | `runs/minecraft-live-benchmark-learned`: 47 experiments, all metrics 1.0, checkpoint recorded in both sub-runs | Complete on local Fabric server |
 
 ## Current external gates
@@ -46,8 +46,9 @@ interventions. Planner efficiency intervals cross zero in this sample.
    DeepSeek rather than inferred from an offline substitute.
 2. MineStudio now launches in the installed WSL/Linux/JDK8 runtime. Controlled
    grounded change regions, camera search, movement-effect discovery, and one
-   obstacle-detour fixture are verified; natural-scene object identity and learned-
-   map generalization remain open.
+   obstacle-detour fixture and coordinate-free route reuse across held-out control
+   mappings are verified; natural-scene object identity and multi-layout map
+   generalization remain open.
 
 The local Fabric and DeepSeek external-LLM paths are empirically verified.
 MineStudio visual results remain a separate optional gate and are not substituted
@@ -226,15 +227,29 @@ volume. This proves fixture-bound online detour selection, not natural-scene
 obstacle recognition, arbitrary-layout search, or a general cognitive map. Evidence:
 `runs/obstacle-replanning-suite-seed88-map940/{report.json,integrity-audit.json}`.
 
+The preregistered seed-120/121/122 topological-route suite persists the source
+detour as two opaque quantized-appearance landmarks and a 13-step functional-role
+program. The map contains neither evaluator coordinates nor source motor handles.
+Both 2/2 held-out episodes load the same map, match its source landmark, recalibrate
+independently permuted opaque controls, and replay the program with zero online route
+exploration. Both paths advance 7.594 blocks, detour 2.584 blocks, return within
+0.066 blocks of center, and avoid the obstacle volume. Independent audit derives
+the program from source events, recomputes all PNG features and temporal pass events,
+verifies each held-out binding and path, and checks strict map loading, hashes, source
+snapshots, and public non-leakage. This proves persistence and same-layout topological
+route reuse, not natural-scene localization, metric SLAM, arbitrary-layout planning,
+or a general cognitive map. Evidence:
+`runs/topological-route-reuse-seed120-map1200/{report.json,visual-topology.json,integrity-audit.json}`.
+
 The evaluator equipment check now fails closed on empty/missing telemetry as well
-as wrong items. Windows full regression passes all 130 tests; the full Linux suite
-records 128 passed and two platform-specific skips. The offline MVP benchmark
+as wrong items. Windows full regression passes all 135 tests; the full Linux suite
+records 133 passed and two platform-specific skips. The offline MVP benchmark
 still reports 1.0 hidden intervention accuracy and task success, 47 experiments,
 one-step change detection, eight revision experiments, three symbols and 13 reuse
 records. Remaining visual scope is explicit: fixture-provided identity and
 controlled geometry, one material and narrow interventions, no natural-scene
-object recognition, arbitrary-layout navigation, learned-map routing, or general
-path planning.
+object recognition, arbitrary-layout navigation, multi-layout map learning, or
+general path planning.
 
 ## Latest release gate
 
@@ -260,6 +275,13 @@ OpenJDK 1.8.0_502), all 130 Windows tests, the full Linux suite with 128 passed 
 two platform-specific skips, and the MVP benchmark.
 The visual result remains scoped as documented above; it does not replace the
 structured-world evidence for hidden state machines or conversion chains.
+
+The 2026-09-24 visual-topology follow-up adds five strict unit tests and the real
+seed-120/121/122 source/held-out suite. Its independent integrity audit is valid,
+all two replay cases pass, both control-role permutations differ, all evaluator
+paths avoid the obstacle, and public artifacts contain no coordinates, direction
+bindings, or source motor handles. The resulting regression totals are 135 passed
+on Windows and 133 passed plus two platform-specific skips on Linux.
 
 The expanded three-mechanism release gate completed with 78 tests. Its 20-pair run
 used per-pair durable checkpoints, three bounded JSON retries, 63 total calls, and
