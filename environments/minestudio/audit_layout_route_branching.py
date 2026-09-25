@@ -454,7 +454,11 @@ def main() -> None:
         "source_snapshot_complete": bool(snapshots)
         and all(item["valid"] for item in snapshots),
         "map_format_and_shape_valid": map_payload["format_version"]
-        == suite["map_format_version"] == VisualTopologicalMap.FORMAT_VERSION
+        == suite["map_format_version"]
+        and map_payload["format_version"] in {
+            2,
+            VisualTopologicalMap.FORMAT_VERSION,
+        }
         and topology.graph.number_of_nodes() == 3
         and topology.graph.number_of_edges() == 2,
         "map_hash_matches_suite": digest(map_path) == suite["map_sha256"],

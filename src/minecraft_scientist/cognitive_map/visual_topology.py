@@ -14,10 +14,20 @@ import hashlib
 import json
 import math
 from collections.abc import Iterable, Mapping
+from enum import StrEnum
 from pathlib import Path
 
 import networkx as nx
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+
+class VisualRouteStatus(StrEnum):
+    """Lifecycle state for a learned visual route program."""
+
+    ACTIVE = "active"
+    CHALLENGED = "challenged"
+    SUPERSEDED = "superseded"
+    REJECTED = "rejected"
 
 
 class VisualLandmark(BaseModel):
@@ -49,6 +59,11 @@ class VisualRoute(BaseModel):
     trials: int = Field(ge=1)
     successes: int = Field(ge=0)
     mean_cost: float = Field(gt=0)
+    status: VisualRouteStatus = VisualRouteStatus.ACTIVE
+    failure_streak: int = Field(default=0, ge=0)
+    status_reason: str | None = None
+    parent_route_id: str | None = None
+    superseded_by: str | None = None
 
     @field_validator("action_roles")
     @classmethod
@@ -56,6 +71,27 @@ class VisualRoute(BaseModel):
         if not value or any(not item or item.strip() != item for item in value):
             raise ValueError("route must contain nonempty normalized action roles")
         return value
+
+    @model_validator(mode="after")
+    def lifecycle_is_consistent(self) -> VisualRoute:
+        if self.successes > self.trials:
+            raise ValueError("route successes cannot exceed trials")
+        if self.failure_streak > self.trials:
+            raise ValueError("route failure streak cannot exceed trials")
+        if self.status_reason is not None and (
+            not self.status_reason or self.status_reason.strip() != self.status_reason
+        ):
+            raise ValueError("route status reason must be normalized and nonempty")
+        if self.status is not VisualRouteStatus.ACTIVE and self.status_reason is None:
+            raise ValueError("non-active route must record a status reason")
+        terminal = self.status is VisualRouteStatus.SUPERSEDED
+        if terminal != (self.superseded_by is not None):
+            raise ValueError("only superseded routes must name a replacement")
+        if self.parent_route_id == self.route_id:
+            raise ValueError("route cannot be its own parent")
+        if self.superseded_by == self.route_id:
+            raise ValueError("route cannot supersede itself")
+        return self
 
     @property
     def confidence(self) -> float:
@@ -90,7 +126,7 @@ class VisualRoutePlan(BaseModel):
 class VisualTopologicalMap:
     """Persistent coordinate-free graph of visual landmarks and route programs."""
 
-    FORMAT_VERSION = 2
+    FORMAT_VERSION = 3
 
     def __init__(
         self,
@@ -190,10 +226,18 @@ class VisualTopologicalMap:
             mean_cost = (
                 previous.mean_cost * previous.trials + route_cost
             ) / trials
+            lifecycle = {
+                "status": previous.status,
+                "failure_streak": 0 if success else previous.failure_streak + 1,
+                "status_reason": previous.status_reason,
+                "parent_route_id": previous.parent_route_id,
+                "superseded_by": previous.superseded_by,
+            }
         else:
             trials = 1
             successes = int(success)
             mean_cost = route_cost
+            lifecycle = {"failure_streak": 0 if success else 1}
         route = VisualRoute(
             route_id=route_id,
             source_id=source_id,
@@ -202,9 +246,166 @@ class VisualTopologicalMap:
             trials=trials,
             successes=successes,
             mean_cost=mean_cost,
+            **lifecycle,
         )
         self.graph.add_edge(source_id, target_id, key=route_id, data=route)
         return route_id
+
+    def routes(self) -> tuple[VisualRoute, ...]:
+        """Return an immutable, deterministic view of all route programs."""
+
+        return tuple(
+            attributes["data"]
+            for _, _, _, attributes in sorted(
+                self.graph.edges(keys=True, data=True)
+            )
+        )
+
+    def get_route(self, route_id: str) -> VisualRoute:
+        """Return one route by stable ID, failing closed for unknown IDs."""
+
+        matches = [route for route in self.routes() if route.route_id == route_id]
+        if len(matches) != 1:
+            raise KeyError(f"unknown visual route: {route_id}")
+        return matches[0]
+
+    def _replace_route(self, route: VisualRoute) -> None:
+        if not self.graph.has_edge(
+            route.source_id, route.target_id, key=route.route_id
+        ):
+            raise KeyError(f"unknown visual route: {route.route_id}")
+        self.graph[route.source_id][route.target_id][route.route_id]["data"] = route
+
+    def record_outcome(
+        self,
+        route_id: str,
+        *,
+        success: bool,
+        cost: float | None = None,
+        challenge_threshold: float | None = 0.75,
+        failure_reason: str | None = None,
+    ) -> VisualRoute:
+        """Record replay evidence and challenge a confident route on failure.
+
+        The threshold is evaluated against the confidence *before* the new
+        observation.  Passing ``None`` records evidence without an automatic
+        lifecycle transition.
+        """
+
+        if challenge_threshold is not None and not 0 < challenge_threshold <= 1:
+            raise ValueError("challenge threshold must be in (0, 1] or None")
+        if cost is not None and (not math.isfinite(cost) or cost <= 0):
+            raise ValueError("route cost must be finite and positive")
+        previous = self.get_route(route_id)
+        prior_confidence = previous.confidence
+        trials = previous.trials + 1
+        successes = previous.successes + int(success)
+        mean_cost = previous.mean_cost
+        if cost is not None:
+            mean_cost = (previous.mean_cost * previous.trials + cost) / trials
+        status = previous.status
+        status_reason = previous.status_reason
+        if (
+            not success
+            and status is VisualRouteStatus.ACTIVE
+            and challenge_threshold is not None
+            and prior_confidence >= challenge_threshold
+        ):
+            status = VisualRouteStatus.CHALLENGED
+            status_reason = failure_reason or "high-confidence replay failed"
+        updated = previous.model_copy(
+            update={
+                "trials": trials,
+                "successes": successes,
+                "mean_cost": mean_cost,
+                "failure_streak": 0 if success else previous.failure_streak + 1,
+                "status": status,
+                "status_reason": status_reason,
+            }
+        )
+        updated = VisualRoute.model_validate(updated.model_dump())
+        self._replace_route(updated)
+        return updated
+
+    def challenge_route(self, route_id: str, *, reason: str) -> VisualRoute:
+        """Explicitly remove an active route from planning after an anomaly."""
+
+        previous = self.get_route(route_id)
+        if previous.status is not VisualRouteStatus.ACTIVE:
+            raise ValueError("only an active visual route can be challenged")
+        updated = previous.model_copy(
+            update={"status": VisualRouteStatus.CHALLENGED, "status_reason": reason}
+        )
+        updated = VisualRoute.model_validate(updated.model_dump())
+        self._replace_route(updated)
+        return updated
+
+    def reinstate_route(self, route_id: str, *, reason: str) -> VisualRoute:
+        """Return a challenged route to service after independent validation."""
+
+        previous = self.get_route(route_id)
+        if previous.status is not VisualRouteStatus.CHALLENGED:
+            raise ValueError("only a challenged visual route can be reinstated")
+        updated = previous.model_copy(
+            update={"status": VisualRouteStatus.ACTIVE, "status_reason": reason}
+        )
+        updated = VisualRoute.model_validate(updated.model_dump())
+        self._replace_route(updated)
+        return updated
+
+    def reject_route(self, route_id: str, *, reason: str) -> VisualRoute:
+        """Permanently reject an active or challenged route program."""
+
+        previous = self.get_route(route_id)
+        if previous.status not in {
+            VisualRouteStatus.ACTIVE,
+            VisualRouteStatus.CHALLENGED,
+        }:
+            raise ValueError("only an active or challenged visual route can be rejected")
+        updated = previous.model_copy(
+            update={"status": VisualRouteStatus.REJECTED, "status_reason": reason}
+        )
+        updated = VisualRoute.model_validate(updated.model_dump())
+        self._replace_route(updated)
+        return updated
+
+    def supersede_route(
+        self,
+        route_id: str,
+        replacement_route_id: str,
+        *,
+        reason: str,
+    ) -> tuple[VisualRoute, VisualRoute]:
+        """Replace a challenged route with a validated competing program."""
+
+        previous = self.get_route(route_id)
+        replacement = self.get_route(replacement_route_id)
+        if previous.status is not VisualRouteStatus.CHALLENGED:
+            raise ValueError("only a challenged visual route can be superseded")
+        if replacement.status is not VisualRouteStatus.ACTIVE:
+            raise ValueError("replacement visual route must be active")
+        if (previous.source_id, previous.target_id) != (
+            replacement.source_id,
+            replacement.target_id,
+        ):
+            raise ValueError("replacement must connect the same visual landmarks")
+        if previous.route_id == replacement.route_id:
+            raise ValueError("replacement visual route must be different")
+        superseded = previous.model_copy(
+            update={
+                "status": VisualRouteStatus.SUPERSEDED,
+                "status_reason": reason,
+                "superseded_by": replacement.route_id,
+            }
+        )
+        promoted = replacement.model_copy(
+            update={"parent_route_id": previous.route_id}
+        )
+        superseded = VisualRoute.model_validate(superseded.model_dump())
+        promoted = VisualRoute.model_validate(promoted.model_dump())
+        self._replace_route(superseded)
+        self._replace_route(promoted)
+        return superseded, promoted
 
     def plan(
         self,
@@ -225,7 +426,11 @@ class VisualTopologicalMap:
             keys=True, data=True
         ):
             route: VisualRoute = attributes["data"]
-            if route.successes and route.confidence >= minimum_confidence:
+            if (
+                route.status is VisualRouteStatus.ACTIVE
+                and route.successes
+                and route.confidence >= minimum_confidence
+            ):
                 weight = route.mean_cost / route.confidence
                 existing = usable.get_edge_data(left, right)
                 if existing is None or (weight, route_id) < (
@@ -275,10 +480,10 @@ class VisualTopologicalMap:
     def load(cls, path: Path) -> VisualTopologicalMap:
         payload = json.loads(path.read_text(encoding="utf-8"))
         format_version = payload.get("format_version")
-        if format_version not in {1, cls.FORMAT_VERSION}:
+        if format_version not in {1, 2, cls.FORMAT_VERSION}:
             raise ValueError("unsupported visual topological map format")
         expected_fields = {"format_version", "match_tolerance", "nodes", "routes"}
-        if format_version == cls.FORMAT_VERSION:
+        if format_version in {2, cls.FORMAT_VERSION}:
             expected_fields.add("ambiguity_margin")
         if set(payload) != expected_fields:
             raise ValueError("unexpected visual topological map fields")
@@ -316,4 +521,34 @@ class VisualTopologicalMap:
                 key=route.route_id,
                 data=route,
             )
+        routes = {route.route_id: route for route in result.routes()}
+        for route in routes.values():
+            if route.parent_route_id is not None:
+                parent = routes.get(route.parent_route_id)
+                if parent is None or parent.superseded_by != route.route_id:
+                    raise ValueError("visual route parent link is inconsistent")
+                if (parent.source_id, parent.target_id) != (
+                    route.source_id,
+                    route.target_id,
+                ):
+                    raise ValueError("visual route parent endpoints are inconsistent")
+            if route.superseded_by is not None:
+                replacement = routes.get(route.superseded_by)
+                if replacement is None or replacement.parent_route_id != route.route_id:
+                    raise ValueError("visual route replacement link is inconsistent")
+                if (replacement.source_id, replacement.target_id) != (
+                    route.source_id,
+                    route.target_id,
+                ):
+                    raise ValueError(
+                        "visual route replacement endpoints are inconsistent"
+                    )
+        for route in routes.values():
+            seen: set[str] = set()
+            current = route
+            while current.superseded_by is not None:
+                if current.route_id in seen:
+                    raise ValueError("visual route supersession chain contains a cycle")
+                seen.add(current.route_id)
+                current = routes[current.superseded_by]
         return result

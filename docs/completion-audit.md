@@ -255,8 +255,9 @@ not arbitrary layouts, natural-scene place recognition, or SLAM. Evidence:
 `runs/layout-route-branching-seed140-map1400/{report.json,visual-topology.json,integrity-audit.json}`.
 
 The evaluator equipment check now fails closed on empty/missing telemetry as well
-as wrong items. Windows full regression passes all 140 tests; the full Linux suite
-records 138 passed and two platform-specific skips. The offline MVP benchmark
+as wrong items. The previously recorded Windows regression passed all 140 tests;
+the corresponding Linux suite recorded 138 passed and two platform-specific skips.
+The offline MVP benchmark
 still reports 1.0 hidden intervention accuracy and task success, 47 experiments,
 one-step change detection, eight revision experiments, three symbols and 13 reuse
 records. Remaining visual scope is explicit: fixture-provided identity and
@@ -302,8 +303,42 @@ are 1.0, the unknown signature is rejected, the independent audit is valid, and
 the regression totals are 140 passed on Windows and 138 passed plus two skips on
 Linux.
 
+The next visual-map revision upgrades new saves to format version 3 and adds a
+strict route lifecycle: active, challenged, superseded, and rejected. A
+high-confidence replay counterexample removes the route from planning; validated
+alternatives retain reciprocal lineage rather than overwriting old evidence. The
+public `inspect-visual-map` command exposes status, confidence, failure streak,
+cost, functional roles and replacement history. Version-1 and version-2 maps remain
+loadable, and historical version-2 branching audits explicitly accept their frozen
+format rather than comparing them to the newest writer version.
+
+The preregistered seed-140 visual-route-crisis suite then exercises the complete
+format-v3 transition in real MineStudio. Two successful source episodes under
+different opaque-control permutations establish the old program at confidence 0.75.
+In the mirror layout, the stale route still binds and executes all 11 actions but
+only advances 2.20 blocks, fails the visual goal and never passes the obstacle; this
+control-valid counterexample moves it to challenged and removes it from planning.
+One online repair learns the mirror-image program. A separate seed/mapping shadow
+replay advances 7.594 blocks, detours 1.720 blocks, returns within 0.066 blocks of
+center, and avoids the evaluator-only obstacle volume. The old record becomes
+superseded and the active replacement retains a reciprocal parent link. Independent
+audit recomputes every calibration and route PNG, action binding, program, signature,
+private path metric, lifecycle transition, source snapshot hash and public leakage
+check; `valid` is true. Evidence:
+`runs/visual-route-crisis-seed140-map1400/{report.json,visual-topology.json,integrity-audit.json}`.
+
+The corresponding release gate passes 147 tests on Windows and 145 tests plus two
+platform-specific skips on Linux. `uv lock --check` and both Python package builds
+pass. Two independently written seed-0 MVP benchmark directories contain the same
+11 files byte-for-byte and retain 1.0 hidden-intervention accuracy and task success,
+47 experiments, one-step change detection, eight revision experiments, description
+length 1307, three symbols, and 13 reuse records. The historical version-1 and
+version-2 MineStudio topology runs also re-audit as valid under the version-3 loader.
+No plaintext API key is present in the repository, and the stale deleted-key copy
+has been removed from Windows Credential Manager.
+
 The expanded three-mechanism release gate completed with 78 tests. Its 20-pair run
 used per-pair durable checkpoints, three bounded JSON retries, 63 total calls, and
-305,554 tokens under the configured hard caps. Both exposed credentials were deleted;
-the replacement is stored in Windows Credential Manager and absent from Git and run
-artifacts.
+305,554 tokens under the configured hard caps. Both exposed credentials are no
+longer active; no replacement credential is currently claimed by this audit, and
+the repository and run artifacts contain no plaintext key.

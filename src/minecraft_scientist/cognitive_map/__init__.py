@@ -3,6 +3,7 @@ from .visual_topology import (
     VisualLandmark,
     VisualRoute,
     VisualRoutePlan,
+    VisualRouteStatus,
     VisualTopologicalMap,
 )
 
@@ -12,5 +13,6 @@ __all__ = [
     "VisualLandmark",
     "VisualRoute",
     "VisualRoutePlan",
+    "VisualRouteStatus",
     "VisualTopologicalMap",
 ]

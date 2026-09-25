@@ -4,6 +4,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from minecraft_scientist.cli import app
+from minecraft_scientist.cognitive_map import VisualTopologicalMap
 from minecraft_scientist.evaluation.benchmark import run_mvp_benchmark
 
 
@@ -56,3 +57,32 @@ def test_cli_loads_world_config_and_writes_artifacts(tmp_path: Path) -> None:
     assert "experiment-" in inspected.output
     assert "superseded" in inspected.output
     assert "accepted" in inspected.output
+
+
+def test_cli_inspects_visual_route_lifecycle(tmp_path: Path) -> None:
+    topology = VisualTopologicalMap()
+    old = topology.record_route((1,), (2,), ("direct",), success=True)
+    replacement = topology.record_route(
+        (1,), (2,), ("detour", "advance"), success=True
+    )
+    topology.challenge_route(old, reason="blocked after layout mutation")
+    topology.supersede_route(
+        old,
+        replacement,
+        reason="shadow validation passed",
+    )
+    path = tmp_path / "visual-map.json"
+    topology.save(path)
+
+    result = CliRunner().invoke(app, ["inspect-visual-map", str(path)])
+    machine = CliRunner().invoke(
+        app, ["inspect-visual-map", str(path), "--json"]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "superseded" in result.output
+    assert "shadow validation passed" in result.output
+    assert machine.exit_code == 0, machine.output
+    payload = json.loads(machine.output)
+    assert payload["format_version"] == VisualTopologicalMap.FORMAT_VERSION
+    assert payload["route_count"] == 2

@@ -198,6 +198,32 @@ and confirms no layout offset, coordinates, raw direction binding, or source mot
 handle enters Agent artifacts. This remains two preregistered offsets of one
 fixture—not arbitrary obstacle geometry, a large-scale place graph, or SLAM.
 
+The library's current format version 3 layers a persistent lifecycle over these
+route programs. High-confidence replay failures can challenge a route, challenged
+routes are excluded from planning, and a separately validated competing program can
+supersede the old record without deleting it. The saved lineage and evidence counters
+are available through `minecraft-scientist inspect-visual-map`; historical version-1
+and version-2 evidence maps remain loadable and independently auditable.
+
+`visual_route_crisis_benchmark.py` drives the full format-v3 lifecycle with real RGB
+and movement. It preregisters two source executions, one forced stale-route replay,
+one online repair, and one independent shadow validation. The accepted seed-140 run
+first establishes the old route at 0.75 confidence. Under the aliased mirror layout,
+all 11 actions remain compliant but goal progress falls to 2.20 blocks and the
+obstacle is not passed; after challenge, the learned mirror route reaches 7.594
+blocks in shadow validation and supersedes the old program. The audit independently
+recomputes PNG features, calibration roles, event bindings, evaluator paths, map
+states, source hashes and public-artifact non-leakage.
+
+```powershell
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/visual_route_crisis_benchmark.py --seed 140 --mapping-seed 1400 --output /mnt/d/minecraft-scientist/runs/visual-route-crisis-seed140-map1400
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/audit_visual_route_crisis.py /mnt/d/minecraft-scientist/runs/visual-route-crisis-seed140-map1400
+```
+
+This intentionally aliases two nearby visual signatures to test recovery. It is
+not evidence that the chosen tolerance is generally optimal, or that arbitrary
+natural layouts can already be recognized and repaired.
+
 MineStudio is deliberately excluded from the root `uv` environment. Its simulator
 documentation targets Linux, Python 3.10+, JDK 8, VirtualGL/Xvfb, and a separate
 Minecraft runtime; mixing those dependencies into the deterministic Windows test

@@ -176,6 +176,26 @@ real-simulator suite learns mirror-image obstacle routes into one 3-node/2-edge 
 selects the correct branch in held-out episodes, and rejects an unseen intermediate
 signature; it remains a fixed-camera controlled-fixture result.
 
+Format version 3 turns route replay failure into an auditable lifecycle rather than
+silently averaging it into a success rate. Active routes may become challenged after
+a high-confidence counterexample, be reinstated after independent validation, be
+rejected, or be superseded by a distinct program connecting the same landmarks.
+Only active routes enter shortest-path planning. Supersession preserves both route
+records plus reciprocal parent/replacement IDs, and loading validates those links.
+The CLI command `inspect-visual-map` reports the status, evidence counts, failure
+streak, cost, functional program and replacement lineage; map formats 1 and 2 are
+still accepted with active/default lifecycle fields.
+
+The real seed-140 visual-route-crisis suite deliberately uses a coarse 8.25 landmark
+tolerance to expose a perceptual alias between mirror obstacle layouts (signature
+distance 8.0). This is a controlled stress case: two source executions establish
+the old program, a held-out replay supplies a control-valid counterexample, the map
+excludes the challenged edge, and a newly induced mirror program must pass a separate
+shadow replay before supersession. The final graph keeps both programs and their
+lineage. This demonstrates the lifecycle over RGB and real simulator actions; it
+does not imply natural-scene change detection, learned tolerance calibration, or
+general navigation.
+
 ## Shared-evidence external evaluation
 
 `benchmark-external-llm-expanded` constructs candidate interventions and active

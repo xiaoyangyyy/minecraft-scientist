@@ -283,6 +283,30 @@ snapshots, and public non-leakage. This is real visual layout-conditioned route
 selection with fail-closed novelty handling, still limited to two controlled,
 color-coded layouts under a fixed camera.
 
+The current version-3 topology adds an explicit route lifecycle. A replay outcome
+updates evidence and cost without changing route identity; a failure of a previously
+high-confidence program moves it to `challenged`, immediately excluding it from
+planning. Independently validated alternatives can supersede it with bidirectional
+parent/replacement links, while rejected programs remain preserved for audit rather
+than being overwritten. Versions 1 and 2 remain loadable. Inspect any saved map with:
+
+```powershell
+uv run minecraft-scientist inspect-visual-map path\to\visual-topology.json
+uv run minecraft-scientist inspect-visual-map path\to\visual-topology.json --json
+```
+
+The seed-140 visual-route-crisis run exercises that lifecycle in the real isolated
+MineStudio simulator. Two independently permuted source episodes establish the old
+route at 0.75 confidence. A mirror-layout replay then executes all 11 bound actions
+successfully but advances only 2.20 blocks and fails to pass the obstacle, so the
+route becomes challenged. Online RGB-only replanning learns the mirror program;
+an independent shadow episode with another control permutation advances 7.594
+blocks, avoids the evaluator-only obstacle volume, and validates promotion. The
+final map preserves the old program as `superseded` and the replacement as `active`
+with reciprocal lineage. The independent audit recomputes every image feature,
+action binding, path metric, map transition, source hash, and non-leakage check.
+Evidence is in `runs/visual-route-crisis-seed140-map1400`.
+
 A concrete label-free `GridVisualController` maps opaque screen regions and hotbar
 slots to MineStudio env actions. Tests verify action translation and semantic
 isolation; the accepted live experiment additionally audits successful opaque

@@ -445,6 +445,76 @@ def inspect_theory(
         console.print_json(json.dumps(item["ir"], sort_keys=True))
 
 
+@app.command("inspect-visual-map")
+def inspect_visual_map(
+    map_path: Annotated[Path, typer.Argument(help="Visual topological map JSON")],
+    json_output: Annotated[
+        bool, typer.Option("--json", help="Emit machine-readable JSON")
+    ] = False,
+) -> None:
+    """Inspect route evidence and lifecycle state without exposing motor handles."""
+
+    from minecraft_scientist.cognitive_map import VisualTopologicalMap
+
+    if not map_path.exists():
+        raise typer.BadParameter(f"visual map does not exist: {map_path}")
+    try:
+        topology = VisualTopologicalMap.load(map_path)
+        saved_format_version = json.loads(
+            map_path.read_text(encoding="utf-8")
+        )["format_version"]
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        raise typer.BadParameter(f"invalid visual map: {exc}") from exc
+    routes = topology.routes()
+    payload = {
+        "format_version": saved_format_version,
+        "landmark_count": topology.graph.number_of_nodes(),
+        "route_count": len(routes),
+        "routes": [
+            {
+                **route.model_dump(mode="json"),
+                "confidence": route.confidence,
+            }
+            for route in routes
+        ],
+    }
+    if json_output:
+        console.print_json(json.dumps(payload, sort_keys=True))
+        return
+    console.print(
+        f"Visual map v{saved_format_version}: "
+        f"{payload['landmark_count']} landmarks, {payload['route_count']} routes"
+    )
+    table = Table(title=map_path.name)
+    table.add_column("Route")
+    table.add_column("Status")
+    table.add_column("Trials", justify="right")
+    table.add_column("Success", justify="right")
+    table.add_column("Confidence", justify="right")
+    table.add_column("Failures", justify="right")
+    table.add_column("Mean cost", justify="right")
+    table.add_column("Roles")
+    for route in routes:
+        table.add_row(
+            route.route_id,
+            route.status.value,
+            str(route.trials),
+            str(route.successes),
+            f"{route.confidence:.3f}",
+            str(route.failure_streak),
+            f"{route.mean_cost:.3f}",
+            " -> ".join(route.action_roles),
+        )
+    console.print(table)
+    for route in routes:
+        if route.status_reason or route.parent_route_id or route.superseded_by:
+            console.print(
+                f"{route.route_id}: reason={route.status_reason or '-'}, "
+                f"parent={route.parent_route_id or '-'}, "
+                f"superseded_by={route.superseded_by or '-'}"
+            )
+
+
 @app.command("train-planner")
 def train_planner(
     output: Annotated[Path, typer.Option(help="Planner checkpoint path")] = Path(
