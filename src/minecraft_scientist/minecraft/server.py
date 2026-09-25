@@ -100,9 +100,7 @@ def server_status(directory: Path) -> dict[str, Any]:
         "fabric_launcher_valid": fabric_launcher_valid,
         "fabric_mods": fabric_mods,
         "fabric_mods_valid": fabric_mods_valid,
-        "fabric_ready": vanilla_ready
-        and fabric_launcher_valid
-        and fabric_mods_valid,
+        "fabric_ready": vanilla_ready and fabric_launcher_valid and fabric_mods_valid,
     }
 
 
@@ -182,10 +180,14 @@ def prepare_fabric_server(
     launcher_lock = directory / f"{FABRIC_LAUNCHER}.sha256"
     if launcher.exists():
         if not launcher_lock.is_file():
-            raise RuntimeError(f"refusing to trust an unlocked Fabric launcher: {launcher}")
+            raise RuntimeError(
+                f"refusing to trust an unlocked Fabric launcher: {launcher}"
+            )
         expected = launcher_lock.read_text(encoding="ascii").strip().lower()
         if file_sha256(launcher) != expected or not zipfile.is_zipfile(launcher):
-            raise RuntimeError(f"Fabric launcher failed its recorded checksum: {launcher}")
+            raise RuntimeError(
+                f"Fabric launcher failed its recorded checksum: {launcher}"
+            )
     else:
         partial = directory / f"{FABRIC_LAUNCHER}.part"
         try:
@@ -209,9 +211,14 @@ def prepare_fabric_server(
     for source in source_mods:
         destination = mods_directory / source.name
         source_digest = file_sha256(source)
-        if destination.exists() and file_sha256(destination) != source_digest:
-            if not overwrite_mods:
-                raise RuntimeError(f"refusing to replace a different server mod: {destination}")
+        if (
+            destination.exists()
+            and file_sha256(destination) != source_digest
+            and not overwrite_mods
+        ):
+            raise RuntimeError(
+                f"refusing to replace a different server mod: {destination}"
+            )
         shutil.copy2(source, destination)
         lock_payload[source.name] = source_digest
     (directory / "scientist-mods.lock.json").write_text(
@@ -247,6 +254,7 @@ def run_server(
             launcher=launcher,
         ),
         cwd=directory.resolve(),
+        env=_server_environment(directory),
         check=False,
     )
     return completed.returncode
@@ -296,6 +304,7 @@ class MinecraftServerProcess:
                 launcher=launcher,
             ),
             cwd=self.directory,
+            env=_server_environment(self.directory),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -481,12 +490,37 @@ def _server_command(
     ]
 
 
+def _server_environment(directory: Path) -> dict[str, str]:
+    """Isolate Java IPC/temp files for reliable server startup on Windows."""
+
+    java_tmp = directory.resolve() / ".java-tmp"
+    java_tmp.mkdir(parents=True, exist_ok=True)
+    environment = os.environ.copy()
+    environment["TEMP"] = str(java_tmp)
+    environment["TMP"] = str(java_tmp)
+    compatibility = " ".join(
+        (
+            f"-Djava.io.tmpdir={java_tmp}",
+            f"-Djdk.net.unixdomain.tmpdir={java_tmp}",
+            "-Djava.net.preferIPv4Stack=true",
+        )
+    )
+    environment["JAVA_TOOL_OPTIONS"] = " ".join(
+        value
+        for value in (environment.get("JAVA_TOOL_OPTIONS", ""), compatibility)
+        if value
+    )
+    return environment
+
+
 def _select_launcher(status: dict[str, Any], flavor: str) -> str:
     if flavor not in {"auto", "vanilla", "fabric"}:
         raise ValueError("server flavor must be auto, vanilla, or fabric")
     if flavor == "fabric":
         if not status["fabric_ready"]:
-            raise RuntimeError("Fabric server is not prepared or failed integrity checks")
+            raise RuntimeError(
+                "Fabric server is not prepared or failed integrity checks"
+            )
         return FABRIC_LAUNCHER
     if flavor == "auto" and status["fabric_ready"]:
         return FABRIC_LAUNCHER

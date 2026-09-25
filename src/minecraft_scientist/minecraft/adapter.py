@@ -22,7 +22,6 @@ from minecraft_scientist.protocols import (
 from .bridge import MinecraftBridgeClient, MinecraftBridgeError
 from .server import MINECRAFT_VERSION
 
-
 INTERACTIVE_BLOCK_NAMES = frozenset(
     {
         "lodestone",
@@ -59,7 +58,9 @@ class MinecraftConnectionConfig(BaseModel):
     radius: int = Field(default=8, ge=1, le=32)
     max_blocks: int = Field(default=128, ge=1, le=512)
     timeout: float = Field(default=30.0, gt=0)
+    pathfinder_timeout: float = Field(default=15.0, gt=0, le=120)
     allowed_block_positions: tuple[tuple[int, int, int], ...] | None = None
+    exploration_stride: int | None = Field(default=None, ge=1, le=32)
 
 
 class MinecraftWorldAdapter:
@@ -103,6 +104,7 @@ class MinecraftWorldAdapter:
                 "auth": self.config.auth,
                 "version": self.config.version,
                 "timeout_ms": int(self.config.timeout * 1000),
+                "pathfinder_timeout_ms": int(self.config.pathfinder_timeout * 1000),
             },
             timeout=self.config.timeout + 5,
         )
@@ -140,6 +142,10 @@ class MinecraftWorldAdapter:
                         PrimitiveAction(kind=ActionKind.INTERACT, target_id=object_id),
                     )
                 )
+            elif binding["operation"] == "move_to":
+                actions.append(
+                    PrimitiveAction(kind=ActionKind.MOVE, target_id=object_id)
+                )
         actions.append(PrimitiveAction(kind=ActionKind.ACTIVATE))
         return tuple(actions)
 
@@ -172,7 +178,11 @@ class MinecraftWorldAdapter:
             result = self._bridge.request(
                 "act",
                 {"action": bridge_action, "observe": self._observe_params()},
-                timeout=max(self.config.timeout, action.ticks * 0.05 + 5),
+                timeout=max(
+                    self.config.timeout,
+                    self.config.pathfinder_timeout + 5,
+                    action.ticks * 0.05 + 5,
+                ),
             )
             raw = result["observation"]
             outcome_success = bool(result.get("success", True))
@@ -185,9 +195,7 @@ class MinecraftWorldAdapter:
         self._observation = after
         delta = self._delta(before, after)
         positive_inventory = [
-            item_id
-            for item_id, count in delta["inventory"].items()
-            if count > 0
+            item_id for item_id, count in delta["inventory"].items() if count > 0
         ]
         event = WorldEvent(
             event_type=f"minecraft_{action.kind.value}",
@@ -336,6 +344,39 @@ class MinecraftWorldAdapter:
                 )
             )
             public_map_observation["entities"].append({"name": object_id})
+        if self.config.exploration_stride is not None:
+            stride = self.config.exploration_stride
+            source_node = self._map.node_id_for(origin)
+            frontier_offsets = (
+                (-stride, 0),
+                (0, -stride),
+                (0, stride),
+                (stride, 0),
+            )
+            for x_offset, z_offset in frontier_offsets:
+                coordinates = {
+                    "x": origin[0] + x_offset,
+                    "y": origin[1],
+                    "z": origin[2] + z_offset,
+                }
+                stable_key = f"{source_node}:{x_offset}:{z_offset}"
+                object_id = self._opaque("frontier", stable_key)
+                destination_node = self._map.node_id_for(tuple(coordinates.values()))
+                self._bindings[object_id] = {
+                    "operation": "move_to",
+                    **coordinates,
+                }
+                objects.append(
+                    ObjectObservation(
+                        object_id=object_id,
+                        affordances=(ActionKind.MOVE,),
+                        observable_features={
+                            **coordinates,
+                            "distance": float(stride),
+                            "previously_visited": destination_node in self._map.graph,
+                        },
+                    )
+                )
         self._map.ingest(public_map_observation)
         return Observation(
             episode_id=self._episode,
@@ -377,9 +418,10 @@ class MinecraftWorldAdapter:
                 "intent": "interact",
                 **self._coordinates(binding),
             }
-        if action.kind in {ActionKind.PLACE_INPUT, ActionKind.ACTIVATE} and binding[
-            "operation"
-        ] == "use_block":
+        if (
+            action.kind in {ActionKind.PLACE_INPUT, ActionKind.ACTIVATE}
+            and binding["operation"] == "use_block"
+        ):
             return {
                 "kind": "use_block",
                 "intent": action.kind.value,
@@ -387,6 +429,12 @@ class MinecraftWorldAdapter:
             }
         if action.kind is ActionKind.INTERACT and binding["operation"] == "attack":
             return {"kind": "attack", "entity_id": binding["entity_id"]}
+        if action.kind is ActionKind.MOVE and binding["operation"] == "move_to":
+            return {
+                "kind": "move_to",
+                "range": 1,
+                **self._coordinates(binding),
+            }
         raise ValueError("action kind is incompatible with its target")
 
     def _opaque(self, category: str, stable_key: str) -> str:

@@ -74,9 +74,7 @@ def test_fabric_preparation_locks_launcher_and_server_mods(
 ) -> None:
     server_payload = b"test server jar"
     launcher_payload = _jar_bytes("launcher")
-    expected_sha1 = hashlib.sha1(
-        server_payload, usedforsecurity=False
-    ).hexdigest()
+    expected_sha1 = hashlib.sha1(server_payload, usedforsecurity=False).hexdigest()
 
     def fake_retrieve(url: str, destination: Path) -> None:
         destination.write_bytes(
@@ -104,17 +102,27 @@ def test_fabric_preparation_locks_launcher_and_server_mods(
     assert report["fabric_launcher_valid"] is True
     assert report["fabric_mods_valid"] is True
     lock = json.loads(
-        (tmp_path / "server" / "scientist-mods.lock.json").read_text(
-            encoding="utf-8"
-        )
+        (tmp_path / "server" / "scientist-mods.lock.json").read_text(encoding="utf-8")
     )
     assert sorted(lock) == [
         server_module.FABRIC_API_FILENAME,
         "scientist-world-rules-0.1.0.jar",
     ]
 
-    installed_mod = (
-        tmp_path / "server" / "mods" / "scientist-world-rules-0.1.0.jar"
-    )
+    installed_mod = tmp_path / "server" / "mods" / "scientist-world-rules-0.1.0.jar"
     installed_mod.write_bytes(_jar_bytes("tampered"))
     assert server_status(tmp_path / "server")["fabric_ready"] is False
+
+
+def test_server_environment_isolates_windows_java_ipc(tmp_path: Path) -> None:
+    directory = tmp_path / "server"
+
+    environment = server_module._server_environment(directory)
+
+    java_tmp = directory.resolve() / ".java-tmp"
+    assert java_tmp.is_dir()
+    assert environment["TEMP"] == str(java_tmp)
+    assert environment["TMP"] == str(java_tmp)
+    assert f"-Djava.io.tmpdir={java_tmp}" in environment["JAVA_TOOL_OPTIONS"]
+    assert f"-Djdk.net.unixdomain.tmpdir={java_tmp}" in environment["JAVA_TOOL_OPTIONS"]
+    assert "-Djava.net.preferIPv4Stack=true" in environment["JAVA_TOOL_OPTIONS"]

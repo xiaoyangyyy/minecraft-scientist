@@ -5,7 +5,10 @@ from typing import Any
 
 import pytest
 
-from minecraft_scientist.minecraft import MinecraftWorldAdapter
+from minecraft_scientist.minecraft import (
+    MinecraftConnectionConfig,
+    MinecraftWorldAdapter,
+)
 from minecraft_scientist.protocols import ActionKind, PrimitiveAction
 
 
@@ -15,6 +18,7 @@ class FakeBridge:
         self.closed = False
         self.held_item: dict[str, Any] | None = None
         self.last_action: dict[str, Any] | None = None
+        self.connect_params: dict[str, Any] | None = None
 
     def request(
         self,
@@ -26,6 +30,7 @@ class FakeBridge:
         del timeout
         if method == "connect":
             assert params is not None and params["version"] == "1.21.11"
+            self.connect_params = params
             self.connected = True
             return {"username": "ScientistBot", "version": "1.21.11"}
         if method == "observe":
@@ -159,3 +164,75 @@ def test_adapter_exposes_live_curriculum_block_without_leaking_its_name() -> Non
 
     assert bridge.last_action is not None
     assert bridge.last_action["kind"] == "use_block"
+
+
+def test_adapter_exposes_opaque_open_world_movement_frontiers() -> None:
+    bridge = FakeBridge()
+    world = MinecraftWorldAdapter(
+        MinecraftConnectionConfig(exploration_stride=8),
+        bridge_factory=lambda: bridge,
+    )
+    observation = world.reset(seed=31)
+    assert bridge.connect_params is not None
+    assert bridge.connect_params["pathfinder_timeout_ms"] == 15000
+    movement_objects = [
+        item for item in observation.objects if item.affordances == (ActionKind.MOVE,)
+    ]
+
+    assert len(movement_objects) == 4
+    assert all(item.object_id.startswith("obj_") for item in movement_objects)
+    assert all(
+        item.observable_features["distance"] == 8.0
+        and item.observable_features["previously_visited"] is False
+        for item in movement_objects
+    )
+    serialized = observation.model_dump_json()
+    assert all(label not in serialized for label in ("north", "south", "east", "west"))
+
+    action = next(
+        candidate
+        for candidate in world.available_actions()
+        if candidate.kind is ActionKind.MOVE
+    )
+    transition = world.step(action)
+
+    assert transition.intervention_compliance is True
+    assert transition.event.event_type == "minecraft_move"
+    assert bridge.last_action is not None
+    assert bridge.last_action["kind"] == "move_to"
+    assert bridge.last_action["range"] == 1
+
+
+def test_movement_frontier_ids_survive_small_revisit_position_drift() -> None:
+    class OffsetBridge(FakeBridge):
+        def __init__(self, x: float, z: float) -> None:
+            super().__init__()
+            self.x = x
+            self.z = z
+
+        def _observation(self, *, step: int = 0) -> dict[str, Any]:
+            payload = super()._observation(step=step)
+            payload["position"] = {"x": self.x, "y": 64.0, "z": self.z}
+            return payload
+
+    config = MinecraftConnectionConfig(exploration_stride=8)
+    first = MinecraftWorldAdapter(
+        config,
+        bridge_factory=lambda: OffsetBridge(0.5, -2.0),
+    ).reset(seed=31)
+    revisited = MinecraftWorldAdapter(
+        config,
+        bridge_factory=lambda: OffsetBridge(1.5, -1.0),
+    ).reset(seed=31)
+
+    first_ids = sorted(
+        item.object_id
+        for item in first.objects
+        if item.affordances == (ActionKind.MOVE,)
+    )
+    revisited_ids = sorted(
+        item.object_id
+        for item in revisited.objects
+        if item.affordances == (ActionKind.MOVE,)
+    )
+    assert revisited_ids == first_ids

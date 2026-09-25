@@ -68,6 +68,10 @@ async function connect(params) {
   bot.on("kicked", (reason) => console.error("kicked", reason));
   bot.on("error", (error) => console.error("bot error", error.message));
   await waitForSpawn(bot, Number(params.timeout_ms || 30000));
+  bot.pathfinder.thinkTimeout = Math.max(
+    5000,
+    Number(params.pathfinder_timeout_ms || 15000),
+  );
   bot.pathfinder.setMovements(new Movements(bot));
   step = 0;
   return {

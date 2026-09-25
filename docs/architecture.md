@@ -60,6 +60,32 @@ intended intervention, controller compliance, confounders, outcome delta, and
 provenance. JSONL remains the portable run format; SQLite supports ordered replay and
 mechanism queries.
 
+`ExplorationMemory` is a separate durable store for the spatial loop. Its immutable
+journal records place observations, supervised place calibration, frontier discovery
+and frontier outcomes. Typed materialized projections make restart recovery cheap;
+integrity verification re-hashes the journal and compares its latest place/frontier
+states with those projections. A place uses a bounded farthest-point exemplar coreset
+rather than one view, allowing controlled appearance variation without unbounded
+growth. Matching remains fail-closed under ambiguity. Successful frontiers create
+directed transitions; repeated unknown-action failures persist and eventually block
+that frontier. `plan_next_frontier` first finds a confidence-adjusted known route to a
+reachable frontier, then balances uncertainty, novelty, travel cost, execution cost,
+risk and empirical failure probability.
+
+The Mineflayer adapter can optionally expose four movement frontier objects by setting
+`MinecraftConnectionConfig.exploration_stride`. Their identifiers are seeded opaque
+hashes; coordinates and prior-visit flags are public physical features, while compass
+direction names are never emitted. A `MOVE` primitive binds the selected object to the
+bridge's `move_to` action. This makes real traversal possible through the same public
+action contract. Path-search computation has a separate bounded timeout from bridge
+I/O. The real-server smoke gate tries at most four anonymous directions and records
+each controller failure or resolved transition in `ExplorationMemory`; only a
+compliant controller success with sufficient displacement, bounded target error and
+a new place cell passes. The clean seed-31 run resolves one frontier in a newly
+generated vanilla world. The broader release gate also validates memory and planning
+on a hidden procedural graph. These are short traversal and infrastructure gates,
+not evidence of long-horizon open-world Minecraft competence.
+
 `LocalCausalEngine` accepts `(context, intervention, outcome)` samples. It rejects
 controller failures and samples carrying possible confounders before computing a
 controlled effect. A directed edge is emitted only when at least two treatment

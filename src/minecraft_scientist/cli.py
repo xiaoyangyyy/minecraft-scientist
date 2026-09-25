@@ -81,7 +81,8 @@ def run(
         str | None, typer.Option(help="Override with heuristic or openai")
     ] = None,
     planner: Annotated[
-        str | None, typer.Option(help="Override with information_gain, learned, or random")
+        str | None,
+        typer.Option(help="Override with information_gain, learned, or random"),
     ] = None,
     planner_checkpoint: Annotated[
         Path | None, typer.Option(help="Checkpoint required by the learned planner")
@@ -178,9 +179,9 @@ def benchmark_baselines(
     intervention_budget: Annotated[
         int, typer.Option(min=1, help="Budget for fixed-DSL and full agents")
     ] = 80,
-    output: Annotated[
-        Path, typer.Option(help="Baseline artifact directory")
-    ] = Path("runs/baseline-matrix"),
+    output: Annotated[Path, typer.Option(help="Baseline artifact directory")] = Path(
+        "runs/baseline-matrix"
+    ),
     overwrite: Annotated[
         bool, typer.Option(help="Replace the known baseline report")
     ] = False,
@@ -233,14 +234,16 @@ def benchmark_ablations(
 
 @app.command("benchmark-external-llm")
 def benchmark_external_llm(
-    provider: Annotated[
-        str, typer.Option(help="openai or deepseek")
-    ] = "openai",
+    provider: Annotated[str, typer.Option(help="openai or deepseek")] = "openai",
     model: Annotated[
         str, typer.Option(help="Responses API model identifier")
     ] = "gpt-5.6-luna",
-    seed: Annotated[int, typer.Option(help="First deterministic source-world seed")] = 0,
-    seeds: Annotated[int, typer.Option(min=1, help="Number of source/target pairs")] = 3,
+    seed: Annotated[
+        int, typer.Option(help="First deterministic source-world seed")
+    ] = 0,
+    seeds: Annotated[
+        int, typer.Option(min=1, help="Number of source/target pairs")
+    ] = 3,
     evidence_budget: Annotated[
         int, typer.Option(min=0, help="Public interventions supplied per world")
     ] = 6,
@@ -306,13 +309,13 @@ def benchmark_external_llm(
 
 @app.command("benchmark-external-llm-expanded")
 def benchmark_external_llm_expanded(
-    provider: Annotated[
-        str, typer.Option(help="openai or deepseek")
-    ] = "deepseek",
+    provider: Annotated[str, typer.Option(help="openai or deepseek")] = "deepseek",
     model: Annotated[
         str, typer.Option(help="Responses API model identifier")
     ] = "deepseek-flash",
-    seed: Annotated[int, typer.Option(help="First deterministic source-world seed")] = 0,
+    seed: Annotated[
+        int, typer.Option(help="First deterministic source-world seed")
+    ] = 0,
     pairs: Annotated[
         int, typer.Option(min=1, help="Number of source/target world pairs")
     ] = 20,
@@ -430,9 +433,7 @@ def inspect_theory(
         )
     console.print(table)
     for item in matches:
-        console.print(
-            f"\n[bold]v{item['version']} status[/bold]: {item['status']}"
-        )
+        console.print(f"\n[bold]v{item['version']} status[/bold]: {item['status']}")
         console.print(
             f"[bold]v{item['version']} evidence IDs[/bold]: "
             + (", ".join(item["evidence_ids"]) or "-")
@@ -460,9 +461,9 @@ def inspect_visual_map(
         raise typer.BadParameter(f"visual map does not exist: {map_path}")
     try:
         topology = VisualTopologicalMap.load(map_path)
-        saved_format_version = json.loads(
-            map_path.read_text(encoding="utf-8")
-        )["format_version"]
+        saved_format_version = json.loads(map_path.read_text(encoding="utf-8"))[
+            "format_version"
+        ]
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         raise typer.BadParameter(f"invalid visual map: {exc}") from exc
     routes = topology.routes()
@@ -474,9 +475,7 @@ def inspect_visual_map(
             landmark.calibration is not None for landmark in landmarks
         ),
         "route_count": len(routes),
-        "landmarks": [
-            landmark.model_dump(mode="json") for landmark in landmarks
-        ],
+        "landmarks": [landmark.model_dump(mode="json") for landmark in landmarks],
         "routes": [
             {
                 **route.model_dump(mode="json"),
@@ -543,6 +542,144 @@ def inspect_visual_map(
                 f"parent={route.parent_route_id or '-'}, "
                 f"superseded_by={route.superseded_by or '-'}"
             )
+
+
+@app.command("inspect-exploration-memory")
+def inspect_exploration_memory(
+    database: Annotated[Path, typer.Argument(help="Exploration memory SQLite file")],
+    json_output: Annotated[
+        bool, typer.Option("--json", help="Emit machine-readable JSON")
+    ] = False,
+) -> None:
+    """Inspect durable places and frontiers without exposing semantic labels."""
+
+    from minecraft_scientist.exploration import ExplorationMemory
+
+    try:
+        with ExplorationMemory.open(database) as memory:
+            summary = memory.summary()
+            places = memory.places()
+            frontiers = memory.frontiers()
+            payload = {
+                **summary,
+                "places": [item.model_dump(mode="json") for item in places],
+                "frontiers": [item.model_dump(mode="json") for item in frontiers],
+                "transitions": [
+                    item.model_dump(mode="json") for item in memory.transitions()
+                ],
+            }
+    except (FileNotFoundError, OSError, ValueError) as exc:
+        raise typer.BadParameter(f"invalid exploration memory: {exc}") from exc
+    if json_output:
+        console.print_json(json.dumps(payload, sort_keys=True))
+        return
+    console.print(
+        f"Exploration memory v{summary['format_version']}: "
+        f"{summary['place_count']} places, "
+        f"{summary['active_frontier_count']} active frontiers, "
+        f"{summary['transition_count']} known transitions, "
+        f"integrity={'valid' if summary['integrity_valid'] else 'INVALID'}"
+    )
+    table = Table(title=database.name)
+    table.add_column("Frontier")
+    table.add_column("Status")
+    table.add_column("Source")
+    table.add_column("Attempts", justify="right")
+    table.add_column("Uncertainty", justify="right")
+    table.add_column("Risk", justify="right")
+    table.add_column("Roles")
+    for frontier in frontiers:
+        table.add_row(
+            frontier.frontier_id,
+            frontier.status.value,
+            frontier.source_place_id,
+            str(frontier.attempts),
+            f"{frontier.uncertainty:.3f}",
+            f"{frontier.risk:.3f}",
+            " -> ".join(frontier.action_roles),
+        )
+    console.print(table)
+
+
+@app.command("benchmark-exploration")
+def benchmark_exploration(
+    output: Annotated[
+        Path, typer.Option(help="Persistent exploration artifact directory")
+    ] = Path("runs/persistent-exploration"),
+    seed: Annotated[int, typer.Option(help="Deterministic world seed")] = 0,
+    budget: Annotated[
+        int, typer.Option(min=1, help="Maximum unknown-frontier attempts")
+    ] = 60,
+    session_length: Annotated[
+        int, typer.Option(min=1, help="Attempts between forced restarts")
+    ] = 5,
+    overwrite: Annotated[
+        bool, typer.Option(help="Replace known benchmark artifacts")
+    ] = False,
+) -> None:
+    """Run the offline cross-session frontier-memory release gate."""
+
+    from minecraft_scientist.evaluation import (
+        run_persistent_exploration_benchmark,
+    )
+
+    try:
+        report = run_persistent_exploration_benchmark(
+            seed=seed,
+            output=output,
+            budget=budget,
+            session_length=session_length,
+            overwrite=overwrite,
+        )
+    except (FileExistsError, OSError, RuntimeError, ValueError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    metrics = report["metrics"]
+    assert isinstance(metrics, dict)
+    table = Table(title="Persistent exploration benchmark")
+    table.add_column("Metric")
+    table.add_column("Value", justify="right")
+    for key, value in metrics.items():
+        table.add_row(str(key), str(value))
+    console.print(table)
+    console.print(f"Artifacts: {output.resolve()}")
+
+
+@app.command("minecraft-exploration-smoke")
+def minecraft_exploration_smoke(
+    server_directory: Annotated[
+        Path, typer.Option(help="Prepared vanilla Minecraft server directory")
+    ] = Path("minecraft-server"),
+    output: Annotated[
+        Path, typer.Option(help="Movement probe artifact directory")
+    ] = Path("runs/minecraft-open-world-movement"),
+    seed: Annotated[int, typer.Option(help="Opaque-ID seed")] = 0,
+    stride: Annotated[
+        int, typer.Option(min=2, max=32, help="Movement frontier stride")
+    ] = 4,
+    username: Annotated[
+        str, typer.Option(help="Offline Mineflayer username")
+    ] = "ExplorerBot",
+    overwrite: Annotated[
+        bool, typer.Option(help="Replace known movement-probe artifacts")
+    ] = False,
+) -> None:
+    """Run a bounded real vanilla-server opaque movement-frontier search."""
+
+    from minecraft_scientist.minecraft import run_open_world_movement_probe
+
+    try:
+        report = run_open_world_movement_probe(
+            server_directory=server_directory,
+            output=output,
+            seed=seed,
+            stride=stride,
+            username=username,
+            overwrite=overwrite,
+        )
+    except (FileExistsError, OSError, RuntimeError, ValueError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    console.print_json(json.dumps(report, sort_keys=True))
+    console.print(f"Artifacts: {output.resolve()}")
 
 
 @app.command("train-planner")
@@ -744,9 +881,7 @@ def minecraft_server_start(
     ] = Path("minecraft-server"),
     min_memory: Annotated[str, typer.Option(help="Initial Java heap, e.g. 1G")] = "1G",
     max_memory: Annotated[str, typer.Option(help="Maximum Java heap, e.g. 3G")] = "3G",
-    flavor: Annotated[
-        str, typer.Option(help="auto, fabric, or vanilla")
-    ] = "auto",
+    flavor: Annotated[str, typer.Option(help="auto, fabric, or vanilla")] = "auto",
 ) -> None:
     from minecraft_scientist.minecraft import run_server
 
@@ -823,9 +958,7 @@ def minecraft_live_smoke(
     overwrite: Annotated[
         bool, typer.Option(help="Replace known smoke-test artifacts")
     ] = False,
-    server_mode: Annotated[
-        str, typer.Option(help="fabric or gradle")
-    ] = "fabric",
+    server_mode: Annotated[str, typer.Option(help="fabric or gradle")] = "fabric",
 ) -> None:
     from minecraft_scientist.minecraft import (
         MinecraftConnectionConfig,
@@ -888,13 +1021,13 @@ def minecraft_live_run(
     change_episode: Annotated[
         int | None, typer.Option(help="Episode that activates shifted rules")
     ] = 1,
-    username: Annotated[str, typer.Option(help="Offline bot username")] = "ScientistBot",
+    username: Annotated[
+        str, typer.Option(help="Offline bot username")
+    ] = "ScientistBot",
     overwrite: Annotated[
         bool, typer.Option(help="Replace known live-run artifacts")
     ] = False,
-    server_mode: Annotated[
-        str, typer.Option(help="fabric or gradle")
-    ] = "fabric",
+    server_mode: Annotated[str, typer.Option(help="fabric or gradle")] = "fabric",
     planner: Annotated[
         str, typer.Option(help="information_gain or learned")
     ] = "information_gain",
@@ -932,13 +1065,13 @@ def minecraft_live_fall(
     intervention_budget: Annotated[
         int, typer.Option(min=1, help="Maximum experiments per equation version")
     ] = 40,
-    username: Annotated[str, typer.Option(help="Offline bot username")] = "ScientistBot",
+    username: Annotated[
+        str, typer.Option(help="Offline bot username")
+    ] = "ScientistBot",
     overwrite: Annotated[
         bool, typer.Option(help="Replace known live equation artifacts")
     ] = False,
-    server_mode: Annotated[
-        str, typer.Option(help="fabric or gradle")
-    ] = "fabric",
+    server_mode: Annotated[str, typer.Option(help="fabric or gradle")] = "fabric",
     planner: Annotated[
         str, typer.Option(help="information_gain or learned")
     ] = "information_gain",
@@ -978,13 +1111,13 @@ def minecraft_live_benchmark(
     fall_intervention_budget: Annotated[
         int, typer.Option(min=1, help="Equation experiments per theory version")
     ] = 40,
-    username: Annotated[str, typer.Option(help="Offline bot username")] = "ScientistBot",
+    username: Annotated[
+        str, typer.Option(help="Offline bot username")
+    ] = "ScientistBot",
     overwrite: Annotated[
         bool, typer.Option(help="Replace known combined live artifacts")
     ] = False,
-    server_mode: Annotated[
-        str, typer.Option(help="fabric or gradle")
-    ] = "fabric",
+    server_mode: Annotated[str, typer.Option(help="fabric or gradle")] = "fabric",
     planner: Annotated[
         str, typer.Option(help="information_gain or learned")
     ] = "information_gain",

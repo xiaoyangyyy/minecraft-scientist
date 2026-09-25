@@ -376,6 +376,38 @@ gate passes 150 tests on Windows and 148 tests plus two expected Node-specific s
 in the full MineStudio Linux environment; dependency-lock validation, sdist/wheel
 builds and the seed-0 MVP benchmark also pass.
 
+The next-stage persistent-exploration foundation adds an append-only, hash-checked
+SQLite event journal and typed projections for multi-view places, directed place
+transitions and unresolved frontiers. Reopening the database restores its exact
+behavioral configuration; opening it with different match, ambiguity, coreset or
+failure-threshold settings is rejected. Multi-view place matching uses a bounded
+farthest-point coreset, supervised positive/negative calibration and ambiguity
+rejection. Frontier attempts, failure streaks and blocked/resolved status survive
+process restarts. Planning composes a known route with one information-seeking action,
+excluding resolved and repeatedly failed frontiers.
+
+The deterministic seed-17 gate hides six places, perturbs every public anonymous
+signature between sessions, forces a restart after every five unknown actions and
+reveals only opaque action roles. It reaches all six places with 1.0 coverage and
+place recall, zero duplicate places, 24 frontier attempts, 13 known-route travel
+actions, four successful restart recognitions, zero unresolved frontiers and a valid
+journal/projection integrity check. Evidence is in
+`runs/persistent-exploration-seed17/{report.json,exploration.sqlite3}`. The Mineflayer
+adapter now additionally exposes four optional anonymous movement targets and
+translates `MOVE` to its already implemented `move_to` bridge action without compass
+labels. The bridge now separates its path-search computation budget from I/O timeout,
+and the smoke gate tries at most four anonymous directions while persisting failed or
+resolved frontiers. In a freshly generated vanilla seed-31 world, the first frontier
+completed with 2.826 blocks of displacement and 1.174 blocks of target error;
+controller success and intervention compliance were true, two places and one
+directed transition were persisted, and the journal/projection integrity check was
+valid. Evidence is in
+`runs/minecraft-open-world-movement-fresh-seed31/{report.json,events.jsonl,exploration.sqlite3}`.
+This is a real short-traversal gate, not evidence of an autonomous long-running
+open-world Minecraft episode. The expanded release gate passes 160 tests on Windows
+and 158 tests plus two expected Node-specific skips in the MineStudio Linux
+environment; dependency-lock validation and both package builds pass.
+
 The expanded three-mechanism release gate completed with 78 tests. Its 20-pair run
 used per-pair durable checkpoints, three bounded JSON retries, 63 total calls, and
 305,554 tokens under the configured hard caps. Both exposed credentials are no

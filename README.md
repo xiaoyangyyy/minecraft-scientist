@@ -333,6 +333,41 @@ recomputes all distances, checks source/evidence hashes, and validates the saved
 map. Evidence is in `runs/adaptive-landmark-calibration`. This establishes one
 auditable controlled-fixture calibration, not a generally learned visual metric.
 
+The next-stage exploration foundation adds an append-only `ExplorationMemory` backed
+by SQLite. Anonymous places retain a bounded multi-view exemplar coreset, calibrated
+match radius, visits and episode history; candidate action frontiers retain attempts,
+failure streaks, risk, uncertainty and resolved destinations across process restarts.
+The planner routes over previously successful directed transitions and then chooses
+the reachable active frontier with the best novelty/information/cost/risk score.
+`minecraft-scientist inspect-exploration-memory` verifies the journal hashes and
+shows the durable projections. The deterministic six-place gate can be run with:
+
+```powershell
+uv run minecraft-scientist benchmark-exploration --seed 17 --output runs/persistent-exploration-seed17
+```
+
+That gate reaches 1.0 coverage and place recall through four forced restarts, with no
+duplicate places or unresolved frontiers. It is deliberately an offline hidden-graph
+test. On the real Mineflayer boundary, setting `exploration_stride` now exposes four
+opaque coordinate targets with `MOVE` affordances and translates the selected target
+to the bridge's existing `move_to` controller. A bounded real-server gate can be run
+against an explicitly prepared vanilla server:
+
+```powershell
+uv run minecraft-scientist minecraft-exploration-smoke --server-directory minecraft-server --seed 31 --output runs/minecraft-open-world-movement
+```
+
+The clean-world seed-31 evidence in
+`runs/minecraft-open-world-movement-fresh-seed31` completed its first anonymous
+frontier with 2.826 blocks of displacement, 1.174 blocks of target error, a resolved
+frontier, one persisted directed transition and a valid memory integrity check. The
+bridge gives path search its own bounded computation budget and the gate can try up
+to four anonymous directions, persisting blocked attempts instead of treating an
+obstacle as controller success. This removes the previous inability to move
+autonomously and grounds one short traversal in the persistent topology. It does not
+yet prove long-horizon survival, chunk-scale coverage or general visual place
+recognition in an uncontrolled Minecraft world.
+
 A concrete label-free `GridVisualController` maps opaque screen regions and hotbar
 slots to MineStudio env actions. Tests verify action translation and semantic
 isolation; the accepted live experiment additionally audits successful opaque
