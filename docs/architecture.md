@@ -186,6 +186,16 @@ The CLI command `inspect-visual-map` reports the status, evidence counts, failur
 streak, cost, functional program and replacement lineage; map formats 1 and 2 are
 still accepted with active/default lifecycle fields.
 
+Format version 4 adds optional per-landmark `VisualMatchCalibration` records. A
+controlled labeled calibration requires at least two positive signatures and one
+negative signature. It sets the acceptance radius to the maximum positive distance
+plus a preregistered margin and refuses the calibration unless that boundary remains
+another margin inside the nearest negative. `match` uses the fitted radius when
+present and otherwise retains the map-level tolerance, so historical maps preserve
+their behavior. The CLI reports sample counts, positive spread, nearest-negative
+distance, margin and radius. Formats 1–3 remain loadable without synthesized
+calibration claims.
+
 The real seed-140 visual-route-crisis suite deliberately uses a coarse 8.25 landmark
 tolerance to expose a perceptual alias between mirror obstacle layouts (signature
 distance 8.0). This is a controlled stress case: two source executions establish
@@ -195,6 +205,18 @@ shadow replay before supersession. The final graph keeps both programs and their
 lineage. This demonstrates the lifecycle over RGB and real simulator actions; it
 does not imply natural-scene change detection, learned tolerance calibration, or
 general navigation.
+
+The follow-up adaptive calibration suite uses immutable copies of five already
+audited MineStudio episodes with disjoint roles: two training positives, one training
+negative, one held-out positive and one held-out negative. The deliberately broad
+8.25 baseline accepts the negative at distance 8.0. The fitted radius is 1.0
+(positive spread 0.0 plus margin 1.0); it accepts the held-out positive and rejects
+the held-out negative and a distance-4 intermediate control. Its independent auditor
+re-renders trajectory features from PNG evidence, recomputes the fit, checks every
+artifact manifest and reloads the v4 map. Because all positive signatures are
+identical in this fixture, this is evidence for supervised boundary persistence and
+fail-closed separation—not robustness to natural appearance variation or a learned
+embedding.
 
 The seed-143 composition suite exercises the graph rather than a single stored
 program. Edge one is learned from one opaque-control source episode and edge two

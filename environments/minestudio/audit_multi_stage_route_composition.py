@@ -80,7 +80,10 @@ def main() -> None:
     blocked = challenged.plan(start_signature, target_id)
     map_checks = {
         "format_hash_and_shape_match": (
-            report["map_format_version"] == VisualTopologicalMap.FORMAT_VERSION
+            report["map_format_version"] in {
+                3,
+                VisualTopologicalMap.FORMAT_VERSION,
+            }
             and digest(map_path) == report["map_sha256"]
             and topology.graph.number_of_nodes() == 3
             and topology.graph.number_of_edges() == 2

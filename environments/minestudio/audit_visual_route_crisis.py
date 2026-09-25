@@ -386,7 +386,10 @@ def main() -> None:
         "final_plan_uses_only_replacement": final_plan is not None
         and final_plan.route_ids == (replacement_id,),
         "format_and_hash_match_report": (
-            report["map_format_version"] == VisualTopologicalMap.FORMAT_VERSION
+            report["map_format_version"] in {
+                3,
+                VisualTopologicalMap.FORMAT_VERSION,
+            }
             and digest(final_path) == report["map_sha256"]
         ),
     }

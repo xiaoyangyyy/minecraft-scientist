@@ -213,6 +213,8 @@ def test_visual_map_loads_version_two_route_defaults(tmp_path: Path) -> None:
     topology.save(path)
     payload = json.loads(path.read_text(encoding="utf-8"))
     payload["format_version"] = 2
+    for node in payload["nodes"]:
+        del node["calibration"]
     for route in payload["routes"]:
         for field in (
             "status",
@@ -228,6 +230,64 @@ def test_visual_map_loads_version_two_route_defaults(tmp_path: Path) -> None:
 
     assert restored.routes()[0].status is VisualRouteStatus.ACTIVE
     assert restored.routes()[0].failure_streak == 0
+
+
+def test_calibrated_landmark_radius_overrides_broad_global_tolerance() -> None:
+    topology = VisualTopologicalMap(match_tolerance=10)
+    node_id = topology.observe((0, 0))
+
+    landmark = topology.calibrate_landmark(
+        node_id,
+        positive_signatures=((0, 0), (1, 0)),
+        negative_signatures=((5, 0), (8, 0)),
+        margin=1,
+    )
+
+    assert landmark.calibration is not None
+    assert landmark.calibration.max_positive_distance == 1
+    assert landmark.calibration.nearest_negative_distance == 5
+    assert landmark.calibration.radius == 2
+    assert topology.match((2, 0)) == node_id
+    assert topology.match((3, 0)) is None
+    assert topology.match((5, 0)) is None
+
+
+def test_landmark_calibration_rejects_overlapping_class_boundaries() -> None:
+    topology = VisualTopologicalMap(match_tolerance=10)
+    node_id = topology.observe((0, 0))
+
+    with pytest.raises(ValueError, match="not separated"):
+        topology.calibrate_landmark(
+            node_id,
+            positive_signatures=((0, 0), (2, 0)),
+            negative_signatures=((3, 0),),
+            margin=1,
+        )
+
+
+def test_calibrated_landmark_persists_and_rejects_tampering(
+    tmp_path: Path,
+) -> None:
+    topology = VisualTopologicalMap(match_tolerance=10)
+    node_id = topology.observe((0, 0))
+    topology.calibrate_landmark(
+        node_id,
+        positive_signatures=((0, 0), (1, 0)),
+        negative_signatures=((5, 0),),
+        margin=1,
+    )
+    path = tmp_path / "calibrated-map.json"
+    topology.save(path)
+
+    restored = VisualTopologicalMap.load(path)
+    assert restored.landmarks()[0].calibration is not None
+    assert restored.landmarks()[0].calibration.radius == 2
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["nodes"][0]["calibration"]["radius"] = 4
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError, match="spread plus margin"):
+        VisualTopologicalMap.load(path)
 
 
 def test_visual_map_rejects_tampered_supersession_lineage(tmp_path: Path) -> None:

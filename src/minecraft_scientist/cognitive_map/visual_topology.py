@@ -30,6 +30,40 @@ class VisualRouteStatus(StrEnum):
     REJECTED = "rejected"
 
 
+class VisualMatchCalibration(BaseModel):
+    """Auditable per-landmark radius fitted from positive and negative views."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    positive_samples: int = Field(ge=2)
+    negative_samples: int = Field(ge=1)
+    max_positive_distance: float = Field(ge=0)
+    nearest_negative_distance: float = Field(gt=0)
+    margin: float = Field(ge=0)
+    radius: float = Field(ge=0)
+
+    @model_validator(mode="after")
+    def boundary_is_finite_and_separated(self) -> VisualMatchCalibration:
+        values = (
+            self.max_positive_distance,
+            self.nearest_negative_distance,
+            self.margin,
+            self.radius,
+        )
+        if not all(math.isfinite(value) for value in values):
+            raise ValueError("visual match calibration must be finite")
+        if not math.isclose(
+            self.radius,
+            self.max_positive_distance + self.margin,
+            rel_tol=1e-12,
+            abs_tol=1e-12,
+        ):
+            raise ValueError("calibrated radius must equal positive spread plus margin")
+        if self.radius >= self.nearest_negative_distance - self.margin:
+            raise ValueError("positive and negative landmark views are not separated")
+        return self
+
+
 class VisualLandmark(BaseModel):
     """An opaque appearance landmark observed by the Agent."""
 
@@ -38,6 +72,7 @@ class VisualLandmark(BaseModel):
     node_id: str
     signature: tuple[int, ...]
     observations: int = Field(default=1, ge=1)
+    calibration: VisualMatchCalibration | None = None
 
     @field_validator("signature")
     @classmethod
@@ -126,7 +161,7 @@ class VisualRoutePlan(BaseModel):
 class VisualTopologicalMap:
     """Persistent coordinate-free graph of visual landmarks and route programs."""
 
-    FORMAT_VERSION = 3
+    FORMAT_VERSION = 4
 
     def __init__(
         self,
@@ -170,6 +205,80 @@ class VisualTopologicalMap:
         )
         return node_id
 
+    @staticmethod
+    def _distance(left: tuple[int, ...], right: tuple[int, ...]) -> float:
+        if len(left) != len(right):
+            raise ValueError("visual signatures must have equal dimensions")
+        return math.sqrt(sum(
+            (left_value - right_value) ** 2
+            for left_value, right_value in zip(left, right, strict=True)
+        ))
+
+    def landmarks(self) -> tuple[VisualLandmark, ...]:
+        """Return an immutable deterministic view of all visual landmarks."""
+
+        return tuple(
+            attributes["data"]
+            for _, attributes in sorted(self.graph.nodes(data=True))
+        )
+
+    def calibrate_landmark(
+        self,
+        node_id: str,
+        positive_signatures: Iterable[Iterable[int]],
+        negative_signatures: Iterable[Iterable[int]],
+        *,
+        margin: float = 1.0,
+    ) -> VisualLandmark:
+        """Fit a conservative match radius from controlled labeled views.
+
+        Positive views estimate within-landmark spread. Negative views do not
+        enlarge the accepted region; they prove that the proposed positive spread
+        plus margin remains separated from the nearest known alternative.
+        """
+
+        if not math.isfinite(margin) or margin < 0:
+            raise ValueError("calibration margin must be finite and nonnegative")
+        if node_id not in self.graph:
+            raise KeyError(f"unknown visual landmark: {node_id}")
+        landmark: VisualLandmark = self.graph.nodes[node_id]["data"]
+        positives = tuple(
+            tuple(int(value) for value in signature)
+            for signature in positive_signatures
+        )
+        negatives = tuple(
+            tuple(int(value) for value in signature)
+            for signature in negative_signatures
+        )
+        if len(positives) < 2:
+            raise ValueError("landmark calibration requires at least two positives")
+        if not negatives:
+            raise ValueError("landmark calibration requires at least one negative")
+        if any(not signature for signature in (*positives, *negatives)):
+            raise ValueError("calibration signatures must not be empty")
+        positive_distances = tuple(
+            self._distance(landmark.signature, signature)
+            for signature in positives
+        )
+        negative_distances = tuple(
+            self._distance(landmark.signature, signature)
+            for signature in negatives
+        )
+        maximum_positive = max(positive_distances)
+        nearest_negative = min(negative_distances)
+        calibration = VisualMatchCalibration(
+            positive_samples=len(positives),
+            negative_samples=len(negatives),
+            max_positive_distance=maximum_positive,
+            nearest_negative_distance=nearest_negative,
+            margin=margin,
+            radius=maximum_positive + margin,
+        )
+        updated = landmark.model_copy(update={"calibration": calibration})
+        updated = VisualLandmark.model_validate(updated.model_dump())
+        self.graph.nodes[node_id]["data"] = updated
+        return updated
+
     def match(self, signature: Iterable[int]) -> str | None:
         normalized = tuple(int(value) for value in signature)
         candidates: list[tuple[float, str]] = []
@@ -177,13 +286,13 @@ class VisualTopologicalMap:
             landmark: VisualLandmark = attributes["data"]
             if len(landmark.signature) != len(normalized):
                 continue
-            distance = math.sqrt(sum(
-                (left - right) ** 2
-                for left, right in zip(
-                    landmark.signature, normalized, strict=True
-                )
-            ))
-            if distance <= self.match_tolerance:
+            distance = self._distance(landmark.signature, normalized)
+            tolerance = (
+                landmark.calibration.radius
+                if landmark.calibration is not None
+                else self.match_tolerance
+            )
+            if distance <= tolerance:
                 candidates.append((distance, node_id))
         candidates.sort()
         if not candidates:
@@ -480,10 +589,10 @@ class VisualTopologicalMap:
     def load(cls, path: Path) -> VisualTopologicalMap:
         payload = json.loads(path.read_text(encoding="utf-8"))
         format_version = payload.get("format_version")
-        if format_version not in {1, 2, cls.FORMAT_VERSION}:
+        if format_version not in {1, 2, 3, cls.FORMAT_VERSION}:
             raise ValueError("unsupported visual topological map format")
         expected_fields = {"format_version", "match_tolerance", "nodes", "routes"}
-        if format_version in {2, cls.FORMAT_VERSION}:
+        if format_version in {2, 3, cls.FORMAT_VERSION}:
             expected_fields.add("ambiguity_margin")
         if set(payload) != expected_fields:
             raise ValueError("unexpected visual topological map fields")

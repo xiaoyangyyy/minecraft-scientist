@@ -61,9 +61,16 @@ def test_cli_loads_world_config_and_writes_artifacts(tmp_path: Path) -> None:
 
 def test_cli_inspects_visual_route_lifecycle(tmp_path: Path) -> None:
     topology = VisualTopologicalMap()
-    old = topology.record_route((1,), (2,), ("direct",), success=True)
+    source_id = topology.observe((1,))
+    topology.calibrate_landmark(
+        source_id,
+        positive_signatures=((1,), (2,)),
+        negative_signatures=((6,),),
+        margin=1,
+    )
+    old = topology.record_route((1,), (10,), ("direct",), success=True)
     replacement = topology.record_route(
-        (1,), (2,), ("detour", "advance"), success=True
+        (1,), (10,), ("detour", "advance"), success=True
     )
     topology.challenge_route(old, reason="blocked after layout mutation")
     topology.supersede_route(
@@ -82,7 +89,14 @@ def test_cli_inspects_visual_route_lifecycle(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     assert "superseded" in result.output
     assert "shadow validation passed" in result.output
+    assert "Calibrated landmarks" in result.output
     assert machine.exit_code == 0, machine.output
     payload = json.loads(machine.output)
     assert payload["format_version"] == VisualTopologicalMap.FORMAT_VERSION
+    assert payload["calibrated_landmark_count"] == 1
+    calibrated = next(
+        item for item in payload["landmarks"]
+        if item["calibration"] is not None
+    )
+    assert calibrated["calibration"]["radius"] == 2
     assert payload["route_count"] == 2

@@ -352,6 +352,30 @@ both boundary matches, the midpoint planning decision, hashes and non-leakage;
 `valid` is true. Evidence:
 `runs/multi-stage-route-seed143-map1415/{report.json,visual-topology.json,integrity-audit.json}`.
 
+The 2026-09-25 adaptive-landmark gate upgrades new visual maps to format version 4.
+`VisualMatchCalibration` persists the positive/negative sample counts, maximum
+positive distance, nearest-negative distance, margin and fitted radius per landmark;
+the matcher falls back to the historical global tolerance for uncalibrated landmarks.
+The calibration API rejects insufficient evidence, non-finite values and overlapping
+positive/negative boundaries. The map inspector exposes the complete calibration.
+
+The accepted `runs/adaptive-landmark-calibration` evidence copies five independently
+audited real MineStudio episodes without rerunning or relabeling them after fitting.
+Two source episodes are training positives, the mirror-layout repair is the training
+negative, the seed-143 composition replay is the held-out positive, and the seed-142
+shadow replay is the held-out negative. The global 8.25 tolerance has a 1.0 false-
+acceptance rate on the held-out negative. With margin 1.0, the fitted landmark has
+positive spread 0.0, nearest-negative distance 8.0 and radius 1.0; held-out positive
+acceptance and held-out negative rejection are both 1.0, and a distance-4 control is
+rejected. The independent audit regenerates signatures from copied PNG trajectories,
+recomputes every statistic and decision, validates upstream audits, source snapshots,
+evidence manifests and map hash, and reports `valid: true`. The historical v1, v2 and
+v3 MineStudio maps also re-audit as valid under the v4 loader. This is a calibrated
+boundary for one controlled landmark, not general place recognition. The release
+gate passes 150 tests on Windows and 148 tests plus two expected Node-specific skips
+in the full MineStudio Linux environment; dependency-lock validation, sdist/wheel
+builds and the seed-0 MVP benchmark also pass.
+
 The expanded three-mechanism release gate completed with 78 tests. Its 20-pair run
 used per-pair durable checkpoints, three bounded JSON retries, 63 total calls, and
 305,554 tokens under the configured hard caps. Both exposed credentials are no

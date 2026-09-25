@@ -198,12 +198,14 @@ and confirms no layout offset, coordinates, raw direction binding, or source mot
 handle enters Agent artifacts. This remains two preregistered offsets of one
 fixture—not arbitrary obstacle geometry, a large-scale place graph, or SLAM.
 
-The library's current format version 3 layers a persistent lifecycle over these
+Format version 3 layers a persistent lifecycle over these
 route programs. High-confidence replay failures can challenge a route, challenged
 routes are excluded from planning, and a separately validated competing program can
 supersede the old record without deleting it. The saved lineage and evidence counters
 are available through `minecraft-scientist inspect-visual-map`; historical version-1
-and version-2 evidence maps remain loadable and independently auditable.
+and version-2 evidence maps remain loadable and independently auditable. The current
+version-4 writer adds optional per-landmark match calibration while retaining v1–v3
+loading.
 
 `visual_route_crisis_benchmark.py` drives the full format-v3 lifecycle with real RGB
 and movement. It preregisters two source executions, one forced stale-route replay,
@@ -244,6 +246,27 @@ manifest, recomputes both source programs, confirms the 3-node/2-edge topology,
 reconstructs the held-out bindings and evaluator path, and independently verifies
 the midpoint and terminal signatures. This remains one short controlled path rather
 than arbitrary graph exploration.
+
+`adaptive_landmark_calibration_benchmark.py` uses immutable copies of the accepted
+crisis and composition evidence to fit a match radius for one controlled source
+landmark. The split is fixed before fitting: two crisis source episodes are positive
+training examples, the repair source is the negative training example, the
+composition replay is a held-out positive, and crisis shadow validation is a held-out
+negative. The broad 8.25 map tolerance intentionally false-accepts the held-out
+negative. The v4 per-landmark radius is 1.0, accepts the held-out positive, and rejects
+the held-out negative plus an intermediate signature.
+
+```powershell
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/adaptive_landmark_calibration_benchmark.py --crisis-run /mnt/d/minecraft-scientist/runs/visual-route-crisis-seed140-map1400 --composition-run /mnt/d/minecraft-scientist/runs/multi-stage-route-seed143-map1415 --output /mnt/d/minecraft-scientist/runs/adaptive-landmark-calibration
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/audit_adaptive_landmark_calibration.py /mnt/d/minecraft-scientist/runs/adaptive-landmark-calibration
+uv run minecraft-scientist inspect-visual-map runs/adaptive-landmark-calibration/visual-topology.json
+```
+
+The independent audit regenerates signatures from copied RGB trajectories, recomputes
+the boundary and all decisions, validates both upstream audits, source snapshots and
+artifact manifests, and strictly reloads the saved map. Identical positive signatures
+mean this validates auditable supervised separation for one fixture; it does not
+measure natural lighting, viewpoint or texture variation.
 
 MineStudio is deliberately excluded from the root `uv` environment. Its simulator
 documentation targets Linux, Python 3.10+, JDK 8, VirtualGL/Xvfb, and a separate

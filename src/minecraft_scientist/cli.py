@@ -466,10 +466,17 @@ def inspect_visual_map(
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         raise typer.BadParameter(f"invalid visual map: {exc}") from exc
     routes = topology.routes()
+    landmarks = topology.landmarks()
     payload = {
         "format_version": saved_format_version,
-        "landmark_count": topology.graph.number_of_nodes(),
+        "landmark_count": len(landmarks),
+        "calibrated_landmark_count": sum(
+            landmark.calibration is not None for landmark in landmarks
+        ),
         "route_count": len(routes),
+        "landmarks": [
+            landmark.model_dump(mode="json") for landmark in landmarks
+        ],
         "routes": [
             {
                 **route.model_dump(mode="json"),
@@ -483,8 +490,31 @@ def inspect_visual_map(
         return
     console.print(
         f"Visual map v{saved_format_version}: "
-        f"{payload['landmark_count']} landmarks, {payload['route_count']} routes"
+        f"{payload['landmark_count']} landmarks "
+        f"({payload['calibrated_landmark_count']} calibrated), "
+        f"{payload['route_count']} routes"
     )
+    calibrated = [
+        landmark for landmark in landmarks if landmark.calibration is not None
+    ]
+    if calibrated:
+        landmark_table = Table(title="Calibrated landmarks")
+        landmark_table.add_column("Landmark")
+        landmark_table.add_column("Radius", justify="right")
+        landmark_table.add_column("Positive", justify="right")
+        landmark_table.add_column("Negative", justify="right")
+        landmark_table.add_column("Nearest negative", justify="right")
+        for landmark in calibrated:
+            calibration = landmark.calibration
+            assert calibration is not None
+            landmark_table.add_row(
+                landmark.node_id,
+                f"{calibration.radius:.3f}",
+                str(calibration.positive_samples),
+                str(calibration.negative_samples),
+                f"{calibration.nearest_negative_distance:.3f}",
+            )
+        console.print(landmark_table)
     table = Table(title=map_path.name)
     table.add_column("Route")
     table.add_column("Status")

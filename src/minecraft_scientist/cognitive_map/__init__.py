@@ -1,6 +1,7 @@
 from .map import CognitiveMap, MapNode
 from .visual_topology import (
     VisualLandmark,
+    VisualMatchCalibration,
     VisualRoute,
     VisualRoutePlan,
     VisualRouteStatus,
@@ -11,6 +12,7 @@ __all__ = [
     "CognitiveMap",
     "MapNode",
     "VisualLandmark",
+    "VisualMatchCalibration",
     "VisualRoute",
     "VisualRoutePlan",
     "VisualRouteStatus",
