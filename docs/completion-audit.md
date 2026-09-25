@@ -404,9 +404,24 @@ directed transition were persisted, and the journal/projection integrity check w
 valid. Evidence is in
 `runs/minecraft-open-world-movement-fresh-seed31/{report.json,events.jsonl,exploration.sqlite3}`.
 This is a real short-traversal gate, not evidence of an autonomous long-running
-open-world Minecraft episode. The expanded release gate passes 160 tests on Windows
-and 158 tests plus two expected Node-specific skips in the MineStudio Linux
-environment; dependency-lock validation and both package builds pass.
+open-world Minecraft episode.
+
+The subsequent multi-session gate runs one real vanilla world while recreating the
+controller and reopening the database every three attempts. Per-place structural
+views use a 34-dimensional, label-free, grid-anchored descriptor and a bounded
+farthest-point coreset in the same append-only integrity chain. In the fresh seed-59
+world, 12 attempts produced 8 valid place-changing moves, 38.140 blocks of path,
+18.385 blocks of maximum start distance, 9 places, 8 transitions and 36 frontiers
+across four controller sessions. Coordinate and structural-scene restart recognition
+were both 3/3. Known-place structural retrieval was 4/4 with zero false matches. One
+new place duplicated an earlier local descriptor; it was retained as an uncommitted
+perceptual alias rather than accepted as a loop closure. Evidence is in
+`runs/minecraft-open-world-perceptual-seed59/{config.json,report.json,events.jsonl,exploration.sqlite3}`.
+This proves bounded real multi-session traversal and structural perception, not
+pixel-level visual generalization, resource gathering, survival or unbounded
+open-world competence. The expanded release gate passes 163 tests on Windows and 161
+tests plus two expected Node-specific skips in the MineStudio Linux environment;
+dependency-lock validation and both package builds pass.
 
 The expanded three-mechanism release gate completed with 78 tests. Its 20-pair run
 used per-pair durable checkpoints, three bounded JSON retries, 63 total calls, and

@@ -368,6 +368,30 @@ autonomously and grounds one short traversal in the persistent topology. It does
 yet prove long-horizon survival, chunk-scale coverage or general visual place
 recognition in an uncontrolled Minecraft world.
 
+`minecraft-explore` extends that gate into a bounded multi-session episode. It closes
+and recreates the Mineflayer controller at a fixed interval, reopens the SQLite
+memory each time, prefers novel active frontiers, and can bind a known route back to
+a remote unresolved frontier. The same database now stores a bounded coreset of
+34-dimensional anonymous structural scene views for each place. The encoder ignores
+opaque IDs, object order and semantic block names, and does not serialize absolute
+coordinates; it uses public coordinates only to define a fixed local grid anchor,
+then summarizes geometry, hardness and diggability. It is invariant to whole-cell
+translations. Ambiguous scene matches fail closed.
+
+```powershell
+uv run minecraft-scientist minecraft-explore --server-directory minecraft-server --seed 59 --move-budget 12 --restart-interval 3 --output runs/minecraft-open-world-perceptual-seed59
+```
+
+The clean-world seed-59 evidence completed 8 valid place-changing moves in 12
+attempts, travelled 38.140 blocks, reached 18.385 blocks from the start, and retained
+9 places, 8 directed transitions and 36 frontiers across four controller sessions.
+Coordinate restart recognition and anonymous-scene restart recognition were both
+3/3; known-place scene retrieval was 4/4 with no false match. One new place had a
+scene descriptor identical to an earlier place, so the topology treated it as an
+uncommitted alias rather than a loop closure. This is meaningful long-term structural
+perception, but it is still not pixel-level visual generalization or unbounded
+survival exploration.
+
 A concrete label-free `GridVisualController` maps opaque screen regions and hotbar
 slots to MineStudio env actions. Tests verify action translation and semantic
 isolation; the accepted live experiment additionally audits successful opaque

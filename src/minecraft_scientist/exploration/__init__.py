@@ -5,16 +5,20 @@ from .memory import (
     FrontierMemory,
     FrontierPlan,
     FrontierStatus,
+    PerceptualPlaceMemory,
     PlaceCalibration,
     PlaceMemory,
     PlaceTransition,
 )
+from .perception import AnonymousSceneEncoder
 
 __all__ = [
+    "AnonymousSceneEncoder",
     "ExplorationMemory",
     "FrontierMemory",
     "FrontierPlan",
     "FrontierStatus",
+    "PerceptualPlaceMemory",
     "PlaceCalibration",
     "PlaceMemory",
     "PlaceTransition",

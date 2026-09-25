@@ -65,6 +65,8 @@ def test_cross_session_frontier_planning_uses_visual_memory_and_known_routes(
             "place_count": 2,
             "multi_view_place_count": 1,
             "calibrated_place_count": 0,
+            "perceptual_place_count": 0,
+            "multi_view_perceptual_place_count": 0,
             "frontier_count": 3,
             "active_frontier_count": 2,
             "resolved_frontier_count": 1,

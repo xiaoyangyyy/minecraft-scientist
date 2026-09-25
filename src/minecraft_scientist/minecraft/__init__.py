@@ -14,6 +14,7 @@ from .minestudio import (
     check_minestudio_backend,
     create_minecraft_sim,
 )
+from .open_world import run_open_world_exploration
 from .scenarios import (
     FallEquationScenario,
     MiningArenaScenario,
@@ -64,6 +65,7 @@ __all__ = [
     "run_live_benchmark",
     "run_live_discovery",
     "run_live_fall_discovery",
+    "run_open_world_exploration",
     "run_open_world_movement_probe",
     "run_server",
     "server_status",

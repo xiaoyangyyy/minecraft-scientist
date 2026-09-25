@@ -56,7 +56,7 @@ class MinecraftConnectionConfig(BaseModel):
     auth: str = "offline"
     version: str = MINECRAFT_VERSION
     radius: int = Field(default=8, ge=1, le=32)
-    max_blocks: int = Field(default=128, ge=1, le=512)
+    max_blocks: int = Field(default=128, ge=1, le=2048)
     timeout: float = Field(default=30.0, gt=0)
     pathfinder_timeout: float = Field(default=15.0, gt=0, le=120)
     allowed_block_positions: tuple[tuple[int, int, int], ...] | None = None

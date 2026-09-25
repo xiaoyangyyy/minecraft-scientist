@@ -682,6 +682,68 @@ def minecraft_exploration_smoke(
     console.print(f"Artifacts: {output.resolve()}")
 
 
+@app.command("minecraft-explore")
+def minecraft_explore(
+    server_directory: Annotated[
+        Path, typer.Option(help="Prepared vanilla Minecraft server directory")
+    ] = Path("minecraft-server"),
+    output: Annotated[
+        Path, typer.Option(help="Persistent open-world exploration artifacts")
+    ] = Path("runs/minecraft-open-world-exploration"),
+    seed: Annotated[int, typer.Option(help="Opaque-ID seed")] = 0,
+    move_budget: Annotated[
+        int, typer.Option(min=1, help="Maximum real movement attempts")
+    ] = 12,
+    restart_interval: Annotated[
+        int, typer.Option(min=1, help="Attempts between controller restarts")
+    ] = 3,
+    stride: Annotated[
+        int, typer.Option(min=2, max=32, help="Movement frontier stride")
+    ] = 4,
+    minimum_successful_moves: Annotated[
+        int, typer.Option(min=1, help="Successful-movement release threshold")
+    ] = 8,
+    minimum_unique_places: Annotated[
+        int, typer.Option(min=2, help="Unique-place release threshold")
+    ] = 6,
+    perceptual_tolerance: Annotated[
+        float, typer.Option(min=0, help="Anonymous-scene retrieval radius")
+    ] = 0,
+    perceptual_ambiguity_margin: Annotated[
+        float, typer.Option(min=0, help="Fail-closed scene ambiguity margin")
+    ] = 0,
+    username: Annotated[
+        str, typer.Option(help="Offline Mineflayer username")
+    ] = "ExplorerBot",
+    overwrite: Annotated[
+        bool, typer.Option(help="Replace known exploration artifacts")
+    ] = False,
+) -> None:
+    """Run a bounded multi-session real Minecraft exploration episode."""
+
+    from minecraft_scientist.minecraft import run_open_world_exploration
+
+    try:
+        report = run_open_world_exploration(
+            server_directory=server_directory,
+            output=output,
+            seed=seed,
+            move_budget=move_budget,
+            restart_interval=restart_interval,
+            stride=stride,
+            minimum_successful_moves=minimum_successful_moves,
+            minimum_unique_places=minimum_unique_places,
+            perceptual_tolerance=perceptual_tolerance,
+            perceptual_ambiguity_margin=perceptual_ambiguity_margin,
+            username=username,
+            overwrite=overwrite,
+        )
+    except (FileExistsError, OSError, RuntimeError, ValueError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    console.print_json(json.dumps(report, sort_keys=True))
+    console.print(f"Artifacts: {output.resolve()}")
+
+
 @app.command("train-planner")
 def train_planner(
     output: Annotated[Path, typer.Option(help="Planner checkpoint path")] = Path(

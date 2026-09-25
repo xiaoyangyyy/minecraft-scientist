@@ -145,6 +145,41 @@ class PlaceMemory(_FrozenModel):
         return self
 
 
+class PerceptualPlaceMemory(_FrozenModel):
+    """Bounded anonymous scene exemplars associated with one spatial place."""
+
+    place_id: str
+    exemplars: tuple[tuple[int, ...], ...]
+    observations: int = Field(ge=1)
+    episodes: tuple[int, ...]
+    last_episode: int = Field(ge=0)
+    last_step: int = Field(ge=0)
+
+    @field_validator("exemplars")
+    @classmethod
+    def exemplars_are_compatible(
+        cls, value: tuple[tuple[int, ...], ...]
+    ) -> tuple[tuple[int, ...], ...]:
+        if not value or not value[0]:
+            raise ValueError("perceptual place memory requires an exemplar")
+        if len({len(item) for item in value}) != 1 or len(set(value)) != len(value):
+            raise ValueError("perceptual exemplars must be unique and equally sized")
+        return value
+
+    @field_validator("episodes")
+    @classmethod
+    def episodes_are_sorted(cls, value: tuple[int, ...]) -> tuple[int, ...]:
+        if not value or tuple(sorted(set(value))) != value:
+            raise ValueError("perceptual episodes must be nonempty, unique, and sorted")
+        return value
+
+    @model_validator(mode="after")
+    def recency_is_consistent(self) -> PerceptualPlaceMemory:
+        if self.last_episode != self.episodes[-1]:
+            raise ValueError("perceptual recency must match its episode history")
+        return self
+
+
 class FrontierMemory(_FrozenModel):
     """Persistent evidence about one candidate action program from a place."""
 
@@ -265,6 +300,11 @@ class ExplorationMemory:
             )
             self._connection.execute(
                 "CREATE TABLE IF NOT EXISTS places (place_id TEXT PRIMARY KEY, payload_json TEXT NOT NULL)"
+            )
+            self._connection.execute(
+                "CREATE TABLE IF NOT EXISTS perceptual_places ("
+                "place_id TEXT PRIMARY KEY, payload_json TEXT NOT NULL, "
+                "FOREIGN KEY (place_id) REFERENCES places(place_id))"
             )
             self._connection.execute(
                 "CREATE TABLE IF NOT EXISTS frontiers (frontier_id TEXT PRIMARY KEY, payload_json TEXT NOT NULL)"
@@ -391,6 +431,109 @@ class ExplorationMemory:
         if row is None:
             raise KeyError(f"unknown place: {place_id}")
         return PlaceMemory.model_validate_json(row[0])
+
+    def perceptual_places(self) -> tuple[PerceptualPlaceMemory, ...]:
+        cursor = self._connection.execute(
+            "SELECT payload_json FROM perceptual_places ORDER BY place_id"
+        )
+        return tuple(
+            PerceptualPlaceMemory.model_validate_json(row[0]) for row in cursor
+        )
+
+    def record_perceptual_view(
+        self,
+        place_id: str,
+        signature: Iterable[int],
+        *,
+        episode_id: int,
+        step: int,
+    ) -> PerceptualPlaceMemory:
+        """Bind an anonymous scene view to a known place using bounded storage."""
+
+        self.get_place(place_id)
+        normalized = _signature(signature)
+        if episode_id < 0 or step < 0:
+            raise ValueError("episode and step must be nonnegative")
+        row = self._connection.execute(
+            "SELECT payload_json FROM perceptual_places WHERE place_id = ?",
+            (place_id,),
+        ).fetchone()
+        if row is None:
+            state = PerceptualPlaceMemory(
+                place_id=place_id,
+                exemplars=(normalized,),
+                observations=1,
+                episodes=(episode_id,),
+                last_episode=episode_id,
+                last_step=step,
+            )
+        else:
+            previous = PerceptualPlaceMemory.model_validate_json(row[0])
+            if len(previous.exemplars[0]) != len(normalized):
+                raise ValueError("perceptual signature width changed")
+            state = PerceptualPlaceMemory(
+                place_id=place_id,
+                exemplars=self._coreset(
+                    previous.exemplars[0], (*previous.exemplars, normalized)
+                ),
+                observations=previous.observations + 1,
+                episodes=tuple(sorted(set(previous.episodes) | {episode_id})),
+                last_episode=max(previous.last_episode, episode_id),
+                last_step=(
+                    max(previous.last_step, step)
+                    if episode_id == previous.last_episode
+                    else step
+                    if episode_id > previous.last_episode
+                    else previous.last_step
+                ),
+            )
+        payload = state.model_dump(mode="json")
+        with self._connection:
+            self._append_event(
+                "perceptual_view_recorded",
+                episode_id,
+                step,
+                {"signature": normalized, "state": payload},
+            )
+            self._connection.execute(
+                "INSERT INTO perceptual_places (place_id, payload_json) VALUES (?, ?) "
+                "ON CONFLICT(place_id) DO UPDATE SET payload_json = excluded.payload_json",
+                (place_id, _canonical(payload)),
+            )
+        return state
+
+    def match_perceptual_place(
+        self,
+        signature: Iterable[int],
+        *,
+        tolerance: float,
+        ambiguity_margin: float = 0,
+    ) -> str | None:
+        """Nearest-exemplar recognition with fail-closed ambiguity handling."""
+
+        if not math.isfinite(tolerance) or tolerance < 0:
+            raise ValueError("perceptual tolerance must be finite and nonnegative")
+        if not math.isfinite(ambiguity_margin) or ambiguity_margin < 0:
+            raise ValueError(
+                "perceptual ambiguity margin must be finite and nonnegative"
+            )
+        normalized = _signature(signature)
+        candidates = sorted(
+            (
+                self._nearest_distance(item.exemplars, normalized),
+                item.place_id,
+            )
+            for item in self.perceptual_places()
+            if len(item.exemplars[0]) == len(normalized)
+        )
+        if not candidates or candidates[0][0] > tolerance:
+            return None
+        if (
+            len(candidates) > 1
+            and candidates[1][0] - candidates[0][0] <= ambiguity_margin
+        ):
+            return None
+        return candidates[0][1]
 
     def frontiers(self) -> tuple[FrontierMemory, ...]:
         cursor = self._connection.execute(
@@ -885,6 +1028,7 @@ class ExplorationMemory:
             return False
         expected_sequence = 1
         replayed_places: dict[str, dict[str, Any]] = {}
+        replayed_perceptual_places: dict[str, dict[str, Any]] = {}
         replayed_frontiers: dict[str, dict[str, Any]] = {}
         replayed_transitions: dict[tuple[str, str, str], dict[str, Any]] = {}
         for event in self.iter_events():
@@ -911,6 +1055,14 @@ class ExplorationMemory:
                 except ValueError:
                     return False
                 replayed_places[place.place_id] = state
+            elif event_type == "perceptual_view_recorded":
+                if not isinstance(state, dict):
+                    return False
+                try:
+                    perceptual = PerceptualPlaceMemory.model_validate(state)
+                except ValueError:
+                    return False
+                replayed_perceptual_places[perceptual.place_id] = state
             elif event_type in {"frontier_registered", "frontier_outcome"}:
                 if not isinstance(state, dict):
                     return False
@@ -946,15 +1098,23 @@ class ExplorationMemory:
             expected_sequence += 1
         try:
             places = self.places()
+            perceptual_places = self.perceptual_places()
             frontiers = self.frontiers()
             transitions = self.transitions()
         except ValueError:
             return False
         stored_places = {item.place_id: item.model_dump(mode="json") for item in places}
+        stored_perceptual_places = {
+            item.place_id: item.model_dump(mode="json") for item in perceptual_places
+        }
         stored_frontiers = {
             item.frontier_id: item.model_dump(mode="json") for item in frontiers
         }
-        if replayed_places != stored_places or replayed_frontiers != stored_frontiers:
+        if (
+            replayed_places != stored_places
+            or replayed_perceptual_places != stored_perceptual_places
+            or replayed_frontiers != stored_frontiers
+        ):
             return False
         stored_transitions = {
             (
@@ -971,6 +1131,7 @@ class ExplorationMemory:
 
     def summary(self) -> dict[str, Any]:
         places = self.places()
+        perceptual_places = self.perceptual_places()
         frontiers = self.frontiers()
         transitions = self.transitions()
         return {
@@ -979,6 +1140,10 @@ class ExplorationMemory:
             "multi_view_place_count": sum(len(item.exemplars) > 1 for item in places),
             "calibrated_place_count": sum(
                 item.calibration is not None for item in places
+            ),
+            "perceptual_place_count": len(perceptual_places),
+            "multi_view_perceptual_place_count": sum(
+                len(item.exemplars) > 1 for item in perceptual_places
             ),
             "frontier_count": len(frontiers),
             "active_frontier_count": sum(

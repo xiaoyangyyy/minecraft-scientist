@@ -84,7 +84,7 @@ async function connect(params) {
 function observe(params = {}) {
   const instance = requireBot();
   const radius = Math.max(1, Math.min(32, Number(params.radius || 8)));
-  const maxBlocks = Math.max(1, Math.min(512, Number(params.max_blocks || 128)));
+  const maxBlocks = Math.max(1, Math.min(2048, Number(params.max_blocks || 128)));
   const positions = instance.findBlocks({
     matching: (block) => block && block.name !== "air" && block.boundingBox !== "empty",
     maxDistance: radius,
