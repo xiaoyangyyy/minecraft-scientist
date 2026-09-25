@@ -42,19 +42,31 @@ def test_visual_route_persists_and_rebinds_opaque_controls(tmp_path: Path) -> No
 def test_visual_map_composes_successful_routes_by_expected_cost() -> None:
     topology = VisualTopologicalMap()
     start, middle, end = (1,), (2,), (3,)
-    topology.record_route(start, end, ("slow",) * 10, success=True, cost=10)
-    topology.record_route(start, middle, ("first",), success=True, cost=2)
-    topology.record_route(middle, end, ("second",), success=True, cost=2)
+    direct = topology.record_route(
+        start, end, ("slow",) * 10, success=True, cost=10
+    )
+    first = topology.record_route(start, middle, ("first",), success=True, cost=2)
+    second = topology.record_route(middle, end, ("second",), success=True, cost=2)
 
     plan = topology.plan(start, topology.node_id_for(end))
+    replanned = topology.plan(middle, topology.node_id_for(end))
 
     assert plan is not None
+    assert plan.route_ids == (first, second)
     assert plan.action_roles == ("first", "second")
     assert plan.node_ids == (
         topology.node_id_for(start),
         topology.node_id_for(middle),
         topology.node_id_for(end),
     )
+    assert replanned is not None
+    assert replanned.route_ids == (second,)
+
+    topology.challenge_route(second, reason="mid-route negative control")
+    fallback = topology.plan(start, topology.node_id_for(end))
+    assert fallback is not None
+    assert fallback.route_ids == (direct,)
+    assert topology.plan(middle, topology.node_id_for(end)) is None
 
 
 def test_visual_map_keeps_competing_programs_and_selects_lower_risk_cost() -> None:

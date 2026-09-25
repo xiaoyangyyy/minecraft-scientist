@@ -337,6 +337,21 @@ version-2 MineStudio topology runs also re-audit as valid under the version-3 lo
 No plaintext API key is present in the repository, and the stale deleted-key copy
 has been removed from Windows Credential Manager.
 
+The preregistered seed-143 multi-stage topology suite advances from edge selection
+to graph composition. Its three-node map contains only a five-action start-to-midpoint
+edge learned from source mapping 1400 and a six-action midpoint-to-goal edge learned
+from distinct source mapping 1403; it has no direct start-to-goal edge. Under held-out
+mapping 1415, the Agent executes edge one, recomputes and matches midpoint
+`view_4db0ee57b62ffc72`, replans from that RGB landmark, executes edge two, and matches
+the final landmark. The route advances 7.594 blocks, detours 1.720, finishes within
+0.066 of center, avoids the evaluator-only obstacle, and uses zero exploratory moves.
+Challenging edge two independently blocks the complete route. The integrity audit
+validates the upstream source audit, immutable copied-source manifest, source
+independence, all PNG features/actions/private paths, map shape and directionality,
+both boundary matches, the midpoint planning decision, hashes and non-leakage;
+`valid` is true. Evidence:
+`runs/multi-stage-route-seed143-map1415/{report.json,visual-topology.json,integrity-audit.json}`.
+
 The expanded three-mechanism release gate completed with 78 tests. Its 20-pair run
 used per-pair durable checkpoints, three bounded JSON retries, 63 total calls, and
 305,554 tokens under the configured hard caps. Both exposed credentials are no

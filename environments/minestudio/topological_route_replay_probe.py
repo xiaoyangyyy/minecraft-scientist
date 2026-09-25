@@ -57,6 +57,7 @@ def run_replay(
     obstacle_passed_pixels: int,
     obstacle_offset: int,
     signature_mode: str,
+    replan_at_landmarks: bool,
     output: Path,
 ) -> tuple[dict, dict]:
     output.mkdir(parents=True, exist_ok=False)
@@ -100,21 +101,57 @@ def run_replay(
         )
         source_signature = signature_function(initial)
         matched_source_id = topology.match(source_signature)
-        plan = topology.plan(source_signature, target_id)
-        if plan is None:
+        initial_plan = topology.plan(source_signature, target_id)
+        if initial_plan is None:
             raise RuntimeError("persisted map has no confident route for this view")
-        handles = plan.bind(roles)
         current = initial
-        for index, (role, handle) in enumerate(
-            zip(plan.action_roles, handles, strict=True), start=1
-        ):
-            records.append(world.step(PrimitiveAction(
-                kind=ActionKind.MOVE,
-                target_id=handle,
-                ticks=move_frames,
-            )))
-            records.append(world.step(PrimitiveAction(kind=ActionKind.WAIT, ticks=2)))
-            current = observe(index, role)
+        executed_route_ids: list[str] = []
+        executed_action_roles: list[str] = []
+        boundary_matches: list[dict] = []
+
+        def execute(roles_to_run: tuple[str, ...]) -> None:
+            nonlocal current
+            for role in roles_to_run:
+                handle = roles[role]
+                records.append(world.step(PrimitiveAction(
+                    kind=ActionKind.MOVE,
+                    target_id=handle,
+                    ticks=move_frames,
+                )))
+                records.append(
+                    world.step(PrimitiveAction(kind=ActionKind.WAIT, ticks=2))
+                )
+                executed_action_roles.append(role)
+                current = observe(len(executed_action_roles), role)
+
+        if replan_at_landmarks:
+            current_signature = source_signature
+            for segment_index, expected_route_id in enumerate(
+                initial_plan.route_ids
+            ):
+                segment_plan = topology.plan(current_signature, target_id)
+                if segment_plan is None:
+                    raise RuntimeError("no route remained after landmark replanning")
+                route_id = segment_plan.route_ids[0]
+                if route_id != expected_route_id:
+                    raise RuntimeError("landmark replanning changed route order")
+                route = topology.get_route(route_id)
+                execute(route.action_roles)
+                current_signature = signature_function(current)
+                matched_id = topology.match(current_signature)
+                boundary_matches.append({
+                    "segment_index": segment_index,
+                    "route_id": route_id,
+                    "expected_landmark_id": route.target_id,
+                    "matched_landmark_id": matched_id,
+                    "signature": current_signature,
+                })
+                if matched_id != route.target_id:
+                    raise RuntimeError("route segment missed its visual landmark")
+                executed_route_ids.append(route_id)
+        else:
+            execute(initial_plan.action_roles)
+            executed_route_ids.extend(initial_plan.route_ids)
 
     save_events(output / "events.jsonl", records)
     save_json(output / "trajectory.json", trajectory)
@@ -135,11 +172,15 @@ def run_replay(
         "source_signature": source_signature,
         "matched_source_id": matched_source_id,
         "target_id": target_id,
-        "route_ids": plan.route_ids,
-        "action_roles": plan.action_roles,
-        "program_length": len(plan.action_roles),
-        "expected_cost": plan.expected_cost,
-        "route_confidence": plan.confidence,
+        "route_ids": executed_route_ids,
+        "action_roles": executed_action_roles,
+        "program_length": len(executed_action_roles),
+        "expected_cost": initial_plan.expected_cost,
+        "route_confidence": initial_plan.confidence,
+        "replan_at_landmarks": replan_at_landmarks,
+        "landmark_replans": max(0, len(executed_route_ids) - 1)
+        if replan_at_landmarks else 0,
+        "boundary_matches": boundary_matches,
         "initial_obstacle_detected": initial["obstacle"] is not None,
         "obstacle_passed_visually": bool(passed_observations),
         "obstacle_passed_observation": (
@@ -151,7 +192,7 @@ def run_replay(
         ) <= center_tolerance,
         "goal_reached_visually": current["salience"] >= score_threshold,
         "final_salience": current["salience"],
-        "all_move_actions_valid": len(move_records) == len(plan.action_roles)
+        "all_move_actions_valid": len(move_records) == len(executed_action_roles)
         and all(
             record.intervention_compliance and record.event.success
             for record in move_records
@@ -181,6 +222,11 @@ def main() -> None:
     parser.add_argument("--obstacle-offset", type=int, choices=(-1, 0, 1), default=0)
     parser.add_argument(
         "--signature-mode", choices=("legacy", "layout"), default="legacy"
+    )
+    parser.add_argument(
+        "--replan-at-landmarks",
+        action="store_true",
+        help="Re-observe and replan after every stored route edge",
     )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -218,6 +264,7 @@ def main() -> None:
         obstacle_passed_pixels=args.obstacle_passed_pixels,
         obstacle_offset=args.obstacle_offset,
         signature_mode=args.signature_mode,
+        replan_at_landmarks=args.replan_at_landmarks,
         output=args.output / "replay",
     )
 

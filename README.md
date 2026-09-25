@@ -307,6 +307,18 @@ with reciprocal lineage. The independent audit recomputes every image feature,
 action binding, path metric, map transition, source hash, and non-leakage check.
 Evidence is in `runs/visual-route-crisis-seed140-map1400`.
 
+The seed-143 multi-stage suite adds actual graph composition. Two independently
+permuted source episodes contribute separate start-to-midpoint and midpoint-to-goal
+edges to a three-node map; there is no direct start-to-goal edge. In the held-out
+MineStudio episode, the Agent executes the first five-role edge, recomputes the RGB
+signature `(0,-1,0,16,13)`, matches the expected midpoint, invokes the planner again,
+and executes the remaining six-role edge. It reaches 7.594 blocks of progress with
+1.720 blocks of lateral excursion and 0.066 final offset, without online exploration.
+Challenging the second edge makes the complete plan unavailable. The independent
+audit recomputes both source episodes, every replay image/action/path, both boundary
+matches, the second planning decision, hashes and non-leakage checks. Evidence is in
+`runs/multi-stage-route-seed143-map1415`.
+
 A concrete label-free `GridVisualController` maps opaque screen regions and hotbar
 slots to MineStudio env actions. Tests verify action translation and semantic
 isolation; the accepted live experiment additionally audits successful opaque

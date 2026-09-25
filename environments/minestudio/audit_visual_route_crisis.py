@@ -213,7 +213,7 @@ def replay_audit(
     directory: Path,
     expected: dict,
     expected_map: Path,
-    expected_route_id: str,
+    expected_route_id: str | list[str],
     settings: dict,
     *,
     should_succeed: bool,
@@ -256,6 +256,11 @@ def replay_audit(
         (directory / name).read_text(encoding="utf-8")
         for name in ("report.json", "calibration.json", "roles.json")
     ] + calibration_texts + [event_text, json.dumps(trajectory)]
+    expected_route_ids = (
+        [expected_route_id]
+        if isinstance(expected_route_id, str)
+        else expected_route_id
+    )
     return {
         "seed_and_mapping_match": (
             report["seed"] == expected["seed"]
@@ -271,7 +276,7 @@ def replay_audit(
         "trajectory_features_recomputed": trajectory == recomputed,
         "signature_recomputed": list(layout_landmark_signature(recomputed[0]))
         == expected["source_signature"],
-        "expected_route_selected": report["route_ids"] == [expected_route_id],
+        "expected_route_selected": report["route_ids"] == expected_route_ids,
         "program_rebound_to_current_handles": (
             len(moves) == len(bound_handles)
             and [event["executed_action"]["target_id"] for event in moves]

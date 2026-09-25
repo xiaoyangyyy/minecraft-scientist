@@ -163,8 +163,10 @@ def run_replay(
     settings: dict,
     map_path: Path,
     target_id: str,
+    *,
+    replan_at_landmarks: bool = False,
 ) -> None:
-    subprocess.run([
+    command = [
         sys.executable,
         str(Path(__file__).with_name("topological_route_replay_probe.py")),
         "--seed", str(case["seed"]),
@@ -178,7 +180,10 @@ def run_replay(
         "--center-tolerance", str(settings["center_tolerance"]),
         "--obstacle-passed-pixels", str(settings["obstacle_passed_pixels"]),
         "--output", str(output),
-    ], check=True, timeout=900)
+    ]
+    if replan_at_landmarks:
+        command.append("--replan-at-landmarks")
+    subprocess.run(command, check=True, timeout=900)
 
 
 def main() -> None:

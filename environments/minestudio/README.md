@@ -224,6 +224,27 @@ This intentionally aliases two nearby visual signatures to test recovery. It is
 not evidence that the chosen tolerance is generally optimal, or that arbitrary
 natural layouts can already be recognized and repaired.
 
+`multi_stage_route_composition_benchmark.py` reuses the two independently audited
+source episodes from that crisis suite, but assigns their evidence to separate
+start→midpoint and midpoint→goal edges. The accepted seed-143 held-out replay has no
+direct start→goal edge to fall back on. With a third anonymous control permutation,
+it executes the first five actions, recognizes the expected midpoint from RGB,
+replans there, then executes the six-action second edge. Both route-boundary IDs are
+recomputed successfully; the evaluator path advances 7.594 blocks, detours 1.720,
+returns within 0.066 of center, and avoids the obstacle. Challenging edge two is a
+negative control that removes the complete plan.
+
+```powershell
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/multi_stage_route_composition_benchmark.py --source-run /mnt/d/minecraft-scientist/runs/visual-route-crisis-seed140-map1400 --replay-seed 143 --replay-mapping-seed 1415 --output /mnt/d/minecraft-scientist/runs/multi-stage-route-seed143-map1415
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/audit_multi_stage_route_composition.py /mnt/d/minecraft-scientist/runs/multi-stage-route-seed143-map1415
+```
+
+The independent audit verifies the upstream source audit and copied artifact
+manifest, recomputes both source programs, confirms the 3-node/2-edge topology,
+reconstructs the held-out bindings and evaluator path, and independently verifies
+the midpoint and terminal signatures. This remains one short controlled path rather
+than arbitrary graph exploration.
+
 MineStudio is deliberately excluded from the root `uv` environment. Its simulator
 documentation targets Linux, Python 3.10+, JDK 8, VirtualGL/Xvfb, and a separate
 Minecraft runtime; mixing those dependencies into the deterministic Windows test

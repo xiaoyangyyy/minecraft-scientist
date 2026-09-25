@@ -196,6 +196,15 @@ lineage. This demonstrates the lifecycle over RGB and real simulator actions; it
 does not imply natural-scene change detection, learned tolerance calibration, or
 general navigation.
 
+The seed-143 composition suite exercises the graph rather than a single stored
+program. Edge one is learned from one opaque-control source episode and edge two
+from another. A held-out episode plans across all three landmarks, executes only the
+first edge, re-encodes the resulting RGB view, verifies the intermediate node, and
+calls `plan` again from that node before executing edge two. The graph has no direct
+start-to-goal edge, and challenging edge two blocks both the midpoint plan and the
+composed start plan. This validates two-edge topological composition and boundary
+relocalization in one controlled route, not large-scale loop closure or SLAM.
+
 ## Shared-evidence external evaluation
 
 `benchmark-external-llm-expanded` constructs candidate interventions and active
