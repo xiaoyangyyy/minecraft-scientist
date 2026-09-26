@@ -9,9 +9,12 @@ import pytest
 from minecraft_scientist.exploration import (
     AnonymousSceneEncoder,
     ExplorationMemory,
+    RGBEdgePanoramaEncoder,
+    RGBEdgeSceneEncoder,
     RGBPanoramaEncoder,
     RGBSceneEncoder,
     infer_visual_rotation_period,
+    temporal_median_rgb,
 )
 from minecraft_scientist.protocols import (
     ActionKind,
@@ -158,6 +161,37 @@ def test_visual_rotation_period_uses_first_eligible_rgb_recurrence() -> None:
         infer_visual_rotation_period(anchor, scan[:2], minimum_steps=4)
 
 
+def test_edge_panorama_ignores_brightness_and_scan_order() -> None:
+    edge_encoder = RGBEdgeSceneEncoder(grid_size=8)
+    panorama_encoder = RGBEdgePanoramaEncoder(edge_encoder)
+    views = tuple(
+        np.roll(_rgb_fixture(), shift, axis=1) for shift in (-30, -10, 10, 30)
+    )
+    darker = tuple(
+        np.clip(frame.astype(float) * 0.45, 0, 255).astype(np.uint8)
+        for frame in reversed(views)
+    )
+
+    reference = panorama_encoder.encode(views)
+    shifted = panorama_encoder.encode(darker)
+
+    assert reference == shifted
+    assert len(reference) == panorama_encoder.dimensions
+
+
+def test_temporal_median_rgb_removes_transient_weather_streaks() -> None:
+    base = _rgb_fixture()
+    samples = [base.copy() for _ in range(5)]
+    samples[0][:, 10:12] = 255
+    samples[1][:, 30:32] = 255
+
+    aggregated = temporal_median_rgb(samples)
+
+    assert np.array_equal(aggregated, base)
+    with pytest.raises(ValueError, match="positive odd"):
+        temporal_median_rgb(samples[:2])
+
+
 def test_rgb_encoder_and_calibrated_modality_memory_generalize_safely(
     tmp_path: Path,
 ) -> None:
@@ -215,13 +249,64 @@ def test_rgb_encoder_and_calibrated_modality_memory_generalize_safely(
             step=0,
         )
         assert accepted.exemplars == exemplars_before
+        consolidated = memory.consolidate_modality_view(
+            encoder.VERSION,
+            place.place_id,
+            heldout_signature,
+            episode_id=1,
+            step=1,
+        )
+        assert heldout_signature in consolidated.exemplars
+        assert any(
+            event["event_type"] == "modality_view_consolidated"
+            for event in memory.iter_events()
+        )
         with pytest.raises(ValueError, match="rejected the unvalidated view"):
             memory.record_modality_view(
                 encoder.VERSION,
                 place.place_id,
                 negative_signature,
                 episode_id=1,
-                step=1,
+                step=2,
+            )
+        with pytest.raises(ValueError, match="rejected consolidation"):
+            memory.consolidate_modality_view(
+                encoder.VERSION,
+                place.place_id,
+                negative_signature,
+                episode_id=1,
+                step=3,
             )
         assert memory.summary()["calibrated_modality_place_count"] == 1
         assert memory.verify_integrity()
+
+
+def test_modality_memory_can_fit_training_only_maximum_gap_boundary(
+    tmp_path: Path,
+) -> None:
+    with ExplorationMemory(tmp_path / "automatic-margin.sqlite3") as memory:
+        place = memory.observe_place((0,), episode_id=0, step=0)
+        memory.record_modality_view(
+            "synthetic-rgb",
+            place.place_id,
+            (0, 0),
+            episode_id=0,
+            step=0,
+        )
+        calibrated = memory.calibrate_modality_place(
+            "synthetic-rgb",
+            place.place_id,
+            ((3, 0), (4, 0)),
+            ((10, 0),),
+            episode_id=0,
+            step=1,
+            margin=None,
+        )
+
+        assert calibrated.calibration is not None
+        boundary = calibrated.calibration
+        assert boundary.maximum_positive_distance == 4
+        assert boundary.nearest_negative_distance == 6
+        assert boundary.radius == pytest.approx(4.999998)
+        assert memory.match_modality_place("synthetic-rgb", (9, 0)) is None
+        assert memory.match_modality_place("synthetic-rgb", (4, 0)) == place.place_id

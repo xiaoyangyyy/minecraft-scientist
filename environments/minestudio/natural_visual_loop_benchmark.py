@@ -28,25 +28,47 @@ from PIL import Image
 
 from minecraft_scientist.exploration import (
     ExplorationMemory,
+    RGBEdgePanoramaEncoder,
     RGBPanoramaEncoder,
     infer_visual_rotation_period,
     rgb_signature_from_observation,
+    temporal_median_rgb,
 )
 from minecraft_scientist.minecraft import GridVisualController, MineStudioVisualAdapter
 from minecraft_scientist.protocols import ActionKind, PrimitiveAction, TransitionRecord
 
-NATURAL_WORLD_COMMANDS = (
+BASE_NATURAL_WORLD_COMMANDS = (
     "/gamerule sendCommandFeedback false",
     "/gamerule announceAdvancements false",
     "/gamerule doTileDrops false",
     "/gamemode creative",
     "/difficulty peaceful",
-    "/weather clear",
-    "/time set noon",
     "/gamerule doDaylightCycle false",
     "/gamerule doWeatherCycle false",
     "/clear @p",
 )
+TIME_CHOICES = ("day", "noon", "night", "midnight")
+WEATHER_CHOICES = ("clear", "rain", "thunder")
+
+
+def natural_world_commands(*, time_of_day: str, weather: str) -> tuple[str, ...]:
+    if time_of_day not in TIME_CHOICES:
+        raise ValueError(f"unsupported time of day: {time_of_day}")
+    if weather not in WEATHER_CHOICES:
+        raise ValueError(f"unsupported weather: {weather}")
+    return (
+        *BASE_NATURAL_WORLD_COMMANDS[:5],
+        f"/weather {weather}",
+        f"/time set {time_of_day}",
+        *BASE_NATURAL_WORLD_COMMANDS[5:],
+    )
+
+
+NATURAL_WORLD_COMMANDS = natural_world_commands(time_of_day="noon", weather="clear")
+PANORAMA_ENCODERS = {
+    "lab": RGBPanoramaEncoder,
+    "edge": RGBEdgePanoramaEncoder,
+}
 PRIVILEGED_KEYS = {"location_stats", "xpos", "ypos", "zpos", "yaw", "pitch"}
 PRIVILEGED_ARTIFACT_TOKENS = (
     "location_stats",
@@ -89,21 +111,21 @@ class Session:
     records: list[TransitionRecord]
 
 
-def _factory(config, audit: PositionAudit):
+def _factory(config, audit: PositionAudit, commands: tuple[str, ...]):
     simulator = MinecraftSim(
         action_type="env",
         seed=config.seed,
-        callbacks=[CommandsCallback(list(NATURAL_WORLD_COMMANDS))],
+        callbacks=[CommandsCallback(list(commands))],
     )
     return PositionAuditSimulator(simulator, audit)
 
 
-def _open_session(seed: int) -> Session:
+def _open_session(seed: int, commands: tuple[str, ...]) -> Session:
     recorder = NaturalRecorder()
     audit = PositionAudit()
     world = MineStudioVisualAdapter(
         recorder,
-        simulator_factory=lambda config: _factory(config, audit),
+        simulator_factory=lambda config: _factory(config, audit, commands),
     )
     world.reset(seed)
     records: list[TransitionRecord] = []
@@ -147,6 +169,7 @@ def _save_scan(
     output: Path,
     frames: tuple[np.ndarray, ...],
     panorama: tuple[int, ...],
+    temporal_samples: tuple[tuple[np.ndarray, ...], ...] | None = None,
 ) -> dict[str, Any]:
     output.mkdir(parents=True, exist_ok=False)
     hashes: dict[str, str] = {}
@@ -154,22 +177,73 @@ def _save_scan(
         path = output / f"view-{index:02d}.png"
         Image.fromarray(frame).save(path)
         hashes[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
-    return {
+    metadata: dict[str, Any] = {
         "view_count": len(frames),
         "panorama_sha256": hashlib.sha256(
             json.dumps(panorama, separators=(",", ":")).encode("utf-8")
         ).hexdigest(),
         "image_sha256": hashes,
     }
+    if temporal_samples is not None:
+        if len(temporal_samples) != len(frames):
+            raise ValueError("temporal samples do not match panorama views")
+        sample_hashes: dict[str, dict[str, str]] = {}
+        for view_index, samples in enumerate(temporal_samples):
+            view_name = f"view-{view_index:02d}"
+            view_hashes = {}
+            for sample_index, sample in enumerate(samples):
+                name = f"sample-{sample_index:02d}.png"
+                path = output / "samples" / view_name / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                Image.fromarray(sample).save(path)
+                view_hashes[name] = hashlib.sha256(path.read_bytes()).hexdigest()
+            sample_hashes[view_name] = view_hashes
+        metadata["temporal_sample_count"] = len(temporal_samples[0])
+        metadata["temporal_sample_sha256"] = sample_hashes
+    return metadata
+
+
+def _temporal_frame(
+    session: Session, sample_count: int
+) -> tuple[np.ndarray, tuple[np.ndarray, ...]]:
+    if sample_count < 1 or sample_count % 2 == 0:
+        raise ValueError("temporal RGB sample count must be a positive odd integer")
+    samples = [session.recorder.frames[-1].copy()]
+    for _ in range(sample_count - 1):
+        session.records.append(
+            session.world.step(PrimitiveAction(kind=ActionKind.WAIT, ticks=1))
+        )
+        samples.append(session.recorder.frames[-1].copy())
+    median = temporal_median_rgb(samples)
+    return median, tuple(samples)
+
+
+def view_openness(frame: np.ndarray) -> float:
+    """Label-free bright-horizon score used to choose a traversable heading."""
+
+    array = np.asarray(frame, dtype=np.float64)
+    if array.ndim != 3 or array.shape[2] < 3:
+        raise ValueError("openness scoring requires an RGB frame")
+    height, width = array.shape[:2]
+    crop = array[: int(0.55 * height), int(0.25 * width) : int(0.75 * width), :3]
+    luminance = 0.2126 * crop[..., 0] + 0.7152 * crop[..., 1] + 0.0722 * crop[..., 2]
+    return float(luminance.mean())
 
 
 def _discover_scan(
     session: Session,
     output: Path,
     *,
+    encoder: RGBPanoramaEncoder,
     minimum_steps: int,
     maximum_steps: int,
-) -> tuple[int, tuple[int, ...], dict[str, Any]]:
+) -> tuple[
+    int,
+    tuple[int, ...],
+    dict[str, Any],
+    int,
+    tuple[tuple[int, ...], ...],
+]:
     right = _target(session.world, ActionKind.LOOK, 2)
     left = _target(session.world, ActionKind.LOOK, 0)
     anchor = _signature(session)
@@ -194,8 +268,11 @@ def _discover_scan(
     restored_distance = math.dist(anchor, _signature(session))
     scan_signatures = (anchor, *signatures[: period - 1])
     scan_frames = tuple(frames[:period])
-    encoder = RGBPanoramaEncoder()
-    panorama = encoder.encode_signatures(scan_signatures)
+    openness_scores = tuple(view_openness(frame) for frame in scan_frames)
+    selected_heading_steps = max(
+        range(period), key=lambda index: (openness_scores[index], -index)
+    )
+    panorama = encoder.encode(scan_frames)
     metadata = _save_scan(output, scan_frames, panorama)
     metadata.update(
         {
@@ -203,31 +280,47 @@ def _discover_scan(
             "probe_steps": maximum_steps,
             "anchor_distances": distances,
             "restored_distance": restored_distance,
+            "openness_scores": openness_scores,
+            "selected_heading_steps": selected_heading_steps,
         }
     )
-    return period, panorama, metadata
+    return period, panorama, metadata, selected_heading_steps, scan_signatures
 
 
 def _capture_scan(
     session: Session,
     output: Path,
     *,
+    encoder: RGBPanoramaEncoder,
     period: int,
-) -> tuple[tuple[int, ...], dict[str, Any]]:
+    temporal_sample_count: int = 1,
+) -> tuple[tuple[int, ...], dict[str, Any], tuple[tuple[int, ...], ...]]:
     right = _target(session.world, ActionKind.LOOK, 2)
-    signatures = [_signature(session)]
-    frames = [session.recorder.frames[-1].copy()]
-    for step in range(1, period + 1):
-        _turn(session, right)
-        if step < period:
-            signatures.append(_signature(session))
-            frames.append(session.recorder.frames[-1].copy())
+    signatures = []
+    frames = []
+    raw_samples = []
+    for step in range(period):
+        if step:
+            _turn(session, right)
+        frame, samples = _temporal_frame(session, temporal_sample_count)
+        frames.append(frame)
+        raw_samples.append(samples)
+        signatures.append(encoder.scene_encoder.encode(frame))
+    _turn(session, right)
     session.records.append(
         session.world.step(PrimitiveAction(kind=ActionKind.WAIT, ticks=2))
     )
-    encoder = RGBPanoramaEncoder()
-    panorama = encoder.encode_signatures(signatures)
-    return panorama, _save_scan(output, tuple(frames), panorama)
+    panorama = encoder.encode(frames)
+    return (
+        panorama,
+        _save_scan(
+            output,
+            tuple(frames),
+            panorama,
+            tuple(raw_samples) if temporal_sample_count > 1 else None,
+        ),
+        tuple(signatures),
+    )
 
 
 def _move(session: Session, *, moves: int, move_frames: int) -> None:
@@ -253,6 +346,87 @@ def _half_turn(session: Session, period: int) -> None:
         _turn(session, right)
     session.records.append(
         session.world.step(PrimitiveAction(kind=ActionKind.WAIT, ticks=2))
+    )
+
+
+def _orient(session: Session, steps: int) -> None:
+    if steps < 0:
+        raise ValueError("orientation steps must be nonnegative")
+    right = _target(session.world, ActionKind.LOOK, 2)
+    for _ in range(steps):
+        _turn(session, right)
+    if steps:
+        session.records.append(
+            session.world.step(PrimitiveAction(kind=ActionKind.WAIT, ticks=2))
+        )
+
+
+def _save_probe_frame(path: Path, frame: np.ndarray) -> str:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    Image.fromarray(frame).save(path)
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _probe_heading(
+    session: Session,
+    *,
+    encoder: RGBPanoramaEncoder,
+    heading_steps: int,
+    period: int,
+    moves: int,
+    move_frames: int,
+    output: Path,
+) -> dict[str, Any]:
+    """Measure a heading's visual out-and-back reversibility without coordinates."""
+
+    _orient(session, heading_steps)
+    start_frame = session.recorder.frames[-1].copy()
+    start = encoder.scene_encoder.encode(start_frame)
+    _move(session, moves=moves, move_frames=move_frames)
+    outbound_frame = session.recorder.frames[-1].copy()
+    outbound = encoder.scene_encoder.encode(outbound_frame)
+    _half_turn(session, period)
+    _move(session, moves=moves, move_frames=move_frames)
+    _half_turn(session, period)
+    return_frame = session.recorder.frames[-1].copy()
+    returned = encoder.scene_encoder.encode(return_frame)
+    outbound_distance = math.dist(start, outbound)
+    return_distance = math.dist(start, returned)
+    root = output / f"heading-{heading_steps:02d}"
+    hashes = {
+        "start.png": _save_probe_frame(root / "start.png", start_frame),
+        "outbound.png": _save_probe_frame(root / "outbound.png", outbound_frame),
+        "return.png": _save_probe_frame(root / "return.png", return_frame),
+    }
+    return {
+        "heading_steps": heading_steps,
+        "outbound_distance": outbound_distance,
+        "return_distance": return_distance,
+        "reversibility_score": outbound_distance / (return_distance + 1.0),
+        "image_sha256": hashes,
+        "signature_sha256": {
+            name: hashlib.sha256(
+                json.dumps(signature, separators=(",", ":")).encode("utf-8")
+            ).hexdigest()
+            for name, signature in (
+                ("start", start),
+                ("outbound", outbound),
+                ("return", returned),
+            )
+        },
+    }
+
+
+def _candidate_headings(
+    openness_scores: tuple[float, ...], count: int
+) -> tuple[int, ...]:
+    if not 1 <= count <= len(openness_scores):
+        raise ValueError("heading candidate count is outside the camera period")
+    return tuple(
+        sorted(
+            range(len(openness_scores)),
+            key=lambda index: (-openness_scores[index], index),
+        )[:count]
     )
 
 
@@ -293,7 +467,10 @@ def _copy_sources(output: Path) -> dict[str, str]:
     root = Path(__file__).resolve().parents[2]
     sources = {
         "natural_visual_loop_benchmark.py": Path(__file__).resolve(),
+        "navigation_probe.py": Path(__file__).with_name("navigation_probe.py"),
+        "memory.py": root / "src/minecraft_scientist/exploration/memory.py",
         "perception.py": root / "src/minecraft_scientist/exploration/perception.py",
+        "minestudio.py": root / "src/minecraft_scientist/minecraft/minestudio.py",
     }
     target = output / "source"
     target.mkdir()
@@ -313,6 +490,47 @@ def main() -> None:
     parser.add_argument("--minimum-turn-steps", type=int, default=8)
     parser.add_argument("--maximum-turn-steps", type=int, default=16)
     parser.add_argument("--margin", type=float, default=2.0)
+    parser.add_argument(
+        "--auto-margin",
+        action="store_true",
+        help="derive the maximum-gap place radius from training positives/negatives",
+    )
+    parser.add_argument(
+        "--temporal-samples",
+        type=int,
+        default=1,
+        help="odd number of RGB frames median-aggregated at every panorama heading",
+    )
+    parser.add_argument("--training-time", choices=TIME_CHOICES, default="noon")
+    parser.add_argument("--training-weather", choices=WEATHER_CHOICES, default="clear")
+    parser.add_argument("--heldout-time", choices=TIME_CHOICES, default="noon")
+    parser.add_argument("--heldout-weather", choices=WEATHER_CHOICES, default="clear")
+    parser.add_argument(
+        "--require-condition-shift",
+        action="store_true",
+        help="fail unless held-out lighting/weather differs from training",
+    )
+    parser.add_argument(
+        "--panorama-encoder",
+        choices=tuple(PANORAMA_ENCODERS),
+        default="lab",
+    )
+    parser.add_argument(
+        "--select-open-heading",
+        action="store_true",
+        help="select a persistent movement heading from the training RGB scan",
+    )
+    parser.add_argument(
+        "--select-reversible-heading",
+        action="store_true",
+        help="probe visually open headings and select one by RGB out-and-back recovery",
+    )
+    parser.add_argument(
+        "--heading-probe-candidates",
+        type=int,
+        default=6,
+        help="number of visually open headings tested for RGB reversibility",
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.moves < 1 or args.move_frames < 1:
@@ -321,60 +539,138 @@ def main() -> None:
         parser.error("invalid camera-period search interval")
     if not math.isfinite(args.margin) or args.margin < 0:
         parser.error("margin must be finite and nonnegative")
+    if args.temporal_samples < 1 or args.temporal_samples % 2 == 0:
+        parser.error("temporal samples must be a positive odd integer")
+    if args.select_open_heading and args.select_reversible_heading:
+        parser.error("open and reversible heading selection are mutually exclusive")
     args.output.mkdir(parents=True, exist_ok=False)
+    training_commands = natural_world_commands(
+        time_of_day=args.training_time,
+        weather=args.training_weather,
+    )
+    heldout_commands = natural_world_commands(
+        time_of_day=args.heldout_time,
+        weather=args.heldout_weather,
+    )
+    condition_shifted = training_commands != heldout_commands
+    if args.require_condition_shift and not condition_shifted:
+        parser.error("held-out conditions must differ from training conditions")
+    encoder = PANORAMA_ENCODERS[args.panorama_encoder]()
 
     sessions: list[Session] = []
     scans: dict[str, dict[str, Any]] = {}
+    heading_probe: dict[str, Any] | None = None
     try:
-        discovery = _open_session(args.seed)
+        discovery = _open_session(args.seed, training_commands)
         sessions.append(discovery)
-        period, anchor, scans["discovery"] = _discover_scan(
+        (
+            period,
+            anchor,
+            scans["discovery"],
+            discovered_heading,
+            _discovery_views,
+        ) = _discover_scan(
             discovery,
             args.output / "scans/discovery",
+            encoder=encoder,
             minimum_steps=args.minimum_turn_steps,
             maximum_steps=args.maximum_turn_steps,
         )
         discovery.world.close()
 
-        training = _open_session(args.seed)
+        if args.select_reversible_heading:
+            scores = tuple(float(item) for item in scans["discovery"]["openness_scores"])
+            try:
+                candidates = _candidate_headings(
+                    scores,
+                    args.heading_probe_candidates,
+                )
+            except ValueError as error:
+                parser.error(str(error))
+            probe_results = []
+            for candidate in candidates:
+                probe = _open_session(args.seed, training_commands)
+                sessions.append(probe)
+                result = _probe_heading(
+                    probe,
+                    encoder=encoder,
+                    heading_steps=candidate,
+                    period=period,
+                    moves=args.moves,
+                    move_frames=args.move_frames,
+                    output=args.output / "heading-probes",
+                )
+                result["session_index"] = len(sessions) - 1
+                probe_results.append(result)
+                probe.world.close()
+            selected = max(
+                probe_results,
+                key=lambda item: (
+                    float(item["reversibility_score"]),
+                    float(item["outbound_distance"]),
+                    -int(item["heading_steps"]),
+                ),
+            )
+            heading_steps = int(selected["heading_steps"])
+            heading_probe = {
+                "selector": "rgb-reversibility-v1",
+                "candidate_count": len(candidates),
+                "candidate_headings": list(candidates),
+                "results": probe_results,
+                "selected_heading_steps": heading_steps,
+            }
+        else:
+            heading_steps = discovered_heading if args.select_open_heading else 0
+
+        training = _open_session(args.seed, training_commands)
         sessions.append(training)
-        positive_one, scans["train_positive_one"] = _capture_scan(
+        _orient(training, heading_steps)
+        positive_one, scans["train_positive_one"], _positive_one_views = _capture_scan(
             training,
             args.output / "scans/train-positive-one",
+            encoder=encoder,
             period=period,
+            temporal_sample_count=args.temporal_samples,
         )
         _move(training, moves=args.moves, move_frames=args.move_frames)
-        training_negative, scans["train_negative"] = _capture_scan(
+        training_negative, scans["train_negative"], _negative_views = _capture_scan(
             training,
             args.output / "scans/train-negative",
+            encoder=encoder,
             period=period,
+            temporal_sample_count=args.temporal_samples,
         )
         training.world.close()
 
-        second_positive_session = _open_session(args.seed)
+        second_positive_session = _open_session(args.seed, training_commands)
         sessions.append(second_positive_session)
-        positive_two, scans["train_positive_two"] = _capture_scan(
+        _orient(second_positive_session, heading_steps)
+        positive_two, scans["train_positive_two"], _positive_two_views = _capture_scan(
             second_positive_session,
             args.output / "scans/train-positive-two",
+            encoder=encoder,
             period=period,
+            temporal_sample_count=args.temporal_samples,
         )
         second_positive_session.world.close()
 
-        training_loop = _open_session(args.seed)
+        training_loop = _open_session(args.seed, training_commands)
         sessions.append(training_loop)
+        _orient(training_loop, heading_steps)
         _move(training_loop, moves=args.moves, move_frames=args.move_frames)
         _half_turn(training_loop, period)
         _move(training_loop, moves=args.moves, move_frames=args.move_frames)
         _half_turn(training_loop, period)
-        training_return, scans["train_loop_return"] = _capture_scan(
+        training_return, scans["train_loop_return"], _return_views = _capture_scan(
             training_loop,
             args.output / "scans/train-loop-return",
+            encoder=encoder,
             period=period,
+            temporal_sample_count=args.temporal_samples,
         )
         training_loop.world.close()
 
         memory_path = args.output / "exploration.sqlite3"
-        encoder = RGBPanoramaEncoder()
         with ExplorationMemory(memory_path, max_exemplars=4) as memory:
             place = memory.observe_place((0,), episode_id=0, step=0)
             memory.record_modality_view(
@@ -391,51 +687,79 @@ def main() -> None:
                 (training_negative,),
                 episode_id=3,
                 step=1,
-                margin=args.margin,
+                margin=None if args.auto_margin else args.margin,
             )
 
-        loop = _open_session(args.seed)
+        continual_adaptation = {
+            "policy": "accepted-view-bounded-coreset-v1",
+            "heldout_start_consolidated": False,
+            "heldout_return_consolidated": False,
+        }
+        loop = _open_session(args.seed, heldout_commands)
         sessions.append(loop)
-        loop_start, scans["heldout_start"] = _capture_scan(
+        _orient(loop, heading_steps)
+        loop_start, scans["heldout_start"], _loop_start_views = _capture_scan(
             loop,
             args.output / "scans/heldout-start",
+            encoder=encoder,
             period=period,
+            temporal_sample_count=args.temporal_samples,
         )
-        _move(loop, moves=args.moves, move_frames=args.move_frames)
-        loop_outbound, scans["heldout_outbound"] = _capture_scan(
-            loop,
-            args.output / "scans/heldout-outbound",
-            period=period,
-        )
-        _half_turn(loop, period)
-        _move(loop, moves=args.moves, move_frames=args.move_frames)
-        _half_turn(loop, period)
-        loop_return, scans["heldout_return"] = _capture_scan(
-            loop,
-            args.output / "scans/heldout-return",
-            period=period,
-        )
-        loop.world.close()
-
         with ExplorationMemory.open(memory_path) as memory:
             start_match = memory.match_modality_place(encoder.VERSION, loop_start)
-            outbound_match = memory.match_modality_place(encoder.VERSION, loop_outbound)
+            if start_match == place.place_id:
+                memory.consolidate_modality_view(
+                    encoder.VERSION,
+                    place.place_id,
+                    loop_start,
+                    episode_id=4,
+                    step=0,
+                )
+                continual_adaptation["heldout_start_consolidated"] = True
+        _move(loop, moves=args.moves, move_frames=args.move_frames)
+        loop_outbound, scans["heldout_outbound"], _outbound_views = _capture_scan(
+            loop,
+            args.output / "scans/heldout-outbound",
+            encoder=encoder,
+            period=period,
+            temporal_sample_count=args.temporal_samples,
+        )
+        with ExplorationMemory.open(memory_path) as memory:
+            outbound_match = memory.match_modality_place(
+                encoder.VERSION, loop_outbound
+            )
+        _half_turn(loop, period)
+        _move(loop, moves=args.moves, move_frames=args.move_frames)
+        _half_turn(loop, period)
+        loop_return, scans["heldout_return"], _return_views = _capture_scan(
+            loop,
+            args.output / "scans/heldout-return",
+            encoder=encoder,
+            period=period,
+            temporal_sample_count=args.temporal_samples,
+        )
+        with ExplorationMemory.open(memory_path) as memory:
             return_match = memory.match_modality_place(encoder.VERSION, loop_return)
             if return_match == place.place_id:
-                memory.record_modality_view(
+                memory.consolidate_modality_view(
                     encoder.VERSION,
                     place.place_id,
                     loop_return,
                     episode_id=4,
                     step=1,
                 )
+                continual_adaptation["heldout_return_consolidated"] = True
+        loop.world.close()
 
-        restart = _open_session(args.seed)
+        restart = _open_session(args.seed, heldout_commands)
         sessions.append(restart)
-        restart_signature, scans["heldout_restart"] = _capture_scan(
+        _orient(restart, heading_steps)
+        restart_signature, scans["heldout_restart"], _restart_views = _capture_scan(
             restart,
             args.output / "scans/heldout-restart",
+            encoder=encoder,
             period=period,
+            temporal_sample_count=args.temporal_samples,
         )
         restart.world.close()
 
@@ -487,19 +811,46 @@ def main() -> None:
                 and loop_metrics["return_error"] <= 1.5
             ),
             "memory_integrity": memory_summary["integrity_valid"] is True,
+            "required_condition_shift": (
+                condition_shifted or not args.require_condition_shift
+            ),
         }
         report = {
             "suite": "natural_visual_loop",
             "backend": "real-minestudio",
             "seed": args.seed,
             "terrain_modified": False,
-            "controlled_conditions": list(NATURAL_WORLD_COMMANDS),
+            "controlled_conditions": {
+                "training": list(training_commands),
+                "heldout": list(heldout_commands),
+            },
+            "condition_split": {
+                "training": {
+                    "time": args.training_time,
+                    "weather": args.training_weather,
+                },
+                "heldout": {
+                    "time": args.heldout_time,
+                    "weather": args.heldout_weather,
+                },
+                "shifted": condition_shifted,
+                "required": args.require_condition_shift,
+            },
             "encoder": encoder.VERSION,
             "descriptor_dimensions": encoder.dimensions,
+            "temporal_samples": args.temporal_samples,
+            "calibration_strategy": (
+                "maximum-gap-training-only" if args.auto_margin else "fixed-margin"
+            ),
             "inferred_camera_period": period,
             "evaluator_orientation_return_error": orientation_error,
             "moves_each_leg": args.moves,
             "move_frames": args.move_frames,
+            "selected_heading_steps": heading_steps,
+            "open_heading_selection_enabled": args.select_open_heading,
+            "reversible_heading_selection_enabled": args.select_reversible_heading,
+            "heading_probe": heading_probe,
+            "continual_adaptation": continual_adaptation,
             "calibration": calibrated.calibration.model_dump(mode="json"),
             "loop_evaluator_metrics": loop_metrics,
             "memory": memory_summary,
@@ -507,9 +858,10 @@ def main() -> None:
             "source_sha256": source_hashes,
             "gate": {**gate, "passed": all(gate.values())},
             "scope": (
-                "Natural generated terrain under fixed noon/clear/peaceful conditions; "
-                "pixel-only panoramic place retrieval with evaluator-only coordinates. "
-                "This is a bounded out-and-back loop, not open-world survival or SLAM."
+                "Natural generated terrain with preregistered training/held-out "
+                "lighting and weather; pixel-only panoramic place retrieval with "
+                "evaluator-only coordinates. This is a bounded out-and-back loop, "
+                "not open-world survival or SLAM."
             ),
         }
         evaluator = {
@@ -532,6 +884,17 @@ def main() -> None:
                     "minimum_turn_steps": args.minimum_turn_steps,
                     "maximum_turn_steps": args.maximum_turn_steps,
                     "margin": args.margin,
+                    "auto_margin": args.auto_margin,
+                    "temporal_samples": args.temporal_samples,
+                    "training_time": args.training_time,
+                    "training_weather": args.training_weather,
+                    "heldout_time": args.heldout_time,
+                    "heldout_weather": args.heldout_weather,
+                    "require_condition_shift": args.require_condition_shift,
+                    "panorama_encoder": args.panorama_encoder,
+                    "select_open_heading": args.select_open_heading,
+                    "select_reversible_heading": args.select_reversible_heading,
+                    "heading_probe_candidates": args.heading_probe_candidates,
                 },
                 indent=2,
                 sort_keys=True,

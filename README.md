@@ -433,6 +433,33 @@ and reports `valid: true`. This establishes one bounded natural-terrain pixel lo
 under fixed noon/clear/peaceful conditions—not learned cross-biome generalization,
 long-horizon autonomous exploration, survival, or metric SLAM.
 
+A stricter condition-split gate now trains only at noon/clear and evaluates at
+night/rain. `RGBEdgePanoramaEncoder` replaces color appearance with anonymous edge
+occupancy/orientation, every formal panorama heading is the pixelwise median of five
+raw RGB frames, and the maximum-gap radius is derived only from training positives
+and negatives. Once the old memory accepts the held-out night/rain start view, a
+separate fail-closed consolidation operation may add that accepted appearance to its
+bounded coreset; rejected views cannot teach the memory about themselves. Reproduce
+the accepted seed-200 run with:
+
+```powershell
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/natural_visual_loop_benchmark.py --seed 200 --moves 4 --move-frames 4 --auto-margin --temporal-samples 5 --panorama-encoder edge --training-time noon --training-weather clear --heldout-time night --heldout-weather rain --require-condition-shift --output /mnt/d/minecraft-scientist/runs/natural-visual-loop-seed200-edge-night-rain-v12
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/audit_natural_visual_loop.py /mnt/d/minecraft-scientist/runs/natural-visual-loop-seed200-edge-night-rain-v12 --write
+```
+
+The training-only radius is 58.036 (positive maximum 53.423; nearest negative
+62.650). The held-out start was accepted at distance 41.725 and safely consolidated
+online before movement; the later return was accepted at 43.966, while the outbound
+view remained rejected.
+The Agent moved 4.161 blocks and returned with evaluator error 0.000; a fresh
+night/rain process restart was also recognized. The audit independently reconstructs
+all 480 temporal source frames, replays both consolidation events, and reports
+`valid: true`. This is evidence for illumination/weather adaptation and persistent
+memory on one natural seed. It still does not establish cross-biome generalization or
+long-horizon open-world navigation. A separate seed-201 ridge trial correctly found
+no reversible four-move path with the current forward/turn-only action space, exposing
+locomotion and safe frontier selection as the next bottleneck rather than hiding it.
+
 A concrete label-free `GridVisualController` maps opaque screen regions and hotbar
 slots to MineStudio env actions. Tests verify action translation and semantic
 isolation; the accepted live experiment additionally audits successful opaque

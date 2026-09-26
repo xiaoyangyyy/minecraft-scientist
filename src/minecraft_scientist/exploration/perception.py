@@ -11,6 +11,23 @@ import numpy as np
 from minecraft_scientist.protocols import ActionKind, Observation
 
 
+def temporal_median_rgb(frames: Iterable[np.ndarray]) -> np.ndarray:
+    """Suppress transient RGB artifacts with an odd-frame pixelwise median."""
+
+    arrays = tuple(np.asarray(frame) for frame in frames)
+    if not arrays or len(arrays) % 2 == 0:
+        raise ValueError("temporal RGB aggregation requires a positive odd sample count")
+    shape = arrays[0].shape
+    if (
+        len(shape) != 3
+        or shape[2] < 3
+        or any(array.shape != shape for array in arrays)
+        or any(not np.isfinite(array).all() for array in arrays)
+    ):
+        raise ValueError("temporal RGB samples must be finite equal-shaped images")
+    return np.median(np.stack(arrays), axis=0).astype(np.uint8)
+
+
 class AnonymousSceneEncoder:
     """Encode local solid geometry without IDs, names, or absolute coordinates.
 
@@ -226,6 +243,116 @@ class RGBSceneEncoder:
         )
 
 
+class RGBEdgeSceneEncoder:
+    """Encode illumination-robust scene structure from anonymous RGB edges.
+
+    A small median filter suppresses rain streaks and isolated particles.  The
+    remaining luminance gradients are converted to percentile-ranked strong-edge
+    occupancy plus unsigned horizontal/vertical orientation channels.  Because the
+    threshold is fitted independently per frame, global brightness and contrast do
+    not enter the descriptor.
+    """
+
+    VERSION = "rgb-edge-grid-v1"
+
+    def __init__(
+        self,
+        *,
+        grid_size: int = 16,
+        horizontal_crop: float = 0.18,
+        bottom_fraction: float = 0.76,
+        edge_quantile: float = 0.7,
+        quantization: float = 32,
+    ) -> None:
+        if grid_size < 2:
+            raise ValueError("edge grid size must be at least two")
+        if not 0 <= horizontal_crop < 0.5:
+            raise ValueError("edge horizontal crop must be in [0, 0.5)")
+        if not 0 < bottom_fraction <= 1:
+            raise ValueError("edge bottom fraction must be in (0, 1]")
+        if not 0 < edge_quantile < 1:
+            raise ValueError("edge quantile must be in (0, 1)")
+        if quantization <= 0:
+            raise ValueError("edge quantization must be positive")
+        self.grid_size = grid_size
+        self.horizontal_crop = float(horizontal_crop)
+        self.bottom_fraction = float(bottom_fraction)
+        self.edge_quantile = float(edge_quantile)
+        self.quantization = float(quantization)
+
+    @property
+    def dimensions(self) -> int:
+        return self.grid_size * self.grid_size * 3
+
+    def encode(self, frame: np.ndarray) -> tuple[int, ...]:
+        array = np.asarray(frame)
+        if (
+            array.ndim != 3
+            or array.shape[2] < 3
+            or array.shape[0] < 2
+            or array.shape[1] < 2
+        ):
+            raise ValueError("RGB frame is too small or has invalid dimensions")
+        rgb = np.asarray(array[:, :, :3], dtype=np.float64)
+        if not np.isfinite(rgb).all():
+            raise ValueError("RGB frame must contain finite values")
+        height, width = rgb.shape[:2]
+        left = int(width * self.horizontal_crop)
+        right = int(width * (1 - self.horizontal_crop))
+        bottom = int(height * self.bottom_fraction)
+        crop = np.clip(rgb[:bottom, left:right], 0, 255)
+        if crop.shape[0] < self.grid_size or crop.shape[1] < self.grid_size:
+            y_indices = np.linspace(0, crop.shape[0] - 1, self.grid_size).astype(int)
+            x_indices = np.linspace(0, crop.shape[1] - 1, self.grid_size).astype(int)
+            crop = crop[y_indices][:, x_indices]
+        luminance = (
+            0.2126 * crop[..., 0] + 0.7152 * crop[..., 1] + 0.0722 * crop[..., 2]
+        )
+        padded = np.pad(luminance, 1, mode="reflect")
+        windows = np.lib.stride_tricks.sliding_window_view(padded, (3, 3))
+        smooth = np.median(windows, axis=(-2, -1))
+        gradient_x = np.zeros_like(smooth)
+        gradient_y = np.zeros_like(smooth)
+        gradient_x[:, 1:-1] = smooth[:, 2:] - smooth[:, :-2]
+        gradient_y[1:-1, :] = smooth[2:, :] - smooth[:-2, :]
+        magnitude = np.hypot(gradient_x, gradient_y)
+        threshold = float(np.quantile(magnitude, self.edge_quantile))
+        strong = magnitude > max(threshold, 1e-9)
+        scale = np.where(strong, 1 / np.maximum(magnitude, 1e-9), 0)
+        channels = np.stack(
+            (
+                strong.astype(np.float64),
+                np.abs(gradient_x) * scale,
+                np.abs(gradient_y) * scale,
+            ),
+            axis=-1,
+        )
+        pooled = self._area_pool(channels)
+        signature = tuple(
+            int(value)
+            for value in np.rint(pooled * self.quantization).astype(np.int16).ravel()
+        )
+        if len(signature) != self.dimensions:
+            raise AssertionError("RGB edge descriptor width changed")
+        return signature
+
+    def _area_pool(self, array: np.ndarray) -> np.ndarray:
+        y_edges = np.linspace(0, array.shape[0], self.grid_size + 1).astype(int)
+        x_edges = np.linspace(0, array.shape[1], self.grid_size + 1).astype(int)
+        return np.stack(
+            [
+                [
+                    array[
+                        y_edges[row] : y_edges[row + 1],
+                        x_edges[column] : x_edges[column + 1],
+                    ].mean(axis=(0, 1))
+                    for column in range(self.grid_size)
+                ]
+                for row in range(self.grid_size)
+            ]
+        )
+
+
 class RGBPanoramaEncoder:
     """Encode a full visual scan independently of its starting camera yaw.
 
@@ -238,7 +365,10 @@ class RGBPanoramaEncoder:
 
     VERSION = "rgb-lab-panorama-v1"
 
-    def __init__(self, scene_encoder: RGBSceneEncoder | None = None) -> None:
+    def __init__(
+        self,
+        scene_encoder: RGBSceneEncoder | RGBEdgeSceneEncoder | None = None,
+    ) -> None:
         self.scene_encoder = scene_encoder or RGBSceneEncoder()
 
     @property
@@ -286,6 +416,15 @@ class RGBPanoramaEncoder:
         if len(signature) != self.dimensions:
             raise ValueError("serialized RGB panorama width does not match encoder")
         return signature
+
+
+class RGBEdgePanoramaEncoder(RGBPanoramaEncoder):
+    """Order-independent panorama built from illumination-robust edge views."""
+
+    VERSION = "rgb-edge-panorama-v1"
+
+    def __init__(self, scene_encoder: RGBEdgeSceneEncoder | None = None) -> None:
+        super().__init__(scene_encoder or RGBEdgeSceneEncoder())
 
 
 def infer_visual_rotation_period(

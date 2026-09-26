@@ -672,13 +672,18 @@ class ExplorationMemory:
         *,
         episode_id: int,
         step: int,
-        margin: float,
+        margin: float | None,
     ) -> ModalityPlaceMemory:
-        """Fit a conservative modality boundary from disjoint positive/negative views."""
+        """Fit a boundary from disjoint positive/negative views.
+
+        ``margin=None`` selects the maximum-gap boundary using training evidence only.
+        A tiny deterministic clearance keeps the positive radius strictly below the
+        negative boundary required by :class:`PlaceCalibration`.
+        """
 
         if episode_id < 0 or step < 0:
             raise ValueError("episode and step must be nonnegative")
-        if not math.isfinite(margin) or margin < 0:
+        if margin is not None and (not math.isfinite(margin) or margin < 0):
             raise ValueError("calibration margin must be finite and nonnegative")
         previous = self._get_modality_place(modality, place_id)
         positives = tuple(_signature(item) for item in positive_signatures)
@@ -700,6 +705,11 @@ class ExplorationMemory:
         negative_distance = min(
             self._nearest_distance(exemplars, item) for item in negatives
         )
+        if margin is None:
+            gap = negative_distance - positive_distance
+            if gap <= 0:
+                raise ValueError("positive and negative place views are not separated")
+            margin = gap * 0.499999
         calibration = PlaceCalibration(
             positive_samples=len(positives),
             negative_samples=len(negatives),
@@ -725,6 +735,59 @@ class ExplorationMemory:
                 "positive_signatures": positives,
                 "negative_signatures": negatives,
             },
+        )
+
+    def consolidate_modality_view(
+        self,
+        modality: str,
+        place_id: str,
+        signature: Iterable[int],
+        *,
+        episode_id: int,
+        step: int,
+    ) -> ModalityPlaceMemory:
+        """Add an already accepted view to the bounded calibrated coreset.
+
+        Consolidation cannot expand the calibrated radius: the candidate must first
+        match the existing coreset, which prevents an unvalidated domain-shift view
+        from teaching the memory about itself.
+        """
+
+        if episode_id < 0 or step < 0:
+            raise ValueError("episode and step must be nonnegative")
+        normalized = _signature(signature)
+        previous = self._get_modality_place(modality, place_id)
+        if previous.calibration is None:
+            raise ValueError("modality view must be calibrated before consolidation")
+        if len(previous.exemplars[0]) != len(normalized):
+            raise ValueError("modality consolidation signature width changed")
+        distance = self._nearest_distance(previous.exemplars, normalized)
+        if distance > previous.match_radius:
+            raise ValueError("calibrated modality rejected consolidation candidate")
+        state = previous.model_copy(
+            update={
+                "exemplars": self._coreset(
+                    previous.exemplars[0], (*previous.exemplars, normalized)
+                ),
+                "observations": previous.observations + 1,
+                "episodes": tuple(sorted(set(previous.episodes) | {episode_id})),
+                "last_episode": max(previous.last_episode, episode_id),
+                "last_step": (
+                    max(previous.last_step, step)
+                    if episode_id == previous.last_episode
+                    else step
+                    if episode_id > previous.last_episode
+                    else previous.last_step
+                ),
+            }
+        )
+        state = ModalityPlaceMemory.model_validate(state.model_dump())
+        return self._save_modality_state(
+            state,
+            episode_id=episode_id,
+            step=step,
+            event_type="modality_view_consolidated",
+            extra={"signature": normalized, "distance_before": distance},
         )
 
     def _save_modality_state(
@@ -1314,6 +1377,7 @@ class ExplorationMemory:
             elif event_type in {
                 "modality_view_recorded",
                 "modality_view_calibrated",
+                "modality_view_consolidated",
             }:
                 if not isinstance(state, dict):
                     return False

@@ -13,10 +13,13 @@ from .memory import (
 )
 from .perception import (
     AnonymousSceneEncoder,
+    RGBEdgePanoramaEncoder,
+    RGBEdgeSceneEncoder,
     RGBPanoramaEncoder,
     RGBSceneEncoder,
     infer_visual_rotation_period,
     rgb_signature_from_observation,
+    temporal_median_rgb,
 )
 
 __all__ = [
@@ -30,8 +33,11 @@ __all__ = [
     "PlaceCalibration",
     "PlaceMemory",
     "PlaceTransition",
+    "RGBEdgePanoramaEncoder",
+    "RGBEdgeSceneEncoder",
     "RGBPanoramaEncoder",
     "RGBSceneEncoder",
     "infer_visual_rotation_period",
     "rgb_signature_from_observation",
+    "temporal_median_rgb",
 ]

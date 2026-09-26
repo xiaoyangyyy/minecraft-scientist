@@ -131,6 +131,28 @@ restart. This proves bounded camera-start invariance and pixel-only loop closure
 one untouched generated forest/village seed under fixed conditions. It is not a
 learned embedding, a compass, cross-biome localization, or metric SLAM.
 
+The condition-split variant adds `RGBEdgeSceneEncoder` and
+`RGBEdgePanoramaEncoder`. The former median-filters luminance, retains quantized
+strong-edge occupancy and unsigned orientation, and the latter keeps the same
+order-independent panorama aggregation. Formal scans may use an odd number of
+temporal RGB samples per heading; the saved view is their pixelwise median, while all
+raw samples and hashes remain in the evidence directory so the auditor can rebuild
+the aggregation. Calibration can select a maximum-gap boundary from training data
+only. After calibration, `consolidate_modality_view` updates the bounded exemplar
+coreset only when the candidate already falls inside the old radius. Consolidation
+therefore adapts a persistent place to a recognized weather domain without allowing
+an unknown or rejected view to expand its own acceptance region. It is an explicit,
+hash-chained event and is replayed by SQLite integrity verification.
+
+The accepted seed-200 noon/clear to night/rain run combines five-frame temporal
+aggregation with this safe consolidation policy. Its independent audit reconstructs
+the temporal medians, verifies the training-only boundary, replays the start/return
+consolidations, and checks the physical loop using evaluator-only coordinates. This
+remains a single-seed bounded loop. The reversible-heading probe is intentionally
+fail-closed on a seed-201 ridge where none of the shortlisted forward/turn paths
+returned visually; expanding the action space and multi-frontier search remains
+necessary for genuine open-world exploration.
+
 `LocalCausalEngine` accepts `(context, intervention, outcome)` samples. It rejects
 controller failures and samples carrying possible confounders before computing a
 controlled effect. A directed edge is emitted only when at least two treatment
