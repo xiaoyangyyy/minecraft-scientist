@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Iterable
 
 import numpy as np
 
@@ -223,6 +224,97 @@ class RGBSceneEncoder:
             ),
             axis=-1,
         )
+
+
+class RGBPanoramaEncoder:
+    """Encode a full visual scan independently of its starting camera yaw.
+
+    A place scan is represented by the per-coordinate mean and standard deviation
+    of its single-view RGB signatures.  Both statistics are invariant to cyclic
+    reordering (and, more generally, any ordering) of the captured headings.  This
+    deliberately treats a panorama as a bag of views: it is useful for place
+    retrieval but does not retain a compass direction or reconstruct geometry.
+    """
+
+    VERSION = "rgb-lab-panorama-v1"
+
+    def __init__(self, scene_encoder: RGBSceneEncoder | None = None) -> None:
+        self.scene_encoder = scene_encoder or RGBSceneEncoder()
+
+    @property
+    def dimensions(self) -> int:
+        return self.scene_encoder.dimensions * 2
+
+    def encode(self, frames: Iterable[np.ndarray]) -> tuple[int, ...]:
+        arrays = tuple(np.asarray(frame) for frame in frames)
+        if len(arrays) < 2:
+            raise ValueError("panorama encoding requires at least two views")
+        return self.encode_signatures(
+            tuple(self.scene_encoder.encode(frame) for frame in arrays)
+        )
+
+    def encode_signatures(self, signatures: Iterable[Iterable[int]]) -> tuple[int, ...]:
+        items = tuple(tuple(int(value) for value in item) for item in signatures)
+        if len(items) < 2:
+            raise ValueError("panorama encoding requires at least two signatures")
+        if any(len(item) != self.scene_encoder.dimensions for item in items):
+            raise ValueError("panorama view signature width does not match encoder")
+        matrix = np.asarray(items, dtype=np.float64)
+        descriptor = tuple(
+            int(value)
+            for value in np.concatenate(
+                (
+                    np.rint(matrix.mean(axis=0)),
+                    np.rint(matrix.std(axis=0)),
+                )
+            ).astype(np.int16)
+        )
+        if len(descriptor) != self.dimensions:
+            raise AssertionError("RGB panorama descriptor width changed")
+        return descriptor
+
+    def serialize(self, signature: tuple[int, ...]) -> str:
+        if len(signature) != self.dimensions:
+            raise ValueError("RGB panorama signature width does not match encoder")
+        return json.dumps(signature, separators=(",", ":"))
+
+    def deserialize(self, payload: str) -> tuple[int, ...]:
+        try:
+            signature = tuple(int(value) for value in json.loads(payload))
+        except (TypeError, ValueError, json.JSONDecodeError) as error:
+            raise ValueError("invalid serialized RGB panorama signature") from error
+        if len(signature) != self.dimensions:
+            raise ValueError("serialized RGB panorama width does not match encoder")
+        return signature
+
+
+def infer_visual_rotation_period(
+    anchor: tuple[int, ...],
+    scan: Iterable[Iterable[int]],
+    *,
+    minimum_steps: int = 4,
+) -> tuple[int, tuple[float, ...]]:
+    """Infer a full-turn period only from recurrence of public RGB signatures.
+
+    ``scan`` contains the views after successive equal camera interventions.  The
+    first eligible global distance minimum is selected deterministically.  An
+    evaluator should still verify the resulting physical yaw when telemetry is
+    available; this function intentionally has no access to it.
+    """
+
+    views = tuple(tuple(int(value) for value in item) for item in scan)
+    if minimum_steps < 2:
+        raise ValueError("minimum rotation period must be at least two steps")
+    if len(views) < minimum_steps:
+        raise ValueError("rotation scan is shorter than its minimum period")
+    if not anchor or any(len(item) != len(anchor) for item in views):
+        raise ValueError("rotation scan signatures must have equal nonzero width")
+    distances = tuple(math.dist(anchor, item) for item in views)
+    eligible = distances[minimum_steps - 1 :]
+    period = minimum_steps + min(
+        range(len(eligible)), key=lambda index: (eligible[index], index)
+    )
+    return period, distances
 
 
 def rgb_signature_from_observation(

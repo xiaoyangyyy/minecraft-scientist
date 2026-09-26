@@ -433,10 +433,30 @@ decisions, compares calibration/distance metrics, and verifies the SQLite journa
 it reports `valid: true`. Evidence is in
 `runs/rgb-place-generalization-v1/{report.json,integrity-audit.json,exploration.sqlite3,evidence}`.
 This is controlled RGB appearance generalization, not a learned natural-scene metric
-or open-world pixel SLAM. The expanded release gate passes 165 tests plus one expected
-visual-extra skip on Windows and 164 tests plus two expected Node-specific skips in
+or open-world pixel SLAM. The expanded release gate passes 167 tests plus one expected
+visual-extra skip on Windows and 166 tests plus two expected Node-specific skips in
 the MineStudio Linux environment; dependency-lock validation and both package builds
 pass.
+
+The natural visual-loop gate removes all fixture terrain commands: only creative
+mode, peaceful difficulty, fixed noon/clear weather and feedback gamerules are set.
+On seed 200, RGB recurrence inferred a 12-step full turn and evaluator yaw confirmed
+orientation restoration within `0.00003` degrees. Three positive training scans
+(including a real physical return) and one displaced negative fit the
+`rgb-lab-panorama-v1` radius at 47.706; the nearest training negative is 88.425. A
+separate held-out episode reached 4.161 blocks from its start and returned within
+0.200 blocks. Pixel memory recognized the held-out start and return, rejected the
+outbound place, and recognized the start again after a sixth simulator/process
+session reopened SQLite. All controller actions complied and the public artifact
+scan found no position/yaw telemetry. The independent audit re-encodes all saved
+views, validates image/source hashes, calibration, decisions, journal integrity,
+physical telemetry and the no-terrain-edit command whitelist; it reports
+`valid: true`. Evidence is in
+`runs/natural-visual-loop-seed200-v2/{report.json,integrity-audit.json,events.jsonl,evaluator-audit.json,exploration.sqlite3,scans}`.
+This is the first audited natural-terrain pixel loop in the project, but it covers
+one seed, about four blocks and controlled conditions. Cross-biome/weather/daylight
+generalization, autonomous frontier selection, long-horizon survival and large-scale
+loop closure remain open.
 
 The expanded three-mechanism release gate completed with 78 tests. Its 20-pair run
 used per-pair durable checkpoints, three bounded JSON retries, 63 total calls, and

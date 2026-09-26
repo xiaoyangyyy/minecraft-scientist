@@ -9,7 +9,9 @@ import pytest
 from minecraft_scientist.exploration import (
     AnonymousSceneEncoder,
     ExplorationMemory,
+    RGBPanoramaEncoder,
     RGBSceneEncoder,
+    infer_visual_rotation_period,
 )
 from minecraft_scientist.protocols import (
     ActionKind,
@@ -121,6 +123,39 @@ def _shift(frame: np.ndarray, pixels: int) -> np.ndarray:
     else:
         result[:] = frame
     return result
+
+
+def test_panorama_signature_is_invariant_to_scan_start_and_order() -> None:
+    scene_encoder = RGBSceneEncoder(grid_size=4)
+    panorama_encoder = RGBPanoramaEncoder(scene_encoder)
+    views = tuple(
+        np.roll(_rgb_fixture(), shift, axis=1) for shift in (-30, -10, 10, 30)
+    )
+    signatures = tuple(scene_encoder.encode(frame) for frame in views)
+
+    reference = panorama_encoder.encode_signatures(signatures)
+    assert reference == panorama_encoder.encode_signatures(
+        signatures[2:] + signatures[:2]
+    )
+    assert reference == panorama_encoder.encode_signatures(tuple(reversed(signatures)))
+    assert reference == panorama_encoder.encode(views)
+    assert len(reference) == panorama_encoder.dimensions
+    assert (
+        panorama_encoder.deserialize(panorama_encoder.serialize(reference)) == reference
+    )
+
+
+def test_visual_rotation_period_uses_first_eligible_rgb_recurrence() -> None:
+    anchor = (0, 0)
+    scan = ((4, 0), (6, 0), (4, 0), (1, 0), (0, 0), (1, 0), (0, 0))
+
+    period, distances = infer_visual_rotation_period(anchor, scan, minimum_steps=4)
+
+    assert period == 5
+    assert distances[period - 1] == 0
+
+    with pytest.raises(ValueError, match="shorter"):
+        infer_visual_rotation_period(anchor, scan[:2], minimum_steps=4)
 
 
 def test_rgb_encoder_and_calibrated_modality_memory_generalize_safely(

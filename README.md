@@ -411,6 +411,28 @@ role separation and evidence hashes, replays SQLite, and recomputes all decision
 This improves controlled RGB generalization substantially, but remains a hand-built
 fixture-calibrated metric rather than a learned natural-biome representation.
 
+The next gate removes the constructed arena. `RGBPanoramaEncoder` aggregates a full
+active camera scan into a 1,536-dimensional order-independent signature, so the scan
+can start at any yaw without introducing a compass label. In the accepted seed-200
+MineStudio run, the RGB-only policy inferred a 12-intervention turn period, trained
+its place radius across independent restarts plus one physical out-and-back return,
+then ran a disjoint held-out loop on untouched generated forest/village terrain:
+
+```powershell
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/natural_visual_loop_benchmark.py --seed 200 --moves 4 --move-frames 4 --output /mnt/d/minecraft-scientist/runs/natural-visual-loop-seed200-v2
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/audit_natural_visual_loop.py /mnt/d/minecraft-scientist/runs/natural-visual-loop-seed200-v2 --write
+```
+
+The calibrated radius is 47.706 versus an 88.425 nearest training negative. The
+held-out Agent moved 4.161 blocks from the start and physically returned within
+0.200 blocks; its start and return panoramas were recognized, its outbound panorama
+was rejected, and a later process restart was recognized from the reopened SQLite
+memory. The independent audit re-encodes every saved PNG, verifies the physical
+loop from evaluator-only coordinates, scans public artifacts for telemetry leakage,
+and reports `valid: true`. This establishes one bounded natural-terrain pixel loop
+under fixed noon/clear/peaceful conditions—not learned cross-biome generalization,
+long-horizon autonomous exploration, survival, or metric SLAM.
+
 A concrete label-free `GridVisualController` maps opaque screen regions and hotbar
 slots to MineStudio env actions. Tests verify action translation and semantic
 isolation; the accepted live experiment additionally audits successful opaque

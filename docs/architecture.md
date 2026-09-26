@@ -116,8 +116,20 @@ training and held-out roles. Deterministic brightness and horizontal-translation
 perturbations are applied within each role, but no held-out frame participates in
 radius fitting. Its independent audit reloads copied pixels rather than trusting
 reported signatures. The current representation has controlled-fixture evidence;
-natural-biome invariance, camera-rotation invariance and pixel-only loop closure are
-still unproven.
+broader natural-biome invariance remains unproven.
+
+`RGBPanoramaEncoder` adds an active-view layer without introducing a compass. It
+takes the mean and standard deviation of the 768-dimensional single-view signatures
+over a complete scan, producing a 1,536-dimensional bag-of-views descriptor. The
+descriptor is invariant to cyclic scan start and arbitrary scan ordering. The Agent
+infers the number of equal camera interventions in a full turn from RGB recurrence;
+evaluator-only yaw telemetry verifies that inference but never enters its policy or
+events. The natural-loop gate fits a fail-closed radius from separate restart and
+physical-return sessions, persists the calibrated descriptor through the existing
+modality journal, then tests a disjoint out-and-back loop and another process
+restart. This proves bounded camera-start invariance and pixel-only loop closure on
+one untouched generated forest/village seed under fixed conditions. It is not a
+learned embedding, a compass, cross-biome localization, or metric SLAM.
 
 `LocalCausalEngine` accepts `(context, intervention, outcome)` samples. It rejects
 controller failures and samples carrying possible confounders before computing a

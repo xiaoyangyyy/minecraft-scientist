@@ -13,7 +13,9 @@ from .memory import (
 )
 from .perception import (
     AnonymousSceneEncoder,
+    RGBPanoramaEncoder,
     RGBSceneEncoder,
+    infer_visual_rotation_period,
     rgb_signature_from_observation,
 )
 
@@ -28,6 +30,8 @@ __all__ = [
     "PlaceCalibration",
     "PlaceMemory",
     "PlaceTransition",
+    "RGBPanoramaEncoder",
     "RGBSceneEncoder",
+    "infer_visual_rotation_period",
     "rgb_signature_from_observation",
 ]
