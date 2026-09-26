@@ -93,14 +93,31 @@ coreset. `AnonymousSceneEncoder` derives a fixed-width descriptor from a world-a
 local window of public block geometry, hardness and diggability; object IDs, object
 order, absolute coordinate values and semantic names do not enter the descriptor.
 Public coordinates define the grid anchor, giving whole-cell translation invariance.
-The bridge
-can return up to 2048 nearby blocks so the fixed window is stable under sub-block
+The bridge can return up to 2048 nearby blocks so the fixed window is stable under sub-block
 reconnect drift. Perceptual views are journaled, projected into SQLite, replayed by
 the integrity verifier, and matched by nearest exemplar with fail-closed ambiguity.
 Spatial cells currently provide self-supervision and an independent evaluator for
 perceptual retrieval. Repeated terrain can still alias, so an unseen frontier never
-commits a scene-only loop closure without topological evidence. Pixel embeddings and
-cross-biome visual calibration remain a separate required layer.
+commits a scene-only loop closure without topological evidence. Learned pixel
+embeddings and cross-biome visual calibration remain a separate required layer.
+
+For pixel observations, `RGBSceneEncoder` crops the HUD-heavy lower/peripheral bands,
+area-pools the remaining view to a 16x16 CIELAB grid, normalizes each channel and
+quantizes it into 768 integers. `GridVisualController` exposes the serialized
+signature, encoder version and dimensionality through the public `Observation`;
+`rgb_signature_from_observation` validates that boundary before persistence. The
+`modality_place_views` SQLite projection keys each coreset by `(modality, place_id)`
+and persists its supervised positive/negative calibration. Journal replay checks
+both recorded views and calibration state. Matching uses the per-place radius and
+fails closed when two places fall within the ambiguity margin.
+
+The `benchmark-rgb-generalization` gate uses separate real MineStudio episodes for
+training and held-out roles. Deterministic brightness and horizontal-translation
+perturbations are applied within each role, but no held-out frame participates in
+radius fitting. Its independent audit reloads copied pixels rather than trusting
+reported signatures. The current representation has controlled-fixture evidence;
+natural-biome invariance, camera-rotation invariance and pixel-only loop closure are
+still unproven.
 
 `LocalCausalEngine` accepts `(context, intervention, outcome)` samples. It rejects
 controller failures and samples carrying possible confounders before computing a

@@ -5,12 +5,17 @@ from .memory import (
     FrontierMemory,
     FrontierPlan,
     FrontierStatus,
+    ModalityPlaceMemory,
     PerceptualPlaceMemory,
     PlaceCalibration,
     PlaceMemory,
     PlaceTransition,
 )
-from .perception import AnonymousSceneEncoder
+from .perception import (
+    AnonymousSceneEncoder,
+    RGBSceneEncoder,
+    rgb_signature_from_observation,
+)
 
 __all__ = [
     "AnonymousSceneEncoder",
@@ -18,8 +23,11 @@ __all__ = [
     "FrontierMemory",
     "FrontierPlan",
     "FrontierStatus",
+    "ModalityPlaceMemory",
     "PerceptualPlaceMemory",
     "PlaceCalibration",
     "PlaceMemory",
     "PlaceTransition",
+    "RGBSceneEncoder",
+    "rgb_signature_from_observation",
 ]

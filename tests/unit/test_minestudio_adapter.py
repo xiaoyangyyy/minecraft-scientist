@@ -5,6 +5,10 @@ from typing import Any
 import numpy as np
 import pytest
 
+from minecraft_scientist.exploration import (
+    RGBSceneEncoder,
+    rgb_signature_from_observation,
+)
 from minecraft_scientist.minecraft import (
     GridVisualController,
     MineStudioVisualAdapter,
@@ -24,15 +28,17 @@ class FakeSimulator:
             "objects": [{"name": "diamond_ore", "type": "block"}]
         }
 
-    def step(
-        self, action: Any
-    ) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
+    def step(self, action: Any) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
         self.actions.append(action)
         self.counter += 1
         frame = np.full((4, 5, 3), self.counter, dtype=np.uint8)
-        return frame, 0.25, False, False, {
-            "objects": [{"name": "diamond_ore", "type": "block"}]
-        }
+        return (
+            frame,
+            0.25,
+            False,
+            False,
+            {"objects": [{"name": "diamond_ore", "type": "block"}]},
+        )
 
     def close(self) -> None:
         self.closed = True
@@ -150,9 +156,7 @@ def test_minestudio_adapter_exposes_pixels_only_through_opaque_perception() -> N
     assert initial.objects[0].object_id == "obj_0017"
     assert initial.agent_state["frame_height"] == 4
     action = next(
-        item
-        for item in world.available_actions()
-        if item.kind is ActionKind.INTERACT
+        item for item in world.available_actions() if item.kind is ActionKind.INTERACT
     )
     transition = world.step(action)
 
@@ -220,8 +224,18 @@ def test_grid_visual_controller_maps_pixels_to_env_actions_without_labels() -> N
     assert scene.agent_state["inventory_observed"] is False
     assert all(item.object_id.startswith("obj_") for item in scene.objects)
     assert "forbidden" not in repr(scene.objects)
-    slot = next(item for item in scene.objects if item.affordances == (ActionKind.SELECT,))
-    cell = next(item for item in scene.objects if ActionKind.INTERACT in item.affordances)
+    assert scene.agent_state is not None
+    assert scene.agent_state["appearance_encoder"] == RGBSceneEncoder.VERSION
+    signature = RGBSceneEncoder().deserialize(
+        str(scene.agent_state["appearance_signature"])
+    )
+    assert len(signature) == RGBSceneEncoder().dimensions
+    slot = next(
+        item for item in scene.objects if item.affordances == (ActionKind.SELECT,)
+    )
+    cell = next(
+        item for item in scene.objects if ActionKind.INTERACT in item.affordances
+    )
     select = controller.encode_action(
         PrimitiveAction(kind=ActionKind.SELECT, target_id=slot.object_id), scene
     )
@@ -251,9 +265,7 @@ def test_grid_visual_controller_exposes_opaque_movement_handles() -> None:
         movement_controls=("forward", "left"),
     )
     scene = controller.perceive(np.zeros((8, 8, 3), dtype=np.uint8), {}, seed=9)
-    handles = [
-        item for item in scene.objects if item.affordances == (ActionKind.MOVE,)
-    ]
+    handles = [item for item in scene.objects if item.affordances == (ActionKind.MOVE,)]
 
     assert len(handles) == 2
     assert all(item.object_id.startswith("obj_") for item in handles)
@@ -271,9 +283,22 @@ def test_grid_visual_controller_exposes_opaque_movement_handles() -> None:
         if int(payload[key]) == 1
     } == {"forward", "left"}
     assert all(
-        int(payload["attack"]) == int(payload["use"]) == 0
-        for payload in payloads
+        int(payload["attack"]) == int(payload["use"]) == 0 for payload in payloads
     )
+
+
+def test_grid_controller_rgb_signature_survives_visual_adapter_boundary() -> None:
+    simulator = FakeSimulator()
+    world = MineStudioVisualAdapter(
+        GridVisualController(rows=1, columns=1, hotbar_slots=1),
+        simulator_factory=lambda config: simulator,
+    )
+
+    observation = world.reset(12)
+    signature = rgb_signature_from_observation(observation)
+
+    assert len(signature) == RGBSceneEncoder().dimensions
+    assert "diamond_ore" not in observation.model_dump_json()
 
 
 @pytest.mark.parametrize(
@@ -295,7 +320,8 @@ def test_move_repeats_requested_simulator_frames() -> None:
     )
     world.reset(2)
     handle = next(
-        item for item in world.observe().objects
+        item
+        for item in world.observe().objects
         if item.affordances == (ActionKind.MOVE,)
     )
 

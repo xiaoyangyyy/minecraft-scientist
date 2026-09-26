@@ -20,6 +20,7 @@ from typing import Any, Protocol, Self
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
+from minecraft_scientist.exploration import RGBSceneEncoder
 from minecraft_scientist.protocols import (
     ActionKind,
     ObjectObservation,
@@ -84,11 +85,12 @@ class GridVisualController:
 
     def __post_init__(self) -> None:
         if self.rows < 1 or self.columns < 1 or not 1 <= self.hotbar_slots <= 9:
-            raise ValueError("grid dimensions must be positive and hotbar_slots in 1..9")
+            raise ValueError(
+                "grid dimensions must be positive and hotbar_slots in 1..9"
+            )
         allowed_movement = {"forward", "back", "left", "right"}
-        if (
-            len(set(self.movement_controls)) != len(self.movement_controls)
-            or any(control not in allowed_movement for control in self.movement_controls)
+        if len(set(self.movement_controls)) != len(self.movement_controls) or any(
+            control not in allowed_movement for control in self.movement_controls
         ):
             raise ValueError("movement controls must be unique cardinal env actions")
 
@@ -100,6 +102,8 @@ class GridVisualController:
         if array.ndim == 2:
             array = array[..., None]
         height, width, _ = array.shape
+        appearance_encoder = RGBSceneEncoder()
+        appearance_signature = appearance_encoder.encode(array)
         objects: list[ObjectObservation] = []
         bindings: dict[str, dict[str, Any]] = {}
         for index, control in enumerate(self.movement_controls):
@@ -148,7 +152,9 @@ class GridVisualController:
                         observable_features={
                             "screen_row": row,
                             "screen_column": column,
-                            "mean_intensity": float(patch.mean()) if patch.size else 0.0,
+                            "mean_intensity": float(patch.mean())
+                            if patch.size
+                            else 0.0,
                             "contrast": float(patch.std()) if patch.size else 0.0,
                         },
                     )
@@ -160,6 +166,11 @@ class GridVisualController:
                 "inventory_observed": False,
                 "frame_mean": float(array.mean()),
                 "frame_contrast": float(array.std()),
+                "appearance_encoder": appearance_encoder.VERSION,
+                "appearance_dimensions": appearance_encoder.dimensions,
+                "appearance_signature": appearance_encoder.serialize(
+                    appearance_signature
+                ),
             },
             controller_state=bindings,
         )
@@ -168,7 +179,7 @@ class GridVisualController:
         payload = self._noop()
         bindings = scene.controller_state
         if not isinstance(bindings, dict):
-            raise ValueError("visual scene is missing controller bindings")
+            raise TypeError("visual scene is missing controller bindings")
         if action.kind is ActionKind.WAIT:
             return payload
         if action.target_id is None or action.target_id not in bindings:
@@ -257,7 +268,9 @@ def check_minestudio_backend() -> dict[str, Any]:
         java_version = first[0] if first else "unknown"
     linux = platform.system() == "Linux"
     installed = importlib.util.find_spec("minestudio") is not None
-    java8 = java_version is not None and ('"1.8.' in java_version or '"8' in java_version)
+    java8 = java_version is not None and (
+        '"1.8.' in java_version or '"8' in java_version
+    )
     return {
         "platform": platform.platform(),
         "python": sys.version.split()[0],
@@ -321,7 +334,9 @@ class MineStudioVisualAdapter:
         ]
         for item in self._scene.objects:
             for affordance in item.affordances:
-                actions.append(PrimitiveAction(kind=affordance, target_id=item.object_id))
+                actions.append(
+                    PrimitiveAction(kind=affordance, target_id=item.object_id)
+                )
         return tuple(dict.fromkeys(actions))
 
     def step(self, action: PrimitiveAction) -> TransitionRecord:
@@ -339,14 +354,14 @@ class MineStudioVisualAdapter:
         # WAIT and MOVE express frame durations. Other actions remain single
         # controller interventions (repeating camera deltas would drift).
         requested_steps = (
-            action.ticks
-            if action.kind in {ActionKind.WAIT, ActionKind.MOVE}
-            else 1
+            action.ticks if action.kind in {ActionKind.WAIT, ActionKind.MOVE} else 1
         )
         reward = 0.0
         executed_steps = 0
         for _ in range(requested_steps):
-            frame, step_reward, terminated, truncated, info = self._simulator.step(payload)
+            frame, step_reward, terminated, truncated, info = self._simulator.step(
+                payload
+            )
             reward += float(step_reward)
             executed_steps += 1
             if terminated or truncated or info.get("controller_failure"):
@@ -408,7 +423,9 @@ class MineStudioVisualAdapter:
     def __exit__(self, *_: object) -> None:
         self.close()
 
-    def _encode(self, frame: dict[str, Any] | np.ndarray, info: dict[str, Any]) -> Observation:
+    def _encode(
+        self, frame: dict[str, Any] | np.ndarray, info: dict[str, Any]
+    ) -> Observation:
         # MinecraftSim returns an observation mapping; only its RGB payload is
         # input to perception. Retain array support for lightweight simulators.
         if isinstance(frame, dict):
@@ -420,7 +437,9 @@ class MineStudioVisualAdapter:
             raise ValueError("MineStudio observation frame must be a 2D or 3D array")
         scene = self._controller.perceive(array, info, seed=self._seed)
         if any(not item.object_id.startswith("obj_") for item in scene.objects):
-            raise ValueError("visual object identifiers must use the opaque obj_ prefix")
+            raise ValueError(
+                "visual object identifiers must use the opaque obj_ prefix"
+            )
         shape = array.shape
         state: dict[str, str | int | float | bool] = {
             **(scene.agent_state or {}),
@@ -463,4 +482,6 @@ class MineStudioVisualAdapter:
         serialized = json.dumps(observation.model_dump(mode="json"), sort_keys=True)
         leaked = sorted(token for token in sensitive if token in serialized)
         if leaked:
-            raise ValueError(f"perception controller leaked semantic token: {leaked[0]}")
+            raise ValueError(
+                f"perception controller leaked semantic token: {leaked[0]}"
+            )

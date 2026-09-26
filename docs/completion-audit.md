@@ -418,10 +418,25 @@ new place duplicated an earlier local descriptor; it was retained as an uncommit
 perceptual alias rather than accepted as a loop closure. Evidence is in
 `runs/minecraft-open-world-perceptual-seed59/{config.json,report.json,events.jsonl,exploration.sqlite3}`.
 This proves bounded real multi-session traversal and structural perception, not
-pixel-level visual generalization, resource gathering, survival or unbounded
-open-world competence. The expanded release gate passes 163 tests on Windows and 161
-tests plus two expected Node-specific skips in the MineStudio Linux environment;
-dependency-lock validation and both package builds pass.
+resource gathering, survival or unbounded open-world competence.
+
+The RGB generalization gate adds a versioned 768-dimensional central CIELAB grid
+signature to every `GridVisualController` observation and persists it in a separate
+calibrated modality coreset. Its real MineStudio evidence has disjoint training and
+held-out episode roles. Fifteen training positives and one training negative fit a
+48.116 radius; the nearest training negative is 173.675. All 15 held-out positive
+brightness/translation variants are accepted and all 15 held-out negative variants
+are rejected. The maximum held-out positive distance is 23.324 and the nearest
+held-out negative distance is 173.721. The independent audit re-reads the copied PNG
+bytes, confirms role disjointness and hashes, regenerates all signatures and
+decisions, compares calibration/distance metrics, and verifies the SQLite journal;
+it reports `valid: true`. Evidence is in
+`runs/rgb-place-generalization-v1/{report.json,integrity-audit.json,exploration.sqlite3,evidence}`.
+This is controlled RGB appearance generalization, not a learned natural-scene metric
+or open-world pixel SLAM. The expanded release gate passes 165 tests plus one expected
+visual-extra skip on Windows and 164 tests plus two expected Node-specific skips in
+the MineStudio Linux environment; dependency-lock validation and both package builds
+pass.
 
 The expanded three-mechanism release gate completed with 78 tests. Its 20-pair run
 used per-pair durable checkpoints, three bounded JSON retries, 63 total calls, and

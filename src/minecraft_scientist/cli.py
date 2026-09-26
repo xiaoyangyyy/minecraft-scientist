@@ -644,6 +644,38 @@ def benchmark_exploration(
     console.print(f"Artifacts: {output.resolve()}")
 
 
+@app.command("benchmark-rgb-generalization")
+def benchmark_rgb_generalization(
+    evidence_root: Annotated[
+        Path, typer.Option(help="Disjoint real MineStudio RGB evidence roles")
+    ] = Path("runs/adaptive-landmark-calibration/evidence"),
+    output: Annotated[
+        Path, typer.Option(help="RGB generalization artifact directory")
+    ] = Path("runs/rgb-place-generalization"),
+    margin: Annotated[
+        float, typer.Option(min=0, help="Positive-coverage calibration margin")
+    ] = 5,
+    overwrite: Annotated[
+        bool, typer.Option(help="Replace known RGB benchmark artifacts")
+    ] = False,
+) -> None:
+    """Calibrate and audit persistent RGB place recognition."""
+
+    from minecraft_scientist.evaluation import run_rgb_generalization_benchmark
+
+    try:
+        report = run_rgb_generalization_benchmark(
+            evidence_root=evidence_root,
+            output=output,
+            margin=margin,
+            overwrite=overwrite,
+        )
+    except (FileExistsError, OSError, RuntimeError, ValueError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    console.print_json(json.dumps(report, sort_keys=True))
+    console.print(f"Artifacts: {output.resolve()}")
+
+
 @app.command("minecraft-exploration-smoke")
 def minecraft_exploration_smoke(
     server_directory: Annotated[

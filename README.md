@@ -392,6 +392,25 @@ uncommitted alias rather than a loop closure. This is meaningful long-term struc
 perception, but it is still not pixel-level visual generalization or unbounded
 survival exploration.
 
+The visual controller now publishes a 768-dimensional `rgb-lab-grid-v1` signature
+derived directly from every RGB frame. It uses a central CIELAB spatial grid,
+per-channel normalization and no semantic labels or learned weights. SQLite keeps
+separate bounded coresets and calibrated radii per modality, so RGB and structural
+views cannot silently overwrite one another. Run the disjoint-episode RGB gate with:
+
+```powershell
+uv run --extra visual minecraft-scientist benchmark-rgb-generalization --evidence-root runs/adaptive-landmark-calibration/evidence --output runs/rgb-place-generalization-v1
+```
+
+The accepted real MineStudio evidence fits a radius of 48.116 from 15 training
+positives and one negative. Across 15 held-out positive transformations and 15
+held-out negative transformations, acceptance and rejection are both 1.0. The
+held-out positive maximum distance is 23.324 while the nearest held-out negative is
+173.721. An independent audit reloads copied PNGs, re-encodes every view, validates
+role separation and evidence hashes, replays SQLite, and recomputes all decisions.
+This improves controlled RGB generalization substantially, but remains a hand-built
+fixture-calibrated metric rather than a learned natural-biome representation.
+
 A concrete label-free `GridVisualController` maps opaque screen regions and hotbar
 slots to MineStudio env actions. Tests verify action translation and semantic
 isolation; the accepted live experiment additionally audits successful opaque

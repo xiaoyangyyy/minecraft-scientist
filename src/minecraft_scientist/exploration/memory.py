@@ -180,6 +180,36 @@ class PerceptualPlaceMemory(_FrozenModel):
         return self
 
 
+class ModalityPlaceMemory(PerceptualPlaceMemory):
+    """Calibrated bounded views for one named nonsemantic sensor modality."""
+
+    modality: str
+    match_radius: float = Field(default=0, ge=0)
+    calibration: PlaceCalibration | None = None
+
+    @field_validator("modality")
+    @classmethod
+    def modality_is_normalized(cls, value: str) -> str:
+        if (
+            not value
+            or value.strip() != value
+            or any(character.isspace() for character in value)
+        ):
+            raise ValueError("modality must be a normalized nonempty token")
+        return value
+
+    @model_validator(mode="after")
+    def calibration_matches_radius(self) -> ModalityPlaceMemory:
+        if self.calibration is not None and not math.isclose(
+            self.match_radius,
+            self.calibration.radius,
+            rel_tol=1e-12,
+            abs_tol=1e-12,
+        ):
+            raise ValueError("modality radius does not match its calibration")
+        return self
+
+
 class FrontierMemory(_FrozenModel):
     """Persistent evidence about one candidate action program from a place."""
 
@@ -304,6 +334,12 @@ class ExplorationMemory:
             self._connection.execute(
                 "CREATE TABLE IF NOT EXISTS perceptual_places ("
                 "place_id TEXT PRIMARY KEY, payload_json TEXT NOT NULL, "
+                "FOREIGN KEY (place_id) REFERENCES places(place_id))"
+            )
+            self._connection.execute(
+                "CREATE TABLE IF NOT EXISTS modality_place_views ("
+                "modality TEXT NOT NULL, place_id TEXT NOT NULL, "
+                "payload_json TEXT NOT NULL, PRIMARY KEY (modality, place_id), "
                 "FOREIGN KEY (place_id) REFERENCES places(place_id))"
             )
             self._connection.execute(
@@ -527,6 +563,217 @@ class ExplorationMemory:
             if len(item.exemplars[0]) == len(normalized)
         )
         if not candidates or candidates[0][0] > tolerance:
+            return None
+        if (
+            len(candidates) > 1
+            and candidates[1][0] - candidates[0][0] <= ambiguity_margin
+        ):
+            return None
+        return candidates[0][1]
+
+    def modality_places(
+        self, modality: str | None = None
+    ) -> tuple[ModalityPlaceMemory, ...]:
+        if modality is None:
+            cursor = self._connection.execute(
+                "SELECT payload_json FROM modality_place_views "
+                "ORDER BY modality, place_id"
+            )
+        else:
+            cursor = self._connection.execute(
+                "SELECT payload_json FROM modality_place_views "
+                "WHERE modality = ? ORDER BY place_id",
+                (modality,),
+            )
+        return tuple(ModalityPlaceMemory.model_validate_json(row[0]) for row in cursor)
+
+    def _get_modality_place(self, modality: str, place_id: str) -> ModalityPlaceMemory:
+        row = self._connection.execute(
+            "SELECT payload_json FROM modality_place_views "
+            "WHERE modality = ? AND place_id = ?",
+            (modality, place_id),
+        ).fetchone()
+        if row is None:
+            raise KeyError(f"unknown modality place: {modality}:{place_id}")
+        return ModalityPlaceMemory.model_validate_json(row[0])
+
+    def record_modality_view(
+        self,
+        modality: str,
+        place_id: str,
+        signature: Iterable[int],
+        *,
+        episode_id: int,
+        step: int,
+    ) -> ModalityPlaceMemory:
+        """Record one bounded view without changing its calibrated boundary."""
+
+        self.get_place(place_id)
+        normalized = _signature(signature)
+        if episode_id < 0 or step < 0:
+            raise ValueError("episode and step must be nonnegative")
+        try:
+            previous = self._get_modality_place(modality, place_id)
+        except KeyError:
+            state = ModalityPlaceMemory(
+                modality=modality,
+                place_id=place_id,
+                exemplars=(normalized,),
+                observations=1,
+                episodes=(episode_id,),
+                last_episode=episode_id,
+                last_step=step,
+            )
+        else:
+            if len(previous.exemplars[0]) != len(normalized):
+                raise ValueError("modality signature width changed")
+            if previous.calibration is not None:
+                distance = self._nearest_distance(previous.exemplars, normalized)
+                if distance > previous.match_radius:
+                    raise ValueError(
+                        "calibrated modality rejected the unvalidated view"
+                    )
+                exemplars = previous.exemplars
+            else:
+                exemplars = self._coreset(
+                    previous.exemplars[0], (*previous.exemplars, normalized)
+                )
+            state = ModalityPlaceMemory(
+                modality=modality,
+                place_id=place_id,
+                exemplars=exemplars,
+                observations=previous.observations + 1,
+                episodes=tuple(sorted(set(previous.episodes) | {episode_id})),
+                last_episode=max(previous.last_episode, episode_id),
+                last_step=(
+                    max(previous.last_step, step)
+                    if episode_id == previous.last_episode
+                    else step
+                    if episode_id > previous.last_episode
+                    else previous.last_step
+                ),
+                match_radius=previous.match_radius,
+                calibration=previous.calibration,
+            )
+        return self._save_modality_state(
+            state,
+            episode_id=episode_id,
+            step=step,
+            event_type="modality_view_recorded",
+            extra={"signature": normalized},
+        )
+
+    def calibrate_modality_place(
+        self,
+        modality: str,
+        place_id: str,
+        positive_signatures: Iterable[Iterable[int]],
+        negative_signatures: Iterable[Iterable[int]],
+        *,
+        episode_id: int,
+        step: int,
+        margin: float,
+    ) -> ModalityPlaceMemory:
+        """Fit a conservative modality boundary from disjoint positive/negative views."""
+
+        if episode_id < 0 or step < 0:
+            raise ValueError("episode and step must be nonnegative")
+        if not math.isfinite(margin) or margin < 0:
+            raise ValueError("calibration margin must be finite and nonnegative")
+        previous = self._get_modality_place(modality, place_id)
+        positives = tuple(_signature(item) for item in positive_signatures)
+        negatives = tuple(_signature(item) for item in negative_signatures)
+        if len(positives) < 2:
+            raise ValueError("modality calibration requires at least two positives")
+        if not negatives:
+            raise ValueError("modality calibration requires at least one negative")
+        if any(
+            len(item) != len(previous.exemplars[0]) for item in (*positives, *negatives)
+        ):
+            raise ValueError("modality calibration signature width changed")
+        positive_distance = max(
+            self._nearest_distance(previous.exemplars, item) for item in positives
+        )
+        exemplars = self._coreset(
+            previous.exemplars[0], (*previous.exemplars, *positives)
+        )
+        negative_distance = min(
+            self._nearest_distance(exemplars, item) for item in negatives
+        )
+        calibration = PlaceCalibration(
+            positive_samples=len(positives),
+            negative_samples=len(negatives),
+            maximum_positive_distance=positive_distance,
+            nearest_negative_distance=negative_distance,
+            margin=margin,
+            radius=positive_distance + margin,
+        )
+        state = previous.model_copy(
+            update={
+                "exemplars": exemplars,
+                "match_radius": calibration.radius,
+                "calibration": calibration,
+            }
+        )
+        state = ModalityPlaceMemory.model_validate(state.model_dump())
+        return self._save_modality_state(
+            state,
+            episode_id=episode_id,
+            step=step,
+            event_type="modality_view_calibrated",
+            extra={
+                "positive_signatures": positives,
+                "negative_signatures": negatives,
+            },
+        )
+
+    def _save_modality_state(
+        self,
+        state: ModalityPlaceMemory,
+        *,
+        episode_id: int,
+        step: int,
+        event_type: str,
+        extra: dict[str, Any],
+    ) -> ModalityPlaceMemory:
+        payload = state.model_dump(mode="json")
+        with self._connection:
+            self._append_event(
+                event_type,
+                episode_id,
+                step,
+                {**extra, "state": payload},
+            )
+            self._connection.execute(
+                "INSERT INTO modality_place_views "
+                "(modality, place_id, payload_json) VALUES (?, ?, ?) "
+                "ON CONFLICT(modality, place_id) DO UPDATE SET "
+                "payload_json = excluded.payload_json",
+                (state.modality, state.place_id, _canonical(payload)),
+            )
+        return state
+
+    def match_modality_place(
+        self,
+        modality: str,
+        signature: Iterable[int],
+        *,
+        ambiguity_margin: float = 0,
+    ) -> str | None:
+        """Match through persisted per-place calibration and reject ambiguity."""
+
+        if not math.isfinite(ambiguity_margin) or ambiguity_margin < 0:
+            raise ValueError("modality ambiguity margin must be nonnegative")
+        normalized = _signature(signature)
+        candidates: list[tuple[float, str]] = []
+        for item in self.modality_places(modality):
+            if len(item.exemplars[0]) != len(normalized):
+                continue
+            distance = self._nearest_distance(item.exemplars, normalized)
+            if distance <= item.match_radius:
+                candidates.append((distance, item.place_id))
+        candidates.sort()
+        if not candidates:
             return None
         if (
             len(candidates) > 1
@@ -1029,6 +1276,7 @@ class ExplorationMemory:
         expected_sequence = 1
         replayed_places: dict[str, dict[str, Any]] = {}
         replayed_perceptual_places: dict[str, dict[str, Any]] = {}
+        replayed_modality_places: dict[tuple[str, str], dict[str, Any]] = {}
         replayed_frontiers: dict[str, dict[str, Any]] = {}
         replayed_transitions: dict[tuple[str, str, str], dict[str, Any]] = {}
         for event in self.iter_events():
@@ -1063,6 +1311,19 @@ class ExplorationMemory:
                 except ValueError:
                     return False
                 replayed_perceptual_places[perceptual.place_id] = state
+            elif event_type in {
+                "modality_view_recorded",
+                "modality_view_calibrated",
+            }:
+                if not isinstance(state, dict):
+                    return False
+                try:
+                    modality_place = ModalityPlaceMemory.model_validate(state)
+                except ValueError:
+                    return False
+                replayed_modality_places[
+                    (modality_place.modality, modality_place.place_id)
+                ] = state
             elif event_type in {"frontier_registered", "frontier_outcome"}:
                 if not isinstance(state, dict):
                     return False
@@ -1099,6 +1360,7 @@ class ExplorationMemory:
         try:
             places = self.places()
             perceptual_places = self.perceptual_places()
+            modality_places = self.modality_places()
             frontiers = self.frontiers()
             transitions = self.transitions()
         except ValueError:
@@ -1107,12 +1369,17 @@ class ExplorationMemory:
         stored_perceptual_places = {
             item.place_id: item.model_dump(mode="json") for item in perceptual_places
         }
+        stored_modality_places = {
+            (item.modality, item.place_id): item.model_dump(mode="json")
+            for item in modality_places
+        }
         stored_frontiers = {
             item.frontier_id: item.model_dump(mode="json") for item in frontiers
         }
         if (
             replayed_places != stored_places
             or replayed_perceptual_places != stored_perceptual_places
+            or replayed_modality_places != stored_modality_places
             or replayed_frontiers != stored_frontiers
         ):
             return False
@@ -1132,6 +1399,7 @@ class ExplorationMemory:
     def summary(self) -> dict[str, Any]:
         places = self.places()
         perceptual_places = self.perceptual_places()
+        modality_places = self.modality_places()
         frontiers = self.frontiers()
         transitions = self.transitions()
         return {
@@ -1144,6 +1412,10 @@ class ExplorationMemory:
             "perceptual_place_count": len(perceptual_places),
             "multi_view_perceptual_place_count": sum(
                 len(item.exemplars) > 1 for item in perceptual_places
+            ),
+            "modality_place_count": len(modality_places),
+            "calibrated_modality_place_count": sum(
+                item.calibration is not None for item in modality_places
             ),
             "frontier_count": len(frontiers),
             "active_frontier_count": sum(
