@@ -287,6 +287,30 @@ def test_grid_visual_controller_exposes_opaque_movement_handles() -> None:
     )
 
 
+def test_grid_visual_controller_supports_opaque_compound_movement_programs() -> None:
+    controller = GridVisualController(
+        rows=1,
+        columns=1,
+        hotbar_slots=1,
+        movement_programs=(("forward",), ("forward", "jump")),
+    )
+    scene = controller.perceive(np.zeros((8, 8, 3), dtype=np.uint8), {}, seed=19)
+    handles = [item for item in scene.objects if item.affordances == (ActionKind.MOVE,)]
+
+    assert len(handles) == 2
+    assert "forward" not in repr(handles) and "jump" not in repr(handles)
+    payloads = [
+        controller.encode_action(
+            PrimitiveAction(kind=ActionKind.MOVE, target_id=item.object_id), scene
+        )
+        for item in handles
+    ]
+    assert [(int(item["forward"]), int(item["jump"])) for item in payloads] == [
+        (1, 0),
+        (1, 1),
+    ]
+
+
 def test_grid_controller_rgb_signature_survives_visual_adapter_boundary() -> None:
     simulator = FakeSimulator()
     world = MineStudioVisualAdapter(
@@ -308,6 +332,20 @@ def test_grid_controller_rgb_signature_survives_visual_adapter_boundary() -> Non
 def test_grid_visual_controller_rejects_invalid_movement_controls(controls) -> None:
     with pytest.raises(ValueError, match="unique cardinal env actions"):
         GridVisualController(movement_controls=controls)
+
+
+@pytest.mark.parametrize(
+    "programs",
+    [
+        ((),),
+        (("forward", "forward"),),
+        (("forward", "fly"),),
+        (("forward", "jump"), ("forward", "jump")),
+    ],
+)
+def test_grid_visual_controller_rejects_invalid_movement_programs(programs) -> None:
+    with pytest.raises(ValueError, match="unique nonempty env-action sets"):
+        GridVisualController(movement_programs=programs)
 
 
 def test_move_repeats_requested_simulator_frames() -> None:

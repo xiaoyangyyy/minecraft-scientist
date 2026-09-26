@@ -14,6 +14,8 @@ import json
 import math
 import os
 import shutil
+import time
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -83,12 +85,12 @@ PRIVILEGED_ARTIFACT_TOKENS = (
 class NaturalRecorder:
     """RGB-only controller; position telemetry is rejected at the boundary."""
 
-    def __init__(self) -> None:
+    def __init__(self, movement_programs: tuple[tuple[str, ...], ...]) -> None:
         self.grid = GridVisualController(
             rows=3,
             columns=3,
             hotbar_slots=1,
-            movement_controls=("forward",),
+            movement_programs=movement_programs,
         )
         self.frames: list[np.ndarray] = []
 
@@ -109,6 +111,7 @@ class Session:
     recorder: NaturalRecorder
     audit: PositionAudit
     records: list[TransitionRecord]
+    startup_attempts: int = 1
 
 
 def _factory(config, audit: PositionAudit, commands: tuple[str, ...]):
@@ -120,17 +123,41 @@ def _factory(config, audit: PositionAudit, commands: tuple[str, ...]):
     return PositionAuditSimulator(simulator, audit)
 
 
-def _open_session(seed: int, commands: tuple[str, ...]) -> Session:
-    recorder = NaturalRecorder()
-    audit = PositionAudit()
-    world = MineStudioVisualAdapter(
-        recorder,
-        simulator_factory=lambda config: _factory(config, audit, commands),
-    )
-    world.reset(seed)
-    records: list[TransitionRecord] = []
-    records.append(world.step(PrimitiveAction(kind=ActionKind.WAIT, ticks=20)))
-    return Session(world=world, recorder=recorder, audit=audit, records=records)
+def _open_session(
+    seed: int,
+    commands: tuple[str, ...],
+    movement_programs: tuple[tuple[str, ...], ...],
+) -> Session:
+    maximum_attempts = 3
+    for attempt in range(1, maximum_attempts + 1):
+        recorder = NaturalRecorder(movement_programs)
+        audit = PositionAudit()
+        world = MineStudioVisualAdapter(
+            recorder,
+            simulator_factory=lambda config, audit=audit, commands=commands: _factory(
+                config, audit, commands
+            ),
+        )
+        try:
+            world.reset(seed)
+            records = [
+                world.step(PrimitiveAction(kind=ActionKind.WAIT, ticks=20))
+            ]
+        except Exception:
+            with suppress(Exception):
+                world.close()
+            if attempt == maximum_attempts:
+                raise
+            time.sleep(2)
+            continue
+        return Session(
+            world=world,
+            recorder=recorder,
+            audit=audit,
+            records=records,
+            startup_attempts=attempt,
+        )
+    raise AssertionError("unreachable session startup state")
 
 
 def _target(
@@ -153,6 +180,16 @@ def _target(
             f"expected one opaque {kind.value} handle, got {len(options)}"
         )
     return options[0]
+
+
+def _movement_targets(world: MineStudioVisualAdapter) -> tuple[str, ...]:
+    return tuple(
+        sorted(
+            item.object_id
+            for item in world.observe().objects
+            if item.affordances == (ActionKind.MOVE,)
+        )
+    )
 
 
 def _turn(session: Session, target_id: str) -> None:
@@ -323,14 +360,21 @@ def _capture_scan(
     )
 
 
-def _move(session: Session, *, moves: int, move_frames: int) -> None:
-    handle = _target(session.world, ActionKind.MOVE)
+def _move(
+    session: Session,
+    *,
+    moves: int,
+    move_frames: int,
+    target_id: str,
+) -> None:
+    if target_id not in _movement_targets(session.world):
+        raise ValueError("selected opaque movement handle is unavailable")
     for _ in range(moves):
         session.records.append(
             session.world.step(
                 PrimitiveAction(
                     kind=ActionKind.MOVE,
-                    target_id=handle,
+                    target_id=target_id,
                     ticks=move_frames,
                 )
             )
@@ -372,6 +416,8 @@ def _probe_heading(
     *,
     encoder: RGBPanoramaEncoder,
     heading_steps: int,
+    program_index: int,
+    movement_target_id: str,
     period: int,
     moves: int,
     move_frames: int,
@@ -382,17 +428,27 @@ def _probe_heading(
     _orient(session, heading_steps)
     start_frame = session.recorder.frames[-1].copy()
     start = encoder.scene_encoder.encode(start_frame)
-    _move(session, moves=moves, move_frames=move_frames)
+    _move(
+        session,
+        moves=moves,
+        move_frames=move_frames,
+        target_id=movement_target_id,
+    )
     outbound_frame = session.recorder.frames[-1].copy()
     outbound = encoder.scene_encoder.encode(outbound_frame)
     _half_turn(session, period)
-    _move(session, moves=moves, move_frames=move_frames)
+    _move(
+        session,
+        moves=moves,
+        move_frames=move_frames,
+        target_id=movement_target_id,
+    )
     _half_turn(session, period)
     return_frame = session.recorder.frames[-1].copy()
     returned = encoder.scene_encoder.encode(return_frame)
     outbound_distance = math.dist(start, outbound)
     return_distance = math.dist(start, returned)
-    root = output / f"heading-{heading_steps:02d}"
+    root = output / f"heading-{heading_steps:02d}-program-{program_index:02d}"
     hashes = {
         "start.png": _save_probe_frame(root / "start.png", start_frame),
         "outbound.png": _save_probe_frame(root / "outbound.png", outbound_frame),
@@ -400,6 +456,8 @@ def _probe_heading(
     }
     return {
         "heading_steps": heading_steps,
+        "program_index": program_index,
+        "movement_target_id": movement_target_id,
         "outbound_distance": outbound_distance,
         "return_distance": return_distance,
         "reversibility_score": outbound_distance / (return_distance + 1.0),
@@ -531,6 +589,11 @@ def main() -> None:
         default=6,
         help="number of visually open headings tested for RGB reversibility",
     )
+    parser.add_argument(
+        "--enable-jump-program",
+        action="store_true",
+        help="add an anonymous forward-plus-jump candidate to reversible probing",
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.moves < 1 or args.move_frames < 1:
@@ -543,6 +606,8 @@ def main() -> None:
         parser.error("temporal samples must be a positive odd integer")
     if args.select_open_heading and args.select_reversible_heading:
         parser.error("open and reversible heading selection are mutually exclusive")
+    if args.enable_jump_program and not args.select_reversible_heading:
+        parser.error("the jump program requires reversible heading selection")
     args.output.mkdir(parents=True, exist_ok=False)
     training_commands = natural_world_commands(
         time_of_day=args.training_time,
@@ -556,12 +621,20 @@ def main() -> None:
     if args.require_condition_shift and not condition_shifted:
         parser.error("held-out conditions must differ from training conditions")
     encoder = PANORAMA_ENCODERS[args.panorama_encoder]()
+    movement_programs = (
+        (("forward",), ("forward", "jump"))
+        if args.enable_jump_program
+        else (("forward",),)
+    )
+    source_hashes = _copy_sources(args.output)
 
     sessions: list[Session] = []
     scans: dict[str, dict[str, Any]] = {}
     heading_probe: dict[str, Any] | None = None
+    selected_program_index = 0
+    selected_probe_metrics: dict[str, float | None] | None = None
     try:
-        discovery = _open_session(args.seed, training_commands)
+        discovery = _open_session(args.seed, training_commands, movement_programs)
         sessions.append(discovery)
         (
             period,
@@ -576,7 +649,23 @@ def main() -> None:
             minimum_steps=args.minimum_turn_steps,
             maximum_steps=args.maximum_turn_steps,
         )
+        movement_target_ids = _movement_targets(discovery.world)
         discovery.world.close()
+        (args.output / "discovery-evaluator-checkpoint.json").write_text(
+            json.dumps(
+                {
+                    "positions": discovery.audit.positions,
+                    "orientation_return_error": _orientation_return_error(
+                        discovery.audit.positions
+                    ),
+                    "startup_attempts": discovery.startup_attempts,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
 
         if args.select_reversible_heading:
             scores = tuple(float(item) for item in scans["discovery"]["openness_scores"])
@@ -589,40 +678,81 @@ def main() -> None:
                 parser.error(str(error))
             probe_results = []
             for candidate in candidates:
-                probe = _open_session(args.seed, training_commands)
-                sessions.append(probe)
-                result = _probe_heading(
-                    probe,
-                    encoder=encoder,
-                    heading_steps=candidate,
-                    period=period,
-                    moves=args.moves,
-                    move_frames=args.move_frames,
-                    output=args.output / "heading-probes",
-                )
-                result["session_index"] = len(sessions) - 1
-                probe_results.append(result)
-                probe.world.close()
+                for program_index, movement_target_id in enumerate(
+                    movement_target_ids
+                ):
+                    probe = _open_session(
+                        args.seed, training_commands, movement_programs
+                    )
+                    sessions.append(probe)
+                    result = _probe_heading(
+                        probe,
+                        encoder=encoder,
+                        heading_steps=candidate,
+                        program_index=program_index,
+                        movement_target_id=movement_target_id,
+                        period=period,
+                        moves=args.moves,
+                        move_frames=args.move_frames,
+                        output=args.output / "heading-probes",
+                    )
+                    result["session_index"] = len(sessions) - 1
+                    probe_results.append(result)
+                    probe.world.close()
             selected = max(
                 probe_results,
                 key=lambda item: (
                     float(item["reversibility_score"]),
                     float(item["outbound_distance"]),
                     -int(item["heading_steps"]),
+                    -int(item["program_index"]),
                 ),
             )
             heading_steps = int(selected["heading_steps"])
+            selected_program_index = int(selected["program_index"])
+            selected_movement_target_id = str(selected["movement_target_id"])
+            selected_probe_metrics = _position_metrics(
+                sessions[int(selected["session_index"])].audit.positions
+            )
             heading_probe = {
-                "selector": "rgb-reversibility-v1",
+                "selector": "rgb-reversibility-v2",
                 "candidate_count": len(candidates),
                 "candidate_headings": list(candidates),
+                "movement_target_ids": list(movement_target_ids),
                 "results": probe_results,
                 "selected_heading_steps": heading_steps,
+                "selected_program_index": selected_program_index,
+                "selected_movement_target_id": selected_movement_target_id,
+                "selected_evaluator_metrics": selected_probe_metrics,
             }
+            (args.output / "heading-probe.json").write_text(
+                json.dumps(heading_probe, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            (args.output / "heading-probe-evaluator.json").write_text(
+                json.dumps(
+                    {
+                        "sessions": [
+                            {
+                                "positions": session.audit.positions,
+                                "startup_attempts": session.startup_attempts,
+                            }
+                            for session in sessions
+                        ],
+                        "selected_session_index": int(selected["session_index"]),
+                        "selected_metrics": selected_probe_metrics,
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
         else:
             heading_steps = discovered_heading if args.select_open_heading else 0
+            selected_movement_target_id = movement_target_ids[0]
 
-        training = _open_session(args.seed, training_commands)
+        training = _open_session(args.seed, training_commands, movement_programs)
         sessions.append(training)
         _orient(training, heading_steps)
         positive_one, scans["train_positive_one"], _positive_one_views = _capture_scan(
@@ -632,7 +762,12 @@ def main() -> None:
             period=period,
             temporal_sample_count=args.temporal_samples,
         )
-        _move(training, moves=args.moves, move_frames=args.move_frames)
+        _move(
+            training,
+            moves=args.moves,
+            move_frames=args.move_frames,
+            target_id=selected_movement_target_id,
+        )
         training_negative, scans["train_negative"], _negative_views = _capture_scan(
             training,
             args.output / "scans/train-negative",
@@ -642,7 +777,9 @@ def main() -> None:
         )
         training.world.close()
 
-        second_positive_session = _open_session(args.seed, training_commands)
+        second_positive_session = _open_session(
+            args.seed, training_commands, movement_programs
+        )
         sessions.append(second_positive_session)
         _orient(second_positive_session, heading_steps)
         positive_two, scans["train_positive_two"], _positive_two_views = _capture_scan(
@@ -654,12 +791,24 @@ def main() -> None:
         )
         second_positive_session.world.close()
 
-        training_loop = _open_session(args.seed, training_commands)
+        training_loop = _open_session(
+            args.seed, training_commands, movement_programs
+        )
         sessions.append(training_loop)
         _orient(training_loop, heading_steps)
-        _move(training_loop, moves=args.moves, move_frames=args.move_frames)
+        _move(
+            training_loop,
+            moves=args.moves,
+            move_frames=args.move_frames,
+            target_id=selected_movement_target_id,
+        )
         _half_turn(training_loop, period)
-        _move(training_loop, moves=args.moves, move_frames=args.move_frames)
+        _move(
+            training_loop,
+            moves=args.moves,
+            move_frames=args.move_frames,
+            target_id=selected_movement_target_id,
+        )
         _half_turn(training_loop, period)
         training_return, scans["train_loop_return"], _return_views = _capture_scan(
             training_loop,
@@ -695,7 +844,8 @@ def main() -> None:
             "heldout_start_consolidated": False,
             "heldout_return_consolidated": False,
         }
-        loop = _open_session(args.seed, heldout_commands)
+        loop_session_index = len(sessions)
+        loop = _open_session(args.seed, heldout_commands, movement_programs)
         sessions.append(loop)
         _orient(loop, heading_steps)
         loop_start, scans["heldout_start"], _loop_start_views = _capture_scan(
@@ -716,7 +866,12 @@ def main() -> None:
                     step=0,
                 )
                 continual_adaptation["heldout_start_consolidated"] = True
-        _move(loop, moves=args.moves, move_frames=args.move_frames)
+        _move(
+            loop,
+            moves=args.moves,
+            move_frames=args.move_frames,
+            target_id=selected_movement_target_id,
+        )
         loop_outbound, scans["heldout_outbound"], _outbound_views = _capture_scan(
             loop,
             args.output / "scans/heldout-outbound",
@@ -729,7 +884,12 @@ def main() -> None:
                 encoder.VERSION, loop_outbound
             )
         _half_turn(loop, period)
-        _move(loop, moves=args.moves, move_frames=args.move_frames)
+        _move(
+            loop,
+            moves=args.moves,
+            move_frames=args.move_frames,
+            target_id=selected_movement_target_id,
+        )
         _half_turn(loop, period)
         loop_return, scans["heldout_return"], _return_views = _capture_scan(
             loop,
@@ -750,8 +910,23 @@ def main() -> None:
                 )
                 continual_adaptation["heldout_return_consolidated"] = True
         loop.world.close()
+        loop_metrics = _position_metrics(loop.audit.positions)
+        (args.output / "loop-evaluator-checkpoint.json").write_text(
+            json.dumps(
+                {
+                    "positions": loop.audit.positions,
+                    "metrics": loop_metrics,
+                    "startup_attempts": loop.startup_attempts,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        _write_events(args.output / "events-checkpoint.jsonl", sessions)
 
-        restart = _open_session(args.seed, heldout_commands)
+        restart = _open_session(args.seed, heldout_commands, movement_programs)
         sessions.append(restart)
         _orient(restart, heading_steps)
         restart_signature, scans["heldout_restart"], _restart_views = _capture_scan(
@@ -787,9 +962,7 @@ def main() -> None:
             record.intervention_compliance and record.event.success
             for record in action_records
         )
-        loop_metrics = _position_metrics(loop.audit.positions)
         orientation_error = _orientation_return_error(discovery.audit.positions)
-        source_hashes = _copy_sources(args.output)
         assert calibrated.calibration is not None
         gate = {
             "camera_period_even": period % 2 == 0,
@@ -809,6 +982,15 @@ def main() -> None:
             "physical_return": (
                 loop_metrics["return_error"] is not None
                 and loop_metrics["return_error"] <= 1.5
+            ),
+            "selected_probe_physical_reversibility": (
+                selected_probe_metrics is None
+                or (
+                    selected_probe_metrics["maximum_excursion"] is not None
+                    and selected_probe_metrics["maximum_excursion"] >= 2.0
+                    and selected_probe_metrics["return_error"] is not None
+                    and selected_probe_metrics["return_error"] <= 1.5
+                )
             ),
             "memory_integrity": memory_summary["integrity_valid"] is True,
             "required_condition_shift": (
@@ -847,8 +1029,14 @@ def main() -> None:
             "moves_each_leg": args.moves,
             "move_frames": args.move_frames,
             "selected_heading_steps": heading_steps,
+            "selected_program_index": selected_program_index,
+            "selected_movement_target_id": selected_movement_target_id,
             "open_heading_selection_enabled": args.select_open_heading,
             "reversible_heading_selection_enabled": args.select_reversible_heading,
+            "jump_program_enabled": args.enable_jump_program,
+            "session_startup_attempts": [
+                session.startup_attempts for session in sessions
+            ],
             "heading_probe": heading_probe,
             "continual_adaptation": continual_adaptation,
             "calibration": calibrated.calibration.model_dump(mode="json"),
@@ -869,10 +1057,11 @@ def main() -> None:
                 {
                     "positions": session.audit.positions,
                     "raw_metadata_keys": sorted(session.audit.metadata_keys),
+                    "startup_attempts": session.startup_attempts,
                 }
                 for session in sessions
             ],
-            "loop_session_index": 4,
+            "loop_session_index": loop_session_index,
             "loop_metrics": loop_metrics,
         }
         (args.output / "config.json").write_text(
@@ -895,6 +1084,7 @@ def main() -> None:
                     "select_open_heading": args.select_open_heading,
                     "select_reversible_heading": args.select_reversible_heading,
                     "heading_probe_candidates": args.heading_probe_candidates,
+                    "enable_jump_program": args.enable_jump_program,
                 },
                 indent=2,
                 sort_keys=True,

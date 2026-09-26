@@ -128,6 +128,32 @@ def _shift(frame: np.ndarray, pixels: int) -> np.ndarray:
     return result
 
 
+@pytest.mark.parametrize("encoder", [RGBSceneEncoder(), RGBEdgeSceneEncoder()])
+def test_rgb_encoders_ignore_standard_hud_margins(encoder) -> None:
+    frame = _rgb_fixture()
+    overlaid = frame.copy()
+    height, width = frame.shape[:2]
+    top = int(height * 0.2)
+    bottom = int(height * 0.76)
+    left = int(width * 0.18)
+    right = int(width * (1 - 0.18))
+    overlaid[:top] = (255, 0, 255)
+    overlaid[bottom:] = (255, 0, 255)
+    overlaid[top:bottom, :left] = (255, 0, 255)
+    overlaid[top:bottom, right:] = (255, 0, 255)
+
+    assert encoder.encode(frame) == encoder.encode(overlaid)
+
+    overlaid[top + 5 : top + 20, left + 5 : left + 20] = (255, 0, 255)
+    assert encoder.encode(frame) != encoder.encode(overlaid)
+
+
+@pytest.mark.parametrize("encoder_type", [RGBSceneEncoder, RGBEdgeSceneEncoder])
+def test_rgb_encoders_reject_empty_vertical_crop(encoder_type) -> None:
+    with pytest.raises(ValueError, match="vertical fractions"):
+        encoder_type(top_fraction=0.8, bottom_fraction=0.8)
+
+
 def test_panorama_signature_is_invariant_to_scan_start_and_order() -> None:
     scene_encoder = RGBSceneEncoder(grid_size=4)
     panorama_encoder = RGBPanoramaEncoder(scene_encoder)
@@ -306,7 +332,50 @@ def test_modality_memory_can_fit_training_only_maximum_gap_boundary(
         assert calibrated.calibration is not None
         boundary = calibrated.calibration
         assert boundary.maximum_positive_distance == 4
-        assert boundary.nearest_negative_distance == 6
-        assert boundary.radius == pytest.approx(4.999998)
+        assert boundary.nearest_negative_distance == 10
+        assert boundary.radius == pytest.approx(6.999994)
         assert memory.match_modality_place("synthetic-rgb", (9, 0)) is None
         assert memory.match_modality_place("synthetic-rgb", (4, 0)) == place.place_id
+
+
+def test_modality_consolidation_cannot_bridge_persisted_negative_boundary(
+    tmp_path: Path,
+) -> None:
+    with ExplorationMemory(
+        tmp_path / "bounded-consolidation.sqlite3", max_exemplars=4
+    ) as memory:
+        place = memory.observe_place((0,), episode_id=0, step=0)
+        memory.record_modality_view(
+            "synthetic-rgb",
+            place.place_id,
+            (0,),
+            episode_id=0,
+            step=0,
+        )
+        calibrated = memory.calibrate_modality_place(
+            "synthetic-rgb",
+            place.place_id,
+            ((2,), (3,)),
+            ((10,),),
+            episode_id=0,
+            step=1,
+            margin=None,
+        )
+
+        assert calibrated.match_radius == pytest.approx(6.499997)
+        assert calibrated.negative_exemplars == ((10,),)
+        consolidated = memory.consolidate_modality_view(
+            "synthetic-rgb",
+            place.place_id,
+            (4,),
+            episode_id=1,
+            step=0,
+        )
+        local_radius = consolidated.exemplar_radii[
+            consolidated.exemplars.index((4,))
+        ]
+
+        assert local_radius == pytest.approx(6 * 0.499999)
+        assert memory.match_modality_place("synthetic-rgb", (6,)) == place.place_id
+        assert memory.match_modality_place("synthetic-rgb", (9,)) is None
+        assert memory.verify_integrity()

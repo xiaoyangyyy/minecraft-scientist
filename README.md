@@ -454,11 +454,32 @@ view remained rejected.
 The Agent moved 4.161 blocks and returned with evaluator error 0.000; a fresh
 night/rain process restart was also recognized. The audit independently reconstructs
 all 480 temporal source frames, replays both consolidation events, and reports
-`valid: true`. This is evidence for illumination/weather adaptation and persistent
-memory on one natural seed. It still does not establish cross-biome generalization or
-long-horizon open-world navigation. A separate seed-201 ridge trial correctly found
-no reversible four-move path with the current forward/turn-only action space, exposing
-locomotion and safe frontier selection as the next bottleneck rather than hiding it.
+`valid: true`.
+
+The seed-201 ridge follow-up expands the anonymous action space with a compound
+forward-plus-jump program. Six RGB-selected headings are crossed with both movement
+programs in independent reset sessions; selection still uses pixels only, while an
+isolated evaluator checks the chosen probe after selection. Version-2 scene encoders
+exclude the top HUD/toast band as well as lower/peripheral HUD. Calibrated positive
+samples estimate coverage around existing exemplars without silently becoming new
+centers. Later accepted weather views receive per-exemplar radii capped by persisted
+negative evidence, preventing continual adaptation from bridging a known boundary.
+Reproduce the accepted run with:
+
+```powershell
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/natural_visual_loop_benchmark.py --seed 201 --moves 4 --move-frames 4 --auto-margin --temporal-samples 5 --panorama-encoder edge --select-reversible-heading --heading-probe-candidates 6 --enable-jump-program --training-time noon --training-weather clear --heldout-time night --heldout-weather rain --require-condition-shift --output /mnt/d/minecraft-scientist/runs/natural-visual-loop-seed201-jump-edge-night-rain-v3
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/audit_natural_visual_loop.py /mnt/d/minecraft-scientist/runs/natural-visual-loop-seed201-jump-edge-night-rain-v3 --write
+```
+
+The chosen jump program reached 5.429 blocks and returned within 0.651 during its
+probe. In the held-out night/rain loop it reached 5.644 blocks and returned within
+0.006. The training-only radius is 68.588 (positive maximum 62.578; nearest negative
+74.599); start and return are recognized, outbound is rejected, restart recognition
+survives reopening SQLite, and the independent audit reports `valid: true` over 624
+saved PNGs and 1,095 public transitions. This is stronger evidence for terrain,
+weather and persistent-memory robustness across two natural seeds. It is still a
+bounded out-and-back experiment, not cross-biome, long-horizon open-world navigation,
+survival, or metric SLAM.
 
 A concrete label-free `GridVisualController` maps opaque screen regions and hotbar
 slots to MineStudio env actions. Tests verify action translation and semantic

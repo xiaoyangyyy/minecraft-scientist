@@ -82,6 +82,7 @@ class GridVisualController:
     columns: int = 3
     hotbar_slots: int = 9
     movement_controls: tuple[str, ...] = ()
+    movement_programs: tuple[tuple[str, ...], ...] = ()
 
     def __post_init__(self) -> None:
         if self.rows < 1 or self.columns < 1 or not 1 <= self.hotbar_slots <= 9:
@@ -93,6 +94,23 @@ class GridVisualController:
             control not in allowed_movement for control in self.movement_controls
         ):
             raise ValueError("movement controls must be unique cardinal env actions")
+        allowed_program = allowed_movement | {"jump", "sprint", "sneak"}
+        normalized_programs = tuple(
+            tuple(dict.fromkeys(program)) for program in self.movement_programs
+        )
+        if (
+            any(not program for program in self.movement_programs)
+            or any(
+                len(program) != len(normalized)
+                or any(control not in allowed_program for control in program)
+                for program, normalized in zip(
+                    self.movement_programs, normalized_programs, strict=True
+                )
+            )
+            or len(set(normalized_programs)) != len(normalized_programs)
+            or any((control,) in normalized_programs for control in self.movement_controls)
+        ):
+            raise ValueError("movement programs must be unique nonempty env-action sets")
 
     def perceive(
         self, frame: np.ndarray, info: dict[str, Any], *, seed: int
@@ -106,9 +124,13 @@ class GridVisualController:
         appearance_signature = appearance_encoder.encode(array)
         objects: list[ObjectObservation] = []
         bindings: dict[str, dict[str, Any]] = {}
-        for index, control in enumerate(self.movement_controls):
+        movement_programs = (
+            *((control,) for control in self.movement_controls),
+            *self.movement_programs,
+        )
+        for index, controls in enumerate(movement_programs):
             object_id = self._opaque(seed, "movement", index)
-            bindings[object_id] = {"kind": "movement", "control": control}
+            bindings[object_id] = {"kind": "movement", "controls": controls}
             objects.append(
                 ObjectObservation(
                     object_id=object_id,
@@ -189,7 +211,8 @@ class GridVisualController:
             payload[f"hotbar.{int(binding['slot'])}"] = np.array(1)
             return payload
         if action.kind is ActionKind.MOVE and binding["kind"] == "movement":
-            payload[str(binding["control"])] = np.array(1)
+            for control in binding["controls"]:
+                payload[str(control)] = np.array(1)
             return payload
         if binding["kind"] != "cell":
             raise ValueError("action kind is incompatible with visual target")

@@ -115,13 +115,14 @@ class RGBSceneEncoder:
     mandatory because this hand-built metric is not universally invariant.
     """
 
-    VERSION = "rgb-lab-grid-v1"
+    VERSION = "rgb-lab-grid-v2"
 
     def __init__(
         self,
         *,
         grid_size: int = 16,
         horizontal_crop: float = 0.18,
+        top_fraction: float = 0.2,
         bottom_fraction: float = 0.76,
         quantization: float = 8,
         stabilization: float = 2,
@@ -130,12 +131,15 @@ class RGBSceneEncoder:
             raise ValueError("RGB grid size must be at least two")
         if not 0 <= horizontal_crop < 0.5:
             raise ValueError("RGB horizontal crop must be in [0, 0.5)")
-        if not 0 < bottom_fraction <= 1:
-            raise ValueError("RGB bottom fraction must be in (0, 1]")
+        if not 0 <= top_fraction < bottom_fraction <= 1:
+            raise ValueError(
+                "RGB vertical fractions must satisfy 0 <= top < bottom <= 1"
+            )
         if quantization <= 0 or stabilization <= 0:
             raise ValueError("RGB quantization and stabilization must be positive")
         self.grid_size = grid_size
         self.horizontal_crop = float(horizontal_crop)
+        self.top_fraction = float(top_fraction)
         self.bottom_fraction = float(bottom_fraction)
         self.quantization = float(quantization)
         self.stabilization = float(stabilization)
@@ -160,8 +164,9 @@ class RGBSceneEncoder:
         height, width = rgb.shape[:2]
         left = int(width * self.horizontal_crop)
         right = int(width * (1 - self.horizontal_crop))
+        top = int(height * self.top_fraction)
         bottom = int(height * self.bottom_fraction)
-        crop = rgb[:bottom, left:right]
+        crop = rgb[top:bottom, left:right]
         if crop.shape[0] < self.grid_size or crop.shape[1] < self.grid_size:
             y_indices = np.linspace(0, crop.shape[0] - 1, self.grid_size).astype(int)
             x_indices = np.linspace(0, crop.shape[1] - 1, self.grid_size).astype(int)
@@ -253,13 +258,14 @@ class RGBEdgeSceneEncoder:
     not enter the descriptor.
     """
 
-    VERSION = "rgb-edge-grid-v1"
+    VERSION = "rgb-edge-grid-v2"
 
     def __init__(
         self,
         *,
         grid_size: int = 16,
         horizontal_crop: float = 0.18,
+        top_fraction: float = 0.2,
         bottom_fraction: float = 0.76,
         edge_quantile: float = 0.7,
         quantization: float = 32,
@@ -268,14 +274,17 @@ class RGBEdgeSceneEncoder:
             raise ValueError("edge grid size must be at least two")
         if not 0 <= horizontal_crop < 0.5:
             raise ValueError("edge horizontal crop must be in [0, 0.5)")
-        if not 0 < bottom_fraction <= 1:
-            raise ValueError("edge bottom fraction must be in (0, 1]")
+        if not 0 <= top_fraction < bottom_fraction <= 1:
+            raise ValueError(
+                "edge vertical fractions must satisfy 0 <= top < bottom <= 1"
+            )
         if not 0 < edge_quantile < 1:
             raise ValueError("edge quantile must be in (0, 1)")
         if quantization <= 0:
             raise ValueError("edge quantization must be positive")
         self.grid_size = grid_size
         self.horizontal_crop = float(horizontal_crop)
+        self.top_fraction = float(top_fraction)
         self.bottom_fraction = float(bottom_fraction)
         self.edge_quantile = float(edge_quantile)
         self.quantization = float(quantization)
@@ -299,8 +308,9 @@ class RGBEdgeSceneEncoder:
         height, width = rgb.shape[:2]
         left = int(width * self.horizontal_crop)
         right = int(width * (1 - self.horizontal_crop))
+        top = int(height * self.top_fraction)
         bottom = int(height * self.bottom_fraction)
-        crop = np.clip(rgb[:bottom, left:right], 0, 255)
+        crop = np.clip(rgb[top:bottom, left:right], 0, 255)
         if crop.shape[0] < self.grid_size or crop.shape[1] < self.grid_size:
             y_indices = np.linspace(0, crop.shape[0] - 1, self.grid_size).astype(int)
             x_indices = np.linspace(0, crop.shape[1] - 1, self.grid_size).astype(int)
@@ -363,7 +373,7 @@ class RGBPanoramaEncoder:
     retrieval but does not retain a compass direction or reconstruct geometry.
     """
 
-    VERSION = "rgb-lab-panorama-v1"
+    VERSION = "rgb-lab-panorama-v2"
 
     def __init__(
         self,
@@ -421,7 +431,7 @@ class RGBPanoramaEncoder:
 class RGBEdgePanoramaEncoder(RGBPanoramaEncoder):
     """Order-independent panorama built from illumination-robust edge views."""
 
-    VERSION = "rgb-edge-panorama-v1"
+    VERSION = "rgb-edge-panorama-v2"
 
     def __init__(self, scene_encoder: RGBEdgeSceneEncoder | None = None) -> None:
         super().__init__(scene_encoder or RGBEdgeSceneEncoder())

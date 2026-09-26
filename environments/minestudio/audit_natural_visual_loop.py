@@ -20,6 +20,7 @@ from PIL import Image
 from minecraft_scientist.exploration import (
     ExplorationMemory,
     RGBEdgePanoramaEncoder,
+    RGBEdgeSceneEncoder,
     RGBPanoramaEncoder,
     RGBSceneEncoder,
 )
@@ -43,6 +44,12 @@ def _encoder(version: str) -> RGBPanoramaEncoder:
     options = {
         RGBPanoramaEncoder.VERSION: RGBPanoramaEncoder,
         RGBEdgePanoramaEncoder.VERSION: RGBEdgePanoramaEncoder,
+        "rgb-lab-panorama-v1": lambda: RGBPanoramaEncoder(
+            RGBSceneEncoder(top_fraction=0)
+        ),
+        "rgb-edge-panorama-v1": lambda: RGBEdgePanoramaEncoder(
+            RGBEdgeSceneEncoder(top_fraction=0)
+        ),
     }
     try:
         return options[version]()
@@ -94,7 +101,8 @@ def audit(root: Path) -> dict[str, object]:
     report = _load_json(root / "report.json")
     evaluator = _load_json(root / "evaluator-audit.json")
     period = int(report["inferred_camera_period"])
-    encoder = _encoder(report["encoder"])
+    modality_version = str(report["encoder"])
+    encoder = _encoder(modality_version)
     scan_signatures = {
         role: _load_scan(root, role, int(metadata["view_count"]), encoder)
         for role, metadata in report["scans"].items()
@@ -150,6 +158,7 @@ def audit(root: Path) -> dict[str, object]:
                 np.array_equal(recomputed, saved)
             )
     discovery_metadata = report["scans"]["discovery"]
+    selected_probe_metrics_valid = True
     if "openness_scores" in discovery_metadata:
         discovery_frames = []
         for index in range(period):
@@ -183,11 +192,33 @@ def audit(root: Path) -> dict[str, object]:
                     key=lambda index: (-openness_scores[index], index),
                 )[: int(probe["candidate_count"])]
             )
-            probe_results_valid = True
+            movement_target_ids = tuple(probe.get("movement_target_ids", ()))
+            compound_schema = bool(movement_target_ids)
+            if not compound_schema:
+                movement_target_ids = (str(report.get("selected_movement_target_id", "")),)
+            expected_pairs = tuple(
+                (heading, program_index)
+                for heading in expected_candidates
+                for program_index in range(len(movement_target_ids))
+            )
+            probe_results_valid = bool(movement_target_ids) and (
+                len(set(movement_target_ids)) == len(movement_target_ids)
+            )
             recomputed_results = []
             for result in probe["results"]:
                 heading = int(result["heading_steps"])
-                root_path = root / "heading-probes" / f"heading-{heading:02d}"
+                program_index = int(result.get("program_index", 0))
+                target_id = str(result.get("movement_target_id", movement_target_ids[0]))
+                program_valid = (
+                    0 <= program_index < len(movement_target_ids)
+                    and target_id == movement_target_ids[program_index]
+                )
+                root_name = (
+                    f"heading-{heading:02d}-program-{program_index:02d}"
+                    if compound_schema
+                    else f"heading-{heading:02d}"
+                )
+                root_path = root / "heading-probes" / root_name
                 signatures = {}
                 hashes_valid = True
                 for role in ("start", "outbound", "return"):
@@ -210,30 +241,86 @@ def audit(root: Path) -> dict[str, object]:
                     signatures["start"], signatures["return"]
                 )
                 score = outbound_distance / (return_distance + 1.0)
-                probe_results_valid = probe_results_valid and hashes_valid and all(
-                    math.isclose(left, float(right), abs_tol=1e-12)
-                    for left, right in (
-                        (outbound_distance, result["outbound_distance"]),
-                        (return_distance, result["return_distance"]),
-                        (score, result["reversibility_score"]),
+                probe_results_valid = (
+                    probe_results_valid
+                    and program_valid
+                    and hashes_valid
+                    and all(
+                        math.isclose(left, float(right), abs_tol=1e-12)
+                        for left, right in (
+                            (outbound_distance, result["outbound_distance"]),
+                            (return_distance, result["return_distance"]),
+                            (score, result["reversibility_score"]),
+                        )
                     )
                 )
-                recomputed_results.append((score, outbound_distance, heading))
+                recomputed_results.append(
+                    (
+                        score,
+                        outbound_distance,
+                        heading,
+                        program_index,
+                        target_id,
+                        int(result.get("session_index", -1)),
+                    )
+                )
             expected_selected = max(
                 recomputed_results,
-                key=lambda item: (item[0], item[1], -item[2]),
-            )[2]
+                key=lambda item: (item[0], item[1], -item[2], -item[3]),
+            )
+            expected_heading = expected_selected[2]
+            expected_program_index = expected_selected[3]
+            expected_target_id = expected_selected[4]
             heading_selection_valid = (
                 openness_valid
                 and report.get("reversible_heading_selection_enabled") is True
                 and report["open_heading_selection_enabled"] is False
                 and tuple(probe["candidate_headings"]) == expected_candidates
-                and tuple(item[2] for item in recomputed_results)
-                == expected_candidates
+                and tuple((item[2], item[3]) for item in recomputed_results)
+                == expected_pairs
                 and probe_results_valid
-                and int(probe["selected_heading_steps"]) == expected_selected
-                and selected_heading == expected_selected
+                and int(probe["selected_heading_steps"]) == expected_heading
+                and selected_heading == expected_heading
             )
+            if compound_schema:
+                heading_selection_valid = heading_selection_valid and (
+                    probe.get("selector") == "rgb-reversibility-v2"
+                    and (root / "heading-probe.json").is_file()
+                    and _load_json(root / "heading-probe.json") == probe
+                    and int(probe["selected_program_index"])
+                    == expected_program_index
+                    and int(report["selected_program_index"])
+                    == expected_program_index
+                    and str(probe["selected_movement_target_id"])
+                    == expected_target_id
+                    and str(report["selected_movement_target_id"])
+                    == expected_target_id
+                )
+                session_index = expected_selected[5]
+                if 0 <= session_index < len(evaluator["sessions"]):
+                    recomputed_probe_metrics = _position_metrics(
+                        evaluator["sessions"][session_index]["positions"]
+                    )
+                    reported_probe_metrics = probe.get("selected_evaluator_metrics", {})
+                    selected_probe_metrics_valid = all(
+                        recomputed_probe_metrics[key] is not None
+                        and reported_probe_metrics.get(key) is not None
+                        and math.isclose(
+                            float(recomputed_probe_metrics[key]),
+                            float(reported_probe_metrics[key]),
+                            abs_tol=1e-12,
+                        )
+                        for key in ("maximum_excursion", "return_error")
+                    ) and (
+                        recomputed_probe_metrics["maximum_excursion"] >= 2
+                        and recomputed_probe_metrics["return_error"] <= 1.5
+                        and report["gate"].get(
+                            "selected_probe_physical_reversibility"
+                        )
+                        is True
+                    )
+                else:
+                    selected_probe_metrics_valid = False
         else:
             heading_selection_valid = openness_valid and selected_heading == (
                 expected_open_heading
@@ -289,14 +376,14 @@ def audit(root: Path) -> dict[str, object]:
         )
 
     with ExplorationMemory.open(root / "exploration.sqlite3") as memory:
-        states = memory.modality_places(encoder.VERSION)
+        states = memory.modality_places(modality_version)
         memory_integrity = memory.verify_integrity()
         memory_events = tuple(memory.iter_events())
         if len(states) != 1:
             return {"valid": False, "reason": "unexpected panorama place count"}
         state = states[0]
         decisions = {
-            role: memory.match_modality_place(encoder.VERSION, signature)
+            role: memory.match_modality_place(modality_version, signature)
             for role, signature in scan_signatures.items()
         }
     adaptation = report.get("continual_adaptation")
@@ -321,6 +408,38 @@ def audit(root: Path) -> dict[str, object]:
             + int(adaptation["heldout_return_consolidated"])
         )
         previous_state = calibration_events[0]["payload"]["state"]
+        negative_bounded = "negative_exemplars" in previous_state
+        if negative_bounded:
+            recorded_states = tuple(
+                event["payload"]["state"]
+                for event in memory_events
+                if event["event_type"] == "modality_view_recorded"
+                and event["sequence"] < calibration_events[0]["sequence"]
+            )
+            calibration_payload = calibration_events[0]["payload"]
+            expected_negatives = tuple(
+                tuple(int(value) for value in signature)
+                for signature in calibration_payload["negative_signatures"]
+            )
+            continual_adaptation_valid = continual_adaptation_valid and (
+                bool(recorded_states)
+                and previous_state["exemplars"] == recorded_states[-1]["exemplars"]
+                and tuple(
+                    tuple(int(value) for value in signature)
+                    for signature in previous_state["negative_exemplars"]
+                )
+                == expected_negatives
+                and len(previous_state["exemplar_radii"])
+                == len(previous_state["exemplars"])
+                and all(
+                    math.isclose(
+                        float(radius),
+                        float(previous_state["match_radius"]),
+                        abs_tol=1e-12,
+                    )
+                    for radius in previous_state["exemplar_radii"]
+                )
+            )
         for role, expected_episode, expected_step, flag_name in (
             ("heldout_start", 4, 0, "heldout_start_consolidated"),
             ("heldout_return", 4, 1, "heldout_return_consolidated"),
@@ -342,17 +461,53 @@ def audit(root: Path) -> dict[str, object]:
                 tuple(int(value) for value in exemplar)
                 for exemplar in previous_state["exemplars"]
             )
-            distance = min(math.dist(signature, exemplar) for exemplar in exemplars)
+            previous_radii = tuple(
+                float(value) for value in previous_state.get("exemplar_radii", ())
+            ) or tuple(float(previous_state["match_radius"]) for _ in exemplars)
+            accepted_distances = tuple(
+                distance
+                for exemplar, radius in zip(exemplars, previous_radii, strict=True)
+                if (distance := math.dist(signature, exemplar)) <= radius
+            )
+            distance = min(accepted_distances, default=math.inf)
             continual_adaptation_valid = continual_adaptation_valid and (
                 signature == scan_signatures[role]
-                and distance <= float(previous_state["match_radius"])
+                and math.isfinite(distance)
                 and math.isclose(
                     distance,
                     float(event["payload"]["distance_before"]),
                     abs_tol=1e-12,
                 )
             )
-            previous_state = event["payload"]["state"]
+            next_state = event["payload"]["state"]
+            if negative_bounded:
+                previous_radius_by_exemplar = dict(
+                    zip(exemplars, previous_radii, strict=True)
+                )
+                negatives = tuple(
+                    tuple(int(value) for value in negative)
+                    for negative in previous_state["negative_exemplars"]
+                )
+                candidate_radius = min(
+                    float(previous_state["match_radius"]),
+                    min(math.dist(signature, negative) for negative in negatives)
+                    * 0.499999,
+                )
+                next_exemplars = tuple(
+                    tuple(int(value) for value in exemplar)
+                    for exemplar in next_state["exemplars"]
+                )
+                expected_radii = tuple(
+                    previous_radius_by_exemplar.get(exemplar, candidate_radius)
+                    for exemplar in next_exemplars
+                )
+                continual_adaptation_valid = continual_adaptation_valid and (
+                    tuple(float(value) for value in next_state["exemplar_radii"])
+                    == expected_radii
+                    and next_state["negative_exemplars"]
+                    == previous_state["negative_exemplars"]
+                )
+            previous_state = next_state
     calibration_valid = (
         state.calibration is not None
         and state.calibration.model_dump(mode="json") == report["calibration"]
@@ -380,6 +535,10 @@ def audit(root: Path) -> dict[str, object]:
     )
 
     public_paths = (root / "config.json", root / "events.jsonl", root / "report.json")
+    if (root / "heading-probe.json").is_file():
+        public_paths = (*public_paths, root / "heading-probe.json")
+    if (root / "events-checkpoint.jsonl").is_file():
+        public_paths = (*public_paths, root / "events-checkpoint.jsonl")
     public_payload = "\n".join(
         path.read_text(encoding="utf-8") for path in public_paths
     )
@@ -453,6 +612,38 @@ def audit(root: Path) -> dict[str, object]:
         and recomputed_loop["return_error"] is not None
         and recomputed_loop["return_error"] <= 1.5
     )
+    startup_attempts = report.get("session_startup_attempts")
+    if startup_attempts is None:
+        startup_attempts_valid = True
+        checkpoints_valid = True
+    else:
+        expected_attempts = tuple(
+            int(session.get("startup_attempts", 1))
+            for session in evaluator["sessions"]
+        )
+        startup_attempts_valid = (
+            tuple(int(value) for value in startup_attempts) == expected_attempts
+            and all(1 <= value <= 3 for value in expected_attempts)
+        )
+        discovery_checkpoint = _load_json(
+            root / "discovery-evaluator-checkpoint.json"
+        )
+        loop_checkpoint = _load_json(root / "loop-evaluator-checkpoint.json")
+        checkpoint_events = [
+            json.loads(line)
+            for line in (root / "events-checkpoint.jsonl")
+            .read_text(encoding="utf-8")
+            .splitlines()
+            if line.strip()
+        ]
+        checkpoints_valid = (
+            discovery_checkpoint["positions"]
+            == evaluator["sessions"][0]["positions"]
+            and loop_checkpoint["positions"] == loop_positions
+            and loop_checkpoint["metrics"] == report["loop_evaluator_metrics"]
+            and checkpoint_events == events[: len(checkpoint_events)]
+            and len(checkpoint_events) < len(events)
+        )
     orientation_error = _orientation_error(evaluator["sessions"][0]["positions"])
     orientation_valid = (
         period % 2 == 0
@@ -474,6 +665,7 @@ def audit(root: Path) -> dict[str, object]:
         "scan_counts_valid": scan_counts_valid,
         "temporal_aggregation_valid": temporal_aggregation_valid,
         "heading_selection_valid": heading_selection_valid,
+        "selected_probe_metrics_valid": selected_probe_metrics_valid,
         "visual_homing_valid": homing_valid,
         "calibration_valid": calibration_valid,
         "calibration_strategy_valid": calibration_strategy_valid,
@@ -486,6 +678,8 @@ def audit(root: Path) -> dict[str, object]:
         "condition_split_valid": condition_split_valid,
         "loop_metrics_valid": loop_metrics_valid,
         "physical_loop_valid": physical_loop_valid,
+        "startup_attempts_valid": startup_attempts_valid,
+        "checkpoints_valid": checkpoints_valid,
         "orientation_valid": orientation_valid,
         "source_hashes_valid": source_hashes_valid,
     }

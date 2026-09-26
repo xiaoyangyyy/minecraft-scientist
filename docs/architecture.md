@@ -101,7 +101,7 @@ perceptual retrieval. Repeated terrain can still alias, so an unseen frontier ne
 commits a scene-only loop closure without topological evidence. Learned pixel
 embeddings and cross-biome visual calibration remain a separate required layer.
 
-For pixel observations, `RGBSceneEncoder` crops the HUD-heavy lower/peripheral bands,
+For pixel observations, `RGBSceneEncoder` crops HUD-heavy top, lower and peripheral bands,
 area-pools the remaining view to a 16x16 CIELAB grid, normalizes each channel and
 quantizes it into 768 integers. `GridVisualController` exposes the serialized
 signature, encoder version and dimensionality through the public `Observation`;
@@ -137,21 +137,28 @@ strong-edge occupancy and unsigned orientation, and the latter keeps the same
 order-independent panorama aggregation. Formal scans may use an odd number of
 temporal RGB samples per heading; the saved view is their pixelwise median, while all
 raw samples and hashes remain in the evidence directory so the auditor can rebuild
-the aggregation. Calibration can select a maximum-gap boundary from training data
-only. After calibration, `consolidate_modality_view` updates the bounded exemplar
-coreset only when the candidate already falls inside the old radius. Consolidation
-therefore adapts a persistent place to a recognized weather domain without allowing
-an unknown or rejected view to expand its own acceptance region. It is an explicit,
-hash-chained event and is replayed by SQLite integrity verification.
+the aggregation. Calibration samples estimate a maximum-gap radius around already
+persisted exemplars but do not silently become new centers in the same operation.
+Negative calibration exemplars are persisted as well. After calibration,
+`consolidate_modality_view` accepts a candidate only inside an existing local radius;
+the new exemplar's radius is capped just inside the midpoint to its nearest known
+negative. Matching evaluates each exemplar against its own radius, preventing an
+accepted weather view from expanding the union across a known boundary. Calibration
+and consolidation remain explicit hash-chained events replayed by SQLite integrity
+verification; legacy states without local radii retain global-radius semantics.
 
 The accepted seed-200 noon/clear to night/rain run combines five-frame temporal
-aggregation with this safe consolidation policy. Its independent audit reconstructs
-the temporal medians, verifies the training-only boundary, replays the start/return
-consolidations, and checks the physical loop using evaluator-only coordinates. This
-remains a single-seed bounded loop. The reversible-heading probe is intentionally
-fail-closed on a seed-201 ridge where none of the shortlisted forward/turn paths
-returned visually; expanding the action space and multi-frontier search remains
-necessary for genuine open-world exploration.
+aggregation with persistent consolidation. The seed-201 ridge follow-up exposes two
+anonymous movement programs—forward and forward-plus-jump—and probes the Cartesian
+product of six RGB-shortlisted headings and those programs in independent reset
+sessions. Pixel reversibility alone selects the program; evaluator coordinates are
+read only afterward. The selected probe moves 5.429 blocks and returns within 0.651,
+and the held-out night/rain loop moves 5.644 blocks and returns within 0.006. Startup
+attempt counts and pre-restart discovery/loop checkpoints make simulator flakes
+auditable. The independent audit reconstructs temporal medians, selection scores,
+local memory boundaries, public actions and evaluator-only physical metrics. This is
+two-seed bounded natural-terrain evidence, not multi-frontier search, cross-biome
+localization, long-horizon open-world exploration, survival, or metric SLAM.
 
 `LocalCausalEngine` accepts `(context, intervention, outcome)` samples. It rejects
 controller failures and samples carrying possible confounders before computing a

@@ -186,6 +186,8 @@ class ModalityPlaceMemory(PerceptualPlaceMemory):
     modality: str
     match_radius: float = Field(default=0, ge=0)
     calibration: PlaceCalibration | None = None
+    negative_exemplars: tuple[tuple[int, ...], ...] = ()
+    exemplar_radii: tuple[float, ...] = ()
 
     @field_validator("modality")
     @classmethod
@@ -207,6 +209,19 @@ class ModalityPlaceMemory(PerceptualPlaceMemory):
             abs_tol=1e-12,
         ):
             raise ValueError("modality radius does not match its calibration")
+        if self.exemplar_radii:
+            if len(self.exemplar_radii) != len(self.exemplars):
+                raise ValueError("each modality exemplar requires one local radius")
+            if any(
+                not math.isfinite(radius)
+                or radius < 0
+                or radius > self.match_radius
+                for radius in self.exemplar_radii
+            ):
+                raise ValueError("modality local radii must fit the global radius")
+        dimensions = len(self.exemplars[0])
+        if any(len(item) != dimensions for item in self.negative_exemplars):
+            raise ValueError("modality negative exemplars changed dimensions")
         return self
 
 
@@ -628,8 +643,8 @@ class ExplorationMemory:
             if len(previous.exemplars[0]) != len(normalized):
                 raise ValueError("modality signature width changed")
             if previous.calibration is not None:
-                distance = self._nearest_distance(previous.exemplars, normalized)
-                if distance > previous.match_radius:
+                distance = self._accepted_modality_distance(previous, normalized)
+                if distance is None:
                     raise ValueError(
                         "calibrated modality rejected the unvalidated view"
                     )
@@ -654,6 +669,8 @@ class ExplorationMemory:
                 ),
                 match_radius=previous.match_radius,
                 calibration=previous.calibration,
+                negative_exemplars=previous.negative_exemplars,
+                exemplar_radii=previous.exemplar_radii,
             )
         return self._save_modality_state(
             state,
@@ -699,9 +716,10 @@ class ExplorationMemory:
         positive_distance = max(
             self._nearest_distance(previous.exemplars, item) for item in positives
         )
-        exemplars = self._coreset(
-            previous.exemplars[0], (*previous.exemplars, *positives)
-        )
+        # Calibration samples estimate coverage around the already persisted
+        # exemplars.  Promoting those samples to new centers in the same operation
+        # would expand the accepted union after its boundary had been measured.
+        exemplars = previous.exemplars
         negative_distance = min(
             self._nearest_distance(exemplars, item) for item in negatives
         )
@@ -723,6 +741,12 @@ class ExplorationMemory:
                 "exemplars": exemplars,
                 "match_radius": calibration.radius,
                 "calibration": calibration,
+                "negative_exemplars": self._coreset(
+                    min(negatives), negatives
+                ),
+                "exemplar_radii": tuple(
+                    calibration.radius for _ in exemplars
+                ),
             }
         )
         state = ModalityPlaceMemory.model_validate(state.model_dump())
@@ -748,9 +772,9 @@ class ExplorationMemory:
     ) -> ModalityPlaceMemory:
         """Add an already accepted view to the bounded calibrated coreset.
 
-        Consolidation cannot expand the calibrated radius: the candidate must first
-        match the existing coreset, which prevents an unvalidated domain-shift view
-        from teaching the memory about itself.
+        A candidate must first match an existing local boundary.  Its new local
+        boundary is then capped at the midpoint to the nearest persisted negative,
+        preventing continual adaptation from bridging a known place boundary.
         """
 
         if episode_id < 0 or step < 0:
@@ -761,13 +785,33 @@ class ExplorationMemory:
             raise ValueError("modality view must be calibrated before consolidation")
         if len(previous.exemplars[0]) != len(normalized):
             raise ValueError("modality consolidation signature width changed")
-        distance = self._nearest_distance(previous.exemplars, normalized)
-        if distance > previous.match_radius:
+        distance = self._accepted_modality_distance(previous, normalized)
+        if distance is None:
             raise ValueError("calibrated modality rejected consolidation candidate")
+        exemplars = self._coreset(
+            previous.exemplars[0], (*previous.exemplars, normalized)
+        )
+        previous_radii = previous.exemplar_radii or tuple(
+            previous.match_radius for _ in previous.exemplars
+        )
+        radius_by_exemplar = dict(zip(previous.exemplars, previous_radii, strict=True))
+        if previous.negative_exemplars:
+            candidate_radius = min(
+                previous.match_radius,
+                min(
+                    _distance(normalized, negative)
+                    for negative in previous.negative_exemplars
+                )
+                * 0.499999,
+            )
+        else:
+            candidate_radius = previous.match_radius
+        radius_by_exemplar.setdefault(normalized, candidate_radius)
         state = previous.model_copy(
             update={
-                "exemplars": self._coreset(
-                    previous.exemplars[0], (*previous.exemplars, normalized)
+                "exemplars": exemplars,
+                "exemplar_radii": tuple(
+                    radius_by_exemplar[item] for item in exemplars
                 ),
                 "observations": previous.observations + 1,
                 "episodes": tuple(sorted(set(previous.episodes) | {episode_id})),
@@ -832,8 +876,8 @@ class ExplorationMemory:
         for item in self.modality_places(modality):
             if len(item.exemplars[0]) != len(normalized):
                 continue
-            distance = self._nearest_distance(item.exemplars, normalized)
-            if distance <= item.match_radius:
+            distance = self._accepted_modality_distance(item, normalized)
+            if distance is not None:
                 candidates.append((distance, item.place_id))
         candidates.sort()
         if not candidates:
@@ -874,6 +918,21 @@ class ExplorationMemory:
         return min(
             (_distance(item, signature) for item in compatible), default=math.inf
         )
+
+    @staticmethod
+    def _accepted_modality_distance(
+        place: ModalityPlaceMemory, signature: tuple[int, ...]
+    ) -> float | None:
+        radii = place.exemplar_radii or tuple(
+            place.match_radius for _ in place.exemplars
+        )
+        accepted = [
+            distance
+            for exemplar, radius in zip(place.exemplars, radii, strict=True)
+            if len(exemplar) == len(signature)
+            and (distance := _distance(exemplar, signature)) <= radius
+        ]
+        return min(accepted, default=None)
 
     def _match_place(self, normalized: tuple[int, ...]) -> tuple[str | None, bool]:
         candidates: list[tuple[float, str]] = []
@@ -1387,7 +1446,7 @@ class ExplorationMemory:
                     return False
                 replayed_modality_places[
                     (modality_place.modality, modality_place.place_id)
-                ] = state
+                ] = modality_place.model_dump(mode="json")
             elif event_type in {"frontier_registered", "frontier_outcome"}:
                 if not isinstance(state, dict):
                     return False
