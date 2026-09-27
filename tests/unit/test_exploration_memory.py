@@ -5,7 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from minecraft_scientist.exploration import ExplorationMemory, FrontierStatus
+from minecraft_scientist.exploration import (
+    ExplorationMemory,
+    FrontierPlan,
+    FrontierStatus,
+    VisualFrontierProgram,
+)
 
 
 def test_multi_view_place_calibration_generalizes_and_rejects_negative(
@@ -124,3 +129,49 @@ def test_memory_rejects_tampered_behavioral_configuration_hash(
 
     with pytest.raises(ValueError, match="configuration hash is invalid"):
         ExplorationMemory.open(path)
+
+
+def test_frontier_plan_requires_one_replay_program_per_path_edge() -> None:
+    with pytest.raises(ValueError, match="cover every path edge"):
+        FrontierPlan(
+            place_path=("a", "b"),
+            travel_action_roles=(),
+            frontier_id="frontier",
+            action_roles=("probe",),
+            travel_cost=1,
+            frontier_cost=1,
+            utility=1,
+            uncertainty_gain=1,
+            failure_probability=0.5,
+        )
+
+
+def test_visual_frontier_program_round_trips_without_control_semantics() -> None:
+    program = VisualFrontierProgram(
+        turn_steps=7,
+        motion_slot=1,
+        repetitions=4,
+        move_frames=3,
+    )
+
+    roles = program.to_roles()
+
+    assert VisualFrontierProgram.from_roles(roles) == program
+    assert not any(
+        semantic in role
+        for role in roles
+        for semantic in ("forward", "jump", "back", "left", "right")
+    )
+
+
+@pytest.mark.parametrize(
+    "roles",
+    [
+        ("visual-frontier-v0", "turn-slot:0", "motion-slot:0", "repetitions:1", "move-frames:1"),
+        ("visual-frontier-v1", "turn-slot:-1", "motion-slot:0", "repetitions:1", "move-frames:1"),
+        ("visual-frontier-v1", "turn-slot:0", "motion-slot:0", "repetitions:0", "move-frames:1"),
+    ],
+)
+def test_visual_frontier_program_rejects_invalid_roles(roles: tuple[str, ...]) -> None:
+    with pytest.raises(ValueError):
+        VisualFrontierProgram.from_roles(roles)

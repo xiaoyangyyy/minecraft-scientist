@@ -462,8 +462,9 @@ programs in independent reset sessions; selection still uses pixels only, while 
 isolated evaluator checks the chosen probe after selection. Version-2 scene encoders
 exclude the top HUD/toast band as well as lower/peripheral HUD. Calibrated positive
 samples estimate coverage around existing exemplars without silently becoming new
-centers. Later accepted weather views receive per-exemplar radii capped by persisted
-negative evidence, preventing continual adaptation from bridging a known boundary.
+centers. Later accepted weather views receive per-exemplar radii capped below the
+nearest persisted negative by the fitted calibration margin, preventing continual
+adaptation from consuming a known counterexample.
 Reproduce the accepted run with:
 
 ```powershell
@@ -480,6 +481,40 @@ saved PNGs and 1,095 public transitions. This is stronger evidence for terrain,
 weather and persistent-memory robustness across two natural seeds. It is still a
 bounded out-and-back experiment, not cross-biome, long-horizon open-world navigation,
 survival, or metric SLAM.
+
+The natural visual expedition gate extends that loop into a persistent directed
+place graph. It revalidates a saved anonymous action program, learns A→B→C under
+noon/clear plus night/rain calibration, and evaluates under unseen
+midnight/thunder. At C it probes four visually open headings in isolated A→B→C
+sessions; RGB out-and-back recovery selects heading 3, while coordinates remain
+evaluator-only. After a fresh restart, the frontier planner emits both executable
+travel programs and the unresolved remote intervention. The Agent recognizes A, B
+and C, discovers novel D, resolves C→D, then restarts again and plans/replays
+A→B→C→D from SQLite.
+
+Reproduce the accepted seed-201 evidence and its independent audit with:
+
+```powershell
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/natural_visual_expedition_benchmark.py --seed 201 --moves 4 --move-frames 4 --temporal-samples 3 --heading-probe-candidates 6 --frontier-probe-candidates 4 --reuse-heading-probes /mnt/d/minecraft-scientist/runs/natural-visual-expedition-seed201-v5 --panorama-encoder edge --training-time noon --training-weather clear --calibration-time night --calibration-weather rain --heldout-time midnight --heldout-weather thunder --output /mnt/d/minecraft-scientist/runs/natural-visual-expedition-seed201-v6
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/audit_natural_visual_expedition.py /mnt/d/minecraft-scientist/runs/natural-visual-expedition-seed201-v6 --write
+```
+
+Omit `--reuse-heading-probes ...` to regenerate the complete 6×2 anonymous action
+probe matrix instead of reusing and independently revalidating the saved selection.
+
+The selected remote probe moved 5.093 blocks and returned within 0.603. Both the
+held-out frontier episode and the independent restart revisit reached 9.466 blocks;
+all four place decisions were correct on revisit. The hash-checked memory contains
+four places, three validated forward transitions and 27 journal events. The run
+saves 1,155 PNGs and 1,372 public transitions; the independent audit recomputes the
+images, cyclic heading alignments, frontier selector, route plan, physical metrics,
+memory projection and frozen-source hashes and reports `valid: true`.
+
+This is the first real natural-terrain, pixel-only, multi-frontier expedition in the
+project. It is deliberately a bounded outward expedition: accumulated reverse-route
+drift remains too large for a safe homing claim, so unverified reverse edges are not
+written to memory. Cross-biome generalization, resource-driven exploration,
+survival, long-horizon recovery and metric SLAM remain open.
 
 A concrete label-free `GridVisualController` maps opaque screen regions and hotbar
 slots to MineStudio env actions. Tests verify action translation and semantic

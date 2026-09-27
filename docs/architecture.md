@@ -141,11 +141,13 @@ the aggregation. Calibration samples estimate a maximum-gap radius around alread
 persisted exemplars but do not silently become new centers in the same operation.
 Negative calibration exemplars are persisted as well. After calibration,
 `consolidate_modality_view` accepts a candidate only inside an existing local radius;
-the new exemplar's radius is capped just inside the midpoint to its nearest known
-negative. Matching evaluates each exemplar against its own radius, preventing an
-accepted weather view from expanding the union across a known boundary. Calibration
-and consolidation remain explicit hash-chained events replayed by SQLite integrity
-verification; legacy states without local radii retain global-radius semantics.
+the new exemplar's radius is capped below its nearest persisted negative by the
+original calibration margin. Matching evaluates each exemplar against its own
+radius, preventing an accepted weather view from consuming a known negative while
+allowing a validated condition-specific prototype to cover held-out weather.
+Calibration and consolidation remain explicit hash-chained events replayed by
+SQLite integrity verification; legacy states without local radii retain
+global-radius semantics.
 
 The accepted seed-200 noon/clear to night/rain run combines five-frame temporal
 aggregation with persistent consolidation. The seed-201 ridge follow-up exposes two
@@ -159,6 +161,22 @@ auditable. The independent audit reconstructs temporal medians, selection scores
 local memory boundaries, public actions and evaluator-only physical metrics. This is
 two-seed bounded natural-terrain evidence, not multi-frontier search, cross-biome
 localization, long-horizon open-world exploration, survival, or metric SLAM.
+
+`VisualFrontierProgram` serializes relative turn slots, anonymous motion slots,
+repeat counts and frame budgets without retaining raw simulator handles or semantic
+control names. `align_panorama_heading` cyclically aligns a current ordered scan to
+a stored RGB heading reference, so a route program remains executable after restart
+when arrival yaw differs. `FrontierPlan.travel_action_roles` carries one program per
+known path edge, and `ExplorationMemory.plan_route` returns the same executable form
+for any connected pair of known places.
+
+The natural-expedition gate persists only verified forward edges A→B→C→D. A remote
+active frontier competes with a high-risk local decoy; planning from A returns the
+two-edge travel prefix plus the C intervention. The held-out midnight/thunder
+episode discovers D after noon/clear training and night/rain calibration, and a
+later process restart independently replays all three edges. Reverse traversal is
+intentionally absent: natural-terrain drift prevented a safe homing validation, so
+no reverse transition is inferred from action symmetry.
 
 `LocalCausalEngine` accepts `(context, intervention, outcome)` samples. It rejects
 controller failures and samples carrying possible confounders before computing a

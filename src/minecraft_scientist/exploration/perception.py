@@ -7,8 +7,61 @@ import math
 from collections.abc import Iterable
 
 import numpy as np
+from pydantic import BaseModel, ConfigDict, Field
 
 from minecraft_scientist.protocols import ActionKind, Observation
+
+
+class PanoramaAlignment(BaseModel):
+    """RGB-only cyclic alignment from a query panorama to a stored heading."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    reference_offset: int = Field(ge=0)
+    right_turn_steps: int = Field(ge=0)
+    mean_distance: float = Field(ge=0)
+    second_best_distance: float = Field(ge=0)
+    separation: float = Field(ge=0)
+
+
+def align_panorama_heading(
+    reference: Iterable[Iterable[int]],
+    query: Iterable[Iterable[int]],
+) -> PanoramaAlignment:
+    """Find the cyclic RGB alignment needed to restore a learned heading.
+
+    If query view zero corresponds to reference view ``k``, turning right by
+    ``period - k`` steps restores reference view zero.  The full panorama is used
+    for scoring, so the result does not depend on one potentially ambiguous frame.
+    """
+
+    stored = tuple(tuple(int(value) for value in item) for item in reference)
+    observed = tuple(tuple(int(value) for value in item) for item in query)
+    if len(stored) < 2 or len(observed) != len(stored):
+        raise ValueError("panorama alignment requires equal multi-view periods")
+    dimensions = len(stored[0])
+    if dimensions < 1 or any(
+        len(item) != dimensions for item in (*stored, *observed)
+    ):
+        raise ValueError("panorama alignment views must have equal nonzero width")
+    period = len(stored)
+    scores = []
+    for offset in range(period):
+        score = sum(
+            math.dist(observed[index], stored[(index + offset) % period])
+            for index in range(period)
+        ) / period
+        scores.append((score, offset))
+    ranked = sorted(scores)
+    best_distance, offset = ranked[0]
+    second_best = ranked[1][0]
+    return PanoramaAlignment(
+        reference_offset=offset,
+        right_turn_steps=(-offset) % period,
+        mean_distance=best_distance,
+        second_best_distance=second_best,
+        separation=second_best - best_distance,
+    )
 
 
 def temporal_median_rgb(frames: Iterable[np.ndarray]) -> np.ndarray:

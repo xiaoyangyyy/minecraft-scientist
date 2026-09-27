@@ -463,3 +463,28 @@ used per-pair durable checkpoints, three bounded JSON retries, 63 total calls, a
 305,554 tokens under the configured hard caps. Both exposed credentials are no
 longer active; no replacement credential is currently claimed by this audit, and
 the repository and run artifacts contain no plaintext key.
+
+The natural visual expedition gate advances the real MineStudio evidence from one
+place loop to a four-place directed graph. Cyclic RGB heading alignment makes
+functional action-slot programs executable after restart, frontier plans now carry
+the travel program for every known edge, and known-place routing is exposed directly
+by `plan_route`. Condition-specific accepted views receive local radii bounded by the
+nearest persisted negative minus the original calibration margin.
+
+The accepted seed-201 run trains at noon/clear, calibrates at night/rain, and holds
+out midnight/thunder. A remote RGB-only probe selects heading 3; evaluator-only
+telemetry reports 5.093 blocks of movement and 0.603 return error. After restart the
+planner traverses A→B→C, resolves novel C→D, and a second restart independently
+replays A→B→C→D. Both outward episodes reach 9.466 blocks. The final journal has four
+places, three forward transitions and valid replay integrity. Its 1,155 PNGs and
+1,372 public transitions independently re-audit as `valid: true`, including image
+hashes, temporal medians, cyclic alignment, frontier selection, route composition,
+telemetry separation and frozen source hashes. Evidence is in
+`runs/natural-visual-expedition-seed201-v6/{report.json,integrity-audit.json,events.jsonl,evaluator-audit.json,exploration.sqlite3,scans}`.
+
+This is bounded outward multi-frontier exploration, not a completion claim for the
+broader visual/open-world goal. Reverse-route drift remains unresolved, so no D→C,
+C→B or B→A edge is accepted; cross-biome generalization, homing, resource-driven
+exploration, survival and long-horizon recovery remain open.
+The expanded release gate passes 188 tests plus one expected visual-extra skip on
+Windows and 187 tests plus two expected platform-specific skips in Linux.

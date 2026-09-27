@@ -13,6 +13,7 @@ from minecraft_scientist.exploration import (
     RGBEdgeSceneEncoder,
     RGBPanoramaEncoder,
     RGBSceneEncoder,
+    align_panorama_heading,
     infer_visual_rotation_period,
     temporal_median_rgb,
 )
@@ -21,6 +22,23 @@ from minecraft_scientist.protocols import (
     ObjectObservation,
     Observation,
 )
+
+
+def test_panorama_heading_alignment_recovers_cyclic_orientation() -> None:
+    reference = ((0, 0), (10, 1), (20, 4), (30, 9))
+    query = reference[2:] + reference[:2]
+
+    alignment = align_panorama_heading(reference, query)
+
+    assert alignment.reference_offset == 2
+    assert alignment.right_turn_steps == 2
+    assert alignment.mean_distance == 0
+    assert alignment.separation > 0
+
+
+def test_panorama_heading_alignment_rejects_incompatible_views() -> None:
+    with pytest.raises(ValueError, match="equal multi-view periods"):
+        align_panorama_heading(((0,), (1,)), ((0,),))
 
 
 def _observation(
@@ -375,7 +393,36 @@ def test_modality_consolidation_cannot_bridge_persisted_negative_boundary(
             consolidated.exemplars.index((4,))
         ]
 
-        assert local_radius == pytest.approx(6 * 0.499999)
+        assert local_radius == pytest.approx(6 - calibrated.calibration.margin)
         assert memory.match_modality_place("synthetic-rgb", (6,)) == place.place_id
         assert memory.match_modality_place("synthetic-rgb", (9,)) is None
+        assert memory.verify_integrity()
+
+
+def test_calibrated_condition_prototype_expands_only_to_negative_margin(
+    tmp_path: Path,
+) -> None:
+    with ExplorationMemory(tmp_path / "condition-prototype.sqlite3") as memory:
+        place = memory.observe_place((0,), episode_id=0, step=0)
+        memory.record_modality_view(
+            "synthetic-rgb", place.place_id, (0,), episode_id=0, step=0
+        )
+        memory.calibrate_modality_place(
+            "synthetic-rgb",
+            place.place_id,
+            ((0,), (4,)),
+            ((10,),),
+            episode_id=0,
+            step=1,
+            margin=2,
+        )
+
+        promoted = memory.consolidate_modality_view(
+            "synthetic-rgb", place.place_id, (4,), episode_id=0, step=2
+        )
+
+        local_radius = promoted.exemplar_radii[promoted.exemplars.index((4,))]
+        assert local_radius == 4
+        assert memory.match_modality_place("synthetic-rgb", (8,)) == place.place_id
+        assert memory.match_modality_place("synthetic-rgb", (10,)) is None
         assert memory.verify_integrity()

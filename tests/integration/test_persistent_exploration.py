@@ -59,7 +59,13 @@ def test_cross_session_frontier_planning_uses_visual_memory_and_known_routes(
         assert plan.frontier_id == remote.frontier_id
         assert plan.frontier_id != local.frontier_id
         assert plan.place_path == (origin.place_id, distant.place_id)
+        assert plan.travel_action_roles == (("advance",),)
         assert plan.action_roles == ("unknown_corridor",)
+        known_route = second_session.plan_route(origin.place_id, distant.place_id)
+        assert known_route is not None
+        assert known_route.place_path == (origin.place_id, distant.place_id)
+        assert known_route.travel_action_roles == (("advance",),)
+        assert second_session.plan_route(distant.place_id, origin.place_id) is None
         assert second_session.summary() == {
             "format_version": 1,
             "place_count": 2,

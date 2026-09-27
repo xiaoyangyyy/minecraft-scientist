@@ -16,6 +16,7 @@ import math
 import sqlite3
 from collections.abc import Iterable, Iterator
 from enum import StrEnum
+from itertools import pairwise
 from pathlib import Path
 from typing import Any, Self
 
@@ -280,6 +281,7 @@ class FrontierPlan(_FrozenModel):
     """Known travel prefix followed by one information-seeking action program."""
 
     place_path: tuple[str, ...]
+    travel_action_roles: tuple[tuple[str, ...], ...]
     frontier_id: str
     action_roles: tuple[str, ...]
     travel_cost: float = Field(ge=0)
@@ -287,6 +289,34 @@ class FrontierPlan(_FrozenModel):
     utility: float
     uncertainty_gain: float = Field(ge=0)
     failure_probability: float = Field(ge=0, le=1)
+
+    @model_validator(mode="after")
+    def travel_program_matches_path(self) -> FrontierPlan:
+        if not self.place_path:
+            raise ValueError("frontier plan requires a nonempty place path")
+        if len(self.travel_action_roles) != len(self.place_path) - 1:
+            raise ValueError("frontier travel actions must cover every path edge")
+        if any(not roles for roles in self.travel_action_roles):
+            raise ValueError("frontier travel action roles must not be empty")
+        return self
+
+
+class KnownRoutePlan(_FrozenModel):
+    """Executable shortest path through already validated place transitions."""
+
+    place_path: tuple[str, ...]
+    travel_action_roles: tuple[tuple[str, ...], ...]
+    travel_cost: float = Field(ge=0)
+
+    @model_validator(mode="after")
+    def travel_program_matches_path(self) -> KnownRoutePlan:
+        if not self.place_path:
+            raise ValueError("known route requires a nonempty place path")
+        if len(self.travel_action_roles) != len(self.place_path) - 1:
+            raise ValueError("known-route actions must cover every path edge")
+        if any(not roles for roles in self.travel_action_roles):
+            raise ValueError("known-route action roles must not be empty")
+        return self
 
 
 class ExplorationMemory:
@@ -773,8 +803,9 @@ class ExplorationMemory:
         """Add an already accepted view to the bounded calibrated coreset.
 
         A candidate must first match an existing local boundary.  Its new local
-        boundary is then capped at the midpoint to the nearest persisted negative,
-        preventing continual adaptation from bridging a known place boundary.
+        boundary is capped below the nearest persisted negative by the original
+        calibration margin, preventing continual adaptation from consuming known
+        counterexamples while allowing validated condition-specific prototypes.
         """
 
         if episode_id < 0 or step < 0:
@@ -796,13 +827,17 @@ class ExplorationMemory:
         )
         radius_by_exemplar = dict(zip(previous.exemplars, previous_radii, strict=True))
         if previous.negative_exemplars:
+            assert previous.calibration is not None
             candidate_radius = min(
                 previous.match_radius,
-                min(
-                    _distance(normalized, negative)
-                    for negative in previous.negative_exemplars
-                )
-                * 0.499999,
+                max(
+                    0.0,
+                    min(
+                        _distance(normalized, negative)
+                        for negative in previous.negative_exemplars
+                    )
+                    - previous.calibration.margin,
+                ),
             )
         else:
             candidate_radius = previous.match_radius
@@ -1286,19 +1321,7 @@ class ExplorationMemory:
 
     def plan_next_frontier(self, current_place_id: str) -> FrontierPlan | None:
         self.get_place(current_place_id)
-        graph = nx.DiGraph()
-        graph.add_nodes_from(place.place_id for place in self.places())
-        for transition in self.transitions():
-            weight = transition.mean_cost / transition.confidence
-            existing = graph.get_edge_data(
-                transition.source_place_id, transition.target_place_id
-            )
-            if existing is None or weight < existing["weight"]:
-                graph.add_edge(
-                    transition.source_place_id,
-                    transition.target_place_id,
-                    weight=weight,
-                )
+        graph = self._route_graph()
         plans: list[FrontierPlan] = []
         for frontier in self.frontiers():
             if frontier.status is not FrontierStatus.ACTIVE:
@@ -1326,6 +1349,7 @@ class ExplorationMemory:
             plans.append(
                 FrontierPlan(
                     place_path=tuple(path),
+                    travel_action_roles=self._path_action_roles(graph, path),
                     frontier_id=frontier.frontier_id,
                     action_roles=frontier.action_roles,
                     travel_cost=travel,
@@ -1337,6 +1361,53 @@ class ExplorationMemory:
             )
         return max(
             plans, key=lambda item: (item.utility, item.frontier_id), default=None
+        )
+
+    def plan_route(
+        self, current_place_id: str, target_place_id: str
+    ) -> KnownRoutePlan | None:
+        """Return an executable best-known route, or ``None`` if disconnected."""
+
+        self.get_place(current_place_id)
+        self.get_place(target_place_id)
+        graph = self._route_graph()
+        try:
+            path = nx.shortest_path(
+                graph, current_place_id, target_place_id, weight="weight"
+            )
+            travel = nx.path_weight(graph, path, weight="weight")
+        except (nx.NodeNotFound, nx.NetworkXNoPath):
+            return None
+        return KnownRoutePlan(
+            place_path=tuple(path),
+            travel_action_roles=self._path_action_roles(graph, path),
+            travel_cost=travel,
+        )
+
+    def _route_graph(self) -> nx.DiGraph:
+        graph = nx.DiGraph()
+        graph.add_nodes_from(place.place_id for place in self.places())
+        for transition in self.transitions():
+            weight = transition.mean_cost / transition.confidence
+            existing = graph.get_edge_data(
+                transition.source_place_id, transition.target_place_id
+            )
+            if existing is None or weight < existing["weight"]:
+                graph.add_edge(
+                    transition.source_place_id,
+                    transition.target_place_id,
+                    weight=weight,
+                    action_roles=transition.action_roles,
+                )
+        return graph
+
+    @staticmethod
+    def _path_action_roles(
+        graph: nx.DiGraph, path: list[str]
+    ) -> tuple[tuple[str, ...], ...]:
+        return tuple(
+            tuple(graph[left][right]["action_roles"])
+            for left, right in pairwise(path)
         )
 
     def _append_event(
