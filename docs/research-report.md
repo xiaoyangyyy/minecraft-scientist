@@ -212,9 +212,20 @@ RGB 出发—返回实验；纯视觉恢复率选出 heading 3，评估器事后
 哈希，结果 `valid=true`：
 `runs/natural-visual-expedition-seed201-v6/{report.json,integrity-audit.json,exploration.sqlite3}`。
 
-该结果是有界的单向多地点探索，不是 homing 或 SLAM。累计反向漂移仍无法安全闭合，
-因此 D→C、C→B、B→A 没有因动作对称性被虚构成已验证边；跨 biome、资源驱动探索、
-长期故障恢复和生存仍是下一阶段问题。
+v6 结果本身仍是有界的单向多地点探索，没有因动作对称性虚构任何反向边。后续
+`adaptive-visual-homing-seed201-v19-spectrum` 在不修改原地点边界的前提下增加了第二
+视觉模态：16×16 边缘全景继续负责精确地点与朝向，低频对数边缘频谱负责容忍亚方块
+视点平移。频谱半径只由 v6 冻结训练/校准 PNG 与其他地点负例拟合。
+
+两个全新午夜雷暴会话均先识别 A→B→C→D，再在第 6 个合格微干预识别 D→C；评估器
+分别测得 4.893 格反向位移。只有 shadow validation 通过后，长期记忆才写入第 4 条
+有向边 D→C，并可重新规划 D→C。证据含 1,068 张 PNG、42 条哈希链记忆事件与冻结
+源码/上游证据清单；独立审计从 PNG 重算频谱、校准边界、循环朝向、首次合格停止、
+SQLite 投影及坐标隔离，所有检查为真：
+`runs/adaptive-visual-homing-seed201-v19-spectrum/{report.json,integrity-audit.json,exploration.sqlite3}`。
+
+这只是经过验证的一条反向前缀，不是完整 homing 或 SLAM。C→B、B→A 仍未写入；跨
+biome、资源驱动探索、长期故障恢复和生存仍是下一阶段问题。
 
 ## 可复现入口
 

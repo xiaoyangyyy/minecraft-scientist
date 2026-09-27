@@ -9,10 +9,15 @@ import pytest
 from minecraft_scientist.exploration import (
     AnonymousSceneEncoder,
     ExplorationMemory,
+    RGBEdgeHistogramPanoramaEncoder,
+    RGBEdgeHistogramSceneEncoder,
     RGBEdgePanoramaEncoder,
     RGBEdgeSceneEncoder,
+    RGBEdgeSpectrumPanoramaEncoder,
+    RGBEdgeSpectrumSceneEncoder,
     RGBPanoramaEncoder,
     RGBSceneEncoder,
+    VisualHomingProgram,
     align_panorama_heading,
     infer_visual_rotation_period,
     temporal_median_rgb,
@@ -39,6 +44,39 @@ def test_panorama_heading_alignment_recovers_cyclic_orientation() -> None:
 def test_panorama_heading_alignment_rejects_incompatible_views() -> None:
     with pytest.raises(ValueError, match="equal multi-view periods"):
         align_panorama_heading(((0,), (1,)), ((0,),))
+
+
+def test_visual_homing_program_round_trips_without_semantic_controls() -> None:
+    program = VisualHomingProgram(
+        turn_steps=6,
+        motion_slot=1,
+        min_repetitions=4,
+        max_repetitions=7,
+        move_frames=4,
+        settle_ticks=10,
+    )
+
+    roles = program.to_roles()
+
+    assert VisualHomingProgram.from_roles(roles) == program
+    assert roles == (
+        "visual-homing-v3",
+        "turn-slot:6",
+        "motion-slot:1",
+        "min-repetitions:4",
+        "max-repetitions:7",
+        "move-frames:4",
+        "settle-ticks:10",
+    )
+    assert not any(
+        token in role
+        for role in roles
+        for token in ("forward", "jump", "back", "left", "right", "obj_")
+    )
+    with pytest.raises(ValueError, match="malformed visual homing"):
+        VisualHomingProgram.from_roles(
+            (*roles[:4], "max-repetitions:-1", *roles[5:])
+        )
 
 
 def _observation(
@@ -223,6 +261,42 @@ def test_edge_panorama_ignores_brightness_and_scan_order() -> None:
     assert len(reference) == panorama_encoder.dimensions
 
 
+def test_edge_histogram_panorama_tolerates_spatial_translation() -> None:
+    scene_encoder = RGBEdgeHistogramSceneEncoder(grid_size=8, bin_count=6)
+    panorama_encoder = RGBEdgeHistogramPanoramaEncoder(scene_encoder)
+    views = tuple(
+        np.roll(_rgb_fixture(), shift, axis=1) for shift in (-30, -10, 10, 30)
+    )
+    translated = tuple(np.roll(frame, 3, axis=0) for frame in reversed(views))
+
+    reference = panorama_encoder.encode(views)
+    shifted = panorama_encoder.encode(translated)
+
+    assert len(reference) == panorama_encoder.dimensions == 36
+    assert math.dist(reference, shifted) < 10
+    assert scene_encoder.dimensions == 18
+
+
+def test_edge_spectrum_panorama_tolerates_spatial_translation() -> None:
+    scene_encoder = RGBEdgeSpectrumSceneEncoder(
+        grid_size=8, low_frequency_radius=2
+    )
+    panorama_encoder = RGBEdgeSpectrumPanoramaEncoder(scene_encoder)
+    views = tuple(
+        np.roll(_rgb_fixture(), shift, axis=1) for shift in (-30, -10, 10, 30)
+    )
+    translated = tuple(
+        np.roll(np.roll(frame, 8, axis=0), -8, axis=1) for frame in reversed(views)
+    )
+
+    reference = panorama_encoder.encode(views)
+    shifted = panorama_encoder.encode(translated)
+
+    assert len(reference) == panorama_encoder.dimensions == 150
+    assert math.dist(reference, shifted) < 25
+    assert scene_encoder.dimensions == 75
+
+
 def test_temporal_median_rgb_removes_transient_weather_streaks() -> None:
     base = _rgb_fixture()
     samples = [base.copy() for _ in range(5)]
@@ -354,6 +428,19 @@ def test_modality_memory_can_fit_training_only_maximum_gap_boundary(
         assert boundary.radius == pytest.approx(6.999994)
         assert memory.match_modality_place("synthetic-rgb", (9, 0)) is None
         assert memory.match_modality_place("synthetic-rgb", (4, 0)) == place.place_id
+        accepted = memory.score_modality_place(
+            "synthetic-rgb", place.place_id, (4, 0)
+        )
+        rejected = memory.score_modality_place(
+            "synthetic-rgb", place.place_id, (9, 0)
+        )
+        assert accepted.nearest_distance == 4
+        assert accepted.acceptance_radius == pytest.approx(6.999994)
+        assert accepted.clearance > 0
+        assert accepted.accepted is True
+        assert rejected.nearest_distance == 9
+        assert rejected.clearance < 0
+        assert rejected.accepted is False
 
 
 def test_modality_consolidation_cannot_bridge_persisted_negative_boundary(

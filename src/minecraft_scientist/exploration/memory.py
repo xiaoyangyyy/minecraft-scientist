@@ -226,6 +226,39 @@ class ModalityPlaceMemory(PerceptualPlaceMemory):
         return self
 
 
+class ModalityPlaceScore(_FrozenModel):
+    """Auditable distance from one observation to one persisted visual place."""
+
+    modality: str
+    place_id: str
+    nearest_distance: float = Field(ge=0)
+    acceptance_radius: float = Field(ge=0)
+    clearance: float
+    accepted: bool
+
+    @model_validator(mode="after")
+    def values_are_consistent(self) -> ModalityPlaceScore:
+        if not all(
+            math.isfinite(value)
+            for value in (
+                self.nearest_distance,
+                self.acceptance_radius,
+                self.clearance,
+            )
+        ):
+            raise ValueError("modality place score values must be finite")
+        if not math.isclose(
+            self.clearance,
+            self.acceptance_radius - self.nearest_distance,
+            rel_tol=1e-12,
+            abs_tol=1e-12,
+        ):
+            raise ValueError("modality place score clearance is inconsistent")
+        if self.accepted != (self.nearest_distance <= self.acceptance_radius):
+            raise ValueError("modality place score acceptance is inconsistent")
+        return self
+
+
 class FrontierMemory(_FrozenModel):
     """Persistent evidence about one candidate action program from a place."""
 
@@ -923,6 +956,43 @@ class ExplorationMemory:
         ):
             return None
         return candidates[0][1]
+
+    def score_modality_place(
+        self,
+        modality: str,
+        place_id: str,
+        signature: Iterable[int],
+    ) -> ModalityPlaceScore:
+        """Score a target place without weakening its calibrated boundary.
+
+        This exposes the same nearest-exemplar evidence used by matching so a
+        closed-loop controller can report progress.  The method never adapts the
+        place, changes a radius, or turns a near miss into a match.
+        """
+
+        normalized = _signature(signature)
+        place = self._get_modality_place(modality, place_id)
+        if len(place.exemplars[0]) != len(normalized):
+            raise ValueError("modality scoring signature width changed")
+        radii = place.exemplar_radii or tuple(
+            place.match_radius for _ in place.exemplars
+        )
+        distance, _index, radius = min(
+            (
+                _distance(exemplar, normalized),
+                index,
+                radii[index],
+            )
+            for index, exemplar in enumerate(place.exemplars)
+        )
+        return ModalityPlaceScore(
+            modality=modality,
+            place_id=place_id,
+            nearest_distance=distance,
+            acceptance_radius=radius,
+            clearance=radius - distance,
+            accepted=distance <= radius,
+        )
 
     def frontiers(self) -> tuple[FrontierMemory, ...]:
         cursor = self._connection.execute(

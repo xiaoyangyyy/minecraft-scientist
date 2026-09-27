@@ -170,13 +170,28 @@ when arrival yaw differs. `FrontierPlan.travel_action_roles` carries one program
 known path edge, and `ExplorationMemory.plan_route` returns the same executable form
 for any connected pair of known places.
 
-The natural-expedition gate persists only verified forward edges A→B→C→D. A remote
+The natural-expedition v6 gate persists only verified forward edges A→B→C→D. A remote
 active frontier competes with a high-risk local decoy; planning from A returns the
 two-edge travel prefix plus the C intervention. The held-out midnight/thunder
 episode discovers D after noon/clear training and night/rain calibration, and a
-later process restart independently replays all three edges. Reverse traversal is
-intentionally absent: natural-terrain drift prevented a safe homing validation, so
-no reverse transition is inferred from action symmetry.
+later process restart independently replays all three edges. It infers no reverse
+transition from action symmetry.
+
+The subsequent adaptive-homing gate adds a second, independently calibrated visual
+modality rather than widening the exact place matcher. `RGBEdgeSpectrumPanoramaEncoder`
+uses the low-frequency log magnitude of each edge grid, making sub-block screen
+translation less destructive while preserving more geometry than a histogram.
+`ModalityPlaceScore` exposes distance, local acceptance radius and clearance without
+mutating memory. `VisualHomingProgram` serializes relative turn/motion slots,
+minimum and maximum repetitions, motion frames and settling ticks. Execution remains
+closed-loop: every intervention is followed by a fresh panorama, early target-like
+views before the minimum are recorded but cannot stop the program, and a budget
+exhaustion cannot create an edge.
+
+On the accepted v19 artifact, both fresh midnight/thunder sessions traverse
+A→B→C→D and independently validate the bounded D→C prefix. Only then does SQLite
+gain the fourth directed transition and a D→C return plan. C→B and B→A are still
+absent; this is not a claim of full homing or SLAM.
 
 `LocalCausalEngine` accepts `(context, intervention, outcome)` samples. It rejects
 controller failures and samples carrying possible confounders before computing a

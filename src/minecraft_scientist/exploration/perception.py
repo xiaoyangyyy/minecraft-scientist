@@ -490,6 +490,108 @@ class RGBEdgePanoramaEncoder(RGBPanoramaEncoder):
         super().__init__(scene_encoder or RGBEdgeSceneEncoder())
 
 
+class RGBEdgeHistogramSceneEncoder:
+    """Translation-tolerant edge distribution for one anonymous RGB view.
+
+    The underlying edge encoder still removes illumination and transient pixel
+    noise.  Spatial cells are then histogrammed per channel, deliberately trading
+    exact screen position for tolerance to the sub-block viewpoint shifts that
+    occur during natural-terrain homing.
+    """
+
+    VERSION = "rgb-edge-histogram-view-v1"
+
+    def __init__(self, *, grid_size: int = 16, bin_count: int = 6) -> None:
+        if bin_count < 2:
+            raise ValueError("edge histogram requires at least two bins")
+        self.edge_encoder = RGBEdgeSceneEncoder(grid_size=grid_size)
+        self.grid_size = grid_size
+        self.bin_count = bin_count
+
+    @property
+    def dimensions(self) -> int:
+        return self.bin_count * 3
+
+    def encode(self, frame: np.ndarray) -> tuple[int, ...]:
+        edge = np.asarray(
+            self.edge_encoder.encode(frame), dtype=np.int16
+        ).reshape(self.grid_size, self.grid_size, 3)
+        # RGBEdgeSceneEncoder quantizes all three channels into [0, 32].
+        boundaries = np.linspace(0, 33, self.bin_count + 1)
+        signature = tuple(
+            int(value)
+            for channel in range(3)
+            for value in np.histogram(edge[:, :, channel], bins=boundaries)[0]
+        )
+        if len(signature) != self.dimensions:
+            raise AssertionError("RGB edge histogram descriptor width changed")
+        return signature
+
+
+class RGBEdgeHistogramPanoramaEncoder(RGBPanoramaEncoder):
+    """Yaw/order-invariant panorama over translation-tolerant edge histograms."""
+
+    VERSION = "rgb-edge-histogram-panorama-v1"
+
+    def __init__(
+        self, scene_encoder: RGBEdgeHistogramSceneEncoder | None = None
+    ) -> None:
+        super().__init__(scene_encoder or RGBEdgeHistogramSceneEncoder())
+
+
+class RGBEdgeSpectrumSceneEncoder:
+    """Translation-invariant edge spectrum retaining coarse spatial structure."""
+
+    VERSION = "rgb-edge-spectrum-view-v1"
+
+    def __init__(
+        self, *, grid_size: int = 16, low_frequency_radius: int = 4
+    ) -> None:
+        if grid_size < 2 or not 1 <= low_frequency_radius < grid_size // 2:
+            raise ValueError("invalid edge spectrum grid or frequency radius")
+        self.edge_encoder = RGBEdgeSceneEncoder(grid_size=grid_size)
+        self.grid_size = grid_size
+        self.low_frequency_radius = low_frequency_radius
+
+    @property
+    def dimensions(self) -> int:
+        width = self.low_frequency_radius * 2 + 1
+        return width * width * 3
+
+    def encode(self, frame: np.ndarray) -> tuple[int, ...]:
+        edge = np.asarray(
+            self.edge_encoder.encode(frame), dtype=np.float64
+        ).reshape(self.grid_size, self.grid_size, 3)
+        center = self.grid_size // 2
+        radius = self.low_frequency_radius
+        features = []
+        for channel in range(3):
+            spectrum = np.fft.fftshift(np.abs(np.fft.fft2(edge[:, :, channel])))
+            crop = np.log1p(
+                spectrum[
+                    center - radius : center + radius + 1,
+                    center - radius : center + radius + 1,
+                ]
+            )
+            normalized = crop / (float(np.linalg.norm(crop)) + 1e-9)
+            features.extend(np.rint(normalized * 100).astype(np.int16).ravel())
+        signature = tuple(int(value) for value in features)
+        if len(signature) != self.dimensions:
+            raise AssertionError("RGB edge spectrum descriptor width changed")
+        return signature
+
+
+class RGBEdgeSpectrumPanoramaEncoder(RGBPanoramaEncoder):
+    """Yaw/order-invariant panorama over translation-invariant edge spectra."""
+
+    VERSION = "rgb-edge-spectrum-panorama-v1"
+
+    def __init__(
+        self, scene_encoder: RGBEdgeSpectrumSceneEncoder | None = None
+    ) -> None:
+        super().__init__(scene_encoder or RGBEdgeSpectrumSceneEncoder())
+
+
 def infer_visual_rotation_period(
     anchor: tuple[int, ...],
     scan: Iterable[Iterable[int]],

@@ -511,10 +511,37 @@ images, cyclic heading alignments, frontier selector, route plan, physical metri
 memory projection and frozen-source hashes and reports `valid: true`.
 
 This is the first real natural-terrain, pixel-only, multi-frontier expedition in the
-project. It is deliberately a bounded outward expedition: accumulated reverse-route
-drift remains too large for a safe homing claim, so unverified reverse edges are not
-written to memory. Cross-biome generalization, resource-driven exploration,
-survival, long-horizon recovery and metric SLAM remain open.
+project. The original v6 artifact remains a bounded outward expedition and contains
+no inferred reverse edges.
+
+The adaptive visual homing gate builds on that immutable artifact without changing
+its place boundaries. Exact 16×16 edge panoramas still perform topological
+localization and cyclic heading alignment. A second edge-spectrum modality uses
+log Fourier magnitudes to tolerate sub-block screen translation while retaining
+more spatial structure than an edge histogram. Its per-place radii are fitted only
+from copied v6 training/calibration PNGs and frozen negative places. `VisualHomingProgram`
+persists an anonymous motion slot, learned half-turn, minimum/maximum intervention
+count, frame budget and post-motion settling budget. It scans after every action,
+stops at the first target-spectrum match after the minimum intervention count, and
+fails closed if the maximum is exhausted.
+
+Reproduce the accepted D→C discovery plus fresh-session shadow validation with:
+
+```powershell
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/adaptive_visual_homing_benchmark.py --source-run /mnt/d/minecraft-scientist/runs/natural-visual-expedition-seed201-v6 --homing-edge-count 1 --min-homing-steps 6 --max-homing-steps 8 --homing-turn-steps 6 --homing-motion-slot 1 --homing-move-frames 4 --homing-settle-ticks 10 --temporal-samples 3 --output /mnt/d/minecraft-scientist/runs/adaptive-visual-homing-seed201-v19-spectrum
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/audit_adaptive_visual_homing.py /mnt/d/minecraft-scientist/runs/adaptive-visual-homing-seed201-v19-spectrum --write
+```
+
+Both new sessions independently recognize A→B→C→D under midnight/thunder and then
+recognize D→C on the sixth bounded reverse intervention. Evaluator-only telemetry
+measures 4.893 blocks on each accepted reverse traversal. Only after validation is
+D→C added as the fourth directed transition; the persistent return plan is D→C.
+The run stores 1,068 PNGs, 42 hash-chain memory events, frozen source/evidence
+manifests and an independent audit with every check true.
+
+This is a verified one-edge reverse prefix, not complete homing. C→B and B→A remain
+absent, and cross-biome generalization, resource-driven exploration, survival,
+long-horizon recovery and metric SLAM remain open.
 
 A concrete label-free `GridVisualController` maps opaque screen regions and hotbar
 slots to MineStudio env actions. Tests verify action translation and semantic

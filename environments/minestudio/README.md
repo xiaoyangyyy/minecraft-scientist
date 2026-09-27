@@ -273,6 +273,17 @@ documentation targets Linux, Python 3.10+, JDK 8, VirtualGL/Xvfb, and a separate
 Minecraft runtime; mixing those dependencies into the deterministic Windows test
 environment would make the offline release gate irreproducible.
 
+The natural-terrain adaptive homing gate consumes the immutable accepted expedition
+and validates one reverse prefix without using evaluator coordinates in the policy:
+
+```powershell
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/adaptive_visual_homing_benchmark.py --source-run /mnt/d/minecraft-scientist/runs/natural-visual-expedition-seed201-v6 --homing-edge-count 1 --min-homing-steps 6 --max-homing-steps 8 --homing-turn-steps 6 --homing-motion-slot 1 --homing-move-frames 4 --homing-settle-ticks 10 --temporal-samples 3 --output /mnt/d/minecraft-scientist/runs/adaptive-visual-homing-seed201-v19-spectrum
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/audit_adaptive_visual_homing.py /mnt/d/minecraft-scientist/runs/adaptive-visual-homing-seed201-v19-spectrum --write
+```
+
+Both discovery and validation traverse A→B→C→D and stop D→C on the first eligible
+edge-spectrum match. The validated D→C edge is persisted; C→B and B→A are not.
+
 Create this environment on Linux with Java 8 and a working display. The verified
 installation uses uv and explicit upstream-pin overrides, not plain pip resolution:
 

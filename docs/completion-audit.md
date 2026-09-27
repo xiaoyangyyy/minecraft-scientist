@@ -482,9 +482,18 @@ hashes, temporal medians, cyclic alignment, frontier selection, route compositio
 telemetry separation and frozen source hashes. Evidence is in
 `runs/natural-visual-expedition-seed201-v6/{report.json,integrity-audit.json,events.jsonl,evaluator-audit.json,exploration.sqlite3,scans}`.
 
-This is bounded outward multi-frontier exploration, not a completion claim for the
-broader visual/open-world goal. Reverse-route drift remains unresolved, so no D→C,
-C→B or B→A edge is accepted; cross-biome generalization, homing, resource-driven
-exploration, survival and long-horizon recovery remain open.
-The expanded release gate passes 188 tests plus one expected visual-extra skip on
-Windows and 187 tests plus two expected platform-specific skips in Linux.
+This is bounded multi-frontier exploration plus one independently validated reverse
+prefix, not a completion claim for the broader visual/open-world goal. The accepted
+`adaptive-visual-homing-seed201-v19-spectrum` artifact keeps exact localization and
+translation-tolerant target acceptance in separate calibrated modalities. Two fresh
+midnight/thunder sessions each recognize A→B→C→D and then D→C; evaluator-only
+telemetry measures 4.893 blocks on both reverse traversals. D→C is promoted only
+after shadow validation, producing four directed transitions and 42 replay-valid
+memory events. The independent audit recomputes all 1,068 PNG-derived signatures,
+boundaries, alignments, first eligible stops, route projection, telemetry separation
+and frozen hashes as `valid: true`.
+
+C→B and B→A remain unresolved and absent. Cross-biome generalization, full homing,
+resource-driven exploration, survival and long-horizon recovery remain open.
+The expanded release gate passes 191 tests plus one expected visual-extra skip on
+Windows and 185 tests plus five expected platform/optional-extra skips in Linux.
