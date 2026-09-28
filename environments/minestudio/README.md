@@ -274,15 +274,18 @@ Minecraft runtime; mixing those dependencies into the deterministic Windows test
 environment would make the offline release gate irreproducible.
 
 The natural-terrain adaptive homing gate consumes the immutable accepted expedition
-and validates one reverse prefix without using evaluator coordinates in the policy:
+and validates a two-edge reverse prefix without using evaluator coordinates in the
+policy. Programs and arrival encoders are preregistered per directed edge:
 
 ```powershell
-wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/adaptive_visual_homing_benchmark.py --source-run /mnt/d/minecraft-scientist/runs/natural-visual-expedition-seed201-v6 --homing-edge-count 1 --min-homing-steps 6 --max-homing-steps 8 --homing-turn-steps 6 --homing-motion-slot 1 --homing-move-frames 4 --homing-settle-ticks 10 --temporal-samples 3 --output /mnt/d/minecraft-scientist/runs/adaptive-visual-homing-seed201-v19-spectrum
-wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/audit_adaptive_visual_homing.py /mnt/d/minecraft-scientist/runs/adaptive-visual-homing-seed201-v19-spectrum --write
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/adaptive_visual_homing_benchmark.py --source-run /mnt/d/minecraft-scientist/runs/natural-visual-expedition-seed201-v6 --homing-edge-count 2 --homing-edge-spec 6,1,6,8,4,10 --homing-edge-spec 6,1,1,8,1,10 --homing-edge-encoder spectrum-r4 --homing-edge-encoder spectrum-r3 --temporal-samples 3 --output /mnt/d/minecraft-scientist/runs/adaptive-visual-homing-seed201-v23-edge2-multimodal
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/audit_adaptive_visual_homing.py /mnt/d/minecraft-scientist/runs/adaptive-visual-homing-seed201-v23-edge2-multimodal --write
 ```
 
-Both discovery and validation traverse A→B→C→D and stop D→C on the first eligible
-edge-spectrum match. The validated D→C edge is persisted; C→B and B→A are not.
+Both discovery and validation traverse A→B→C→D, then stop D→C and C→B on the first
+eligible match from each edge's versioned spectrum. The independent evaluator
+recomputes 0.399- and 0.386-block three-dimensional target errors before the gate
+can pass. D→C and C→B are persisted only after validation; B→A is not.
 
 Create this environment on Linux with Java 8 and a working display. The verified
 installation uses uv and explicit upstream-pin overrides, not plain pip resolution:

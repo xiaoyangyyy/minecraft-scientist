@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import shutil
 from itertools import pairwise
 from pathlib import Path
@@ -42,6 +43,7 @@ from PIL import Image
 
 from minecraft_scientist.exploration import (
     ExplorationMemory,
+    RGBEdgeCompactSpectrumPanoramaEncoder,
     RGBEdgeSpectrumPanoramaEncoder,
     VisualFrontierProgram,
     VisualHomingProgram,
@@ -58,6 +60,10 @@ SOURCE_SCAN_ROLES = (
     "calibration-c",
     "heldout-d2",
 )
+HOMING_ENCODERS = {
+    "spectrum-r4": RGBEdgeSpectrumPanoramaEncoder,
+    "spectrum-r3": RGBEdgeCompactSpectrumPanoramaEncoder,
+}
 
 
 def _digest(path: Path) -> str:
@@ -101,6 +107,8 @@ def _copy_sources(output: Path) -> dict[str, str]:
         "navigation_probe.py": Path(__file__).with_name("navigation_probe.py"),
         "frontier_program.py": repository
         / "src/minecraft_scientist/exploration/frontier_program.py",
+        "exploration_init.py": repository
+        / "src/minecraft_scientist/exploration/__init__.py",
         "memory.py": repository / "src/minecraft_scientist/exploration/memory.py",
         "perception.py": repository
         / "src/minecraft_scientist/exploration/perception.py",
@@ -139,7 +147,7 @@ def _install_homing_modality(
     memory_path: Path,
     evidence: Path,
     *,
-    encoder: RGBEdgeSpectrumPanoramaEncoder,
+    encoder: Any,
     period: int,
     place_ids: tuple[str, ...],
 ) -> dict[str, Any]:
@@ -219,6 +227,56 @@ def _recognition(
     return match, score.model_dump(mode="json")
 
 
+def _parse_homing_edge_spec(raw: str) -> VisualHomingProgram:
+    """Parse one preregistered edge program from six comma-separated integers."""
+
+    fields = (
+        "turn_steps",
+        "motion_slot",
+        "min_repetitions",
+        "max_repetitions",
+        "move_frames",
+        "settle_ticks",
+    )
+    parts = tuple(part.strip() for part in raw.split(","))
+    if len(parts) != len(fields) or any(not part.isdecimal() for part in parts):
+        raise ValueError(
+            "homing edge spec must be "
+            "turn,motion,min_repetitions,max_repetitions,move_frames,settle_ticks"
+        )
+    return VisualHomingProgram.model_validate(
+        dict(zip(fields, (int(part) for part in parts), strict=True))
+    )
+
+
+def _position_distance_3d(
+    positions: list[dict[str, float]], left_index: int, right_index: int
+) -> float:
+    left = positions[left_index]
+    right = positions[right_index]
+    return math.sqrt(
+        (float(left["xpos"]) - float(right["xpos"])) ** 2
+        + (float(left["ypos"]) - float(right["ypos"])) ** 2
+        + (float(left["zpos"]) - float(right["zpos"])) ** 2
+    )
+
+
+def _annotate_arrival_errors(
+    session: Session, result: dict[str, Any], place_ids: tuple[str, ...]
+) -> None:
+    """Add evaluator-only physical errors after policy execution has completed."""
+
+    target_indices = dict(
+        zip(place_ids, result["outward_position_indices"], strict=True)
+    )
+    for edge in result["homing_edges"]:
+        edge["evaluator_metrics"]["target_distance_3d"] = _position_distance_3d(
+            session.audit.positions,
+            int(edge["evaluator_position_index"]),
+            int(target_indices[edge["target_place_id"]]),
+        )
+
+
 def _execute_homing_edge(
     session: Session,
     *,
@@ -228,7 +286,7 @@ def _execute_homing_edge(
     modality: str,
     encoder: Any,
     homing_modality: str,
-    homing_encoder: RGBEdgeSpectrumPanoramaEncoder,
+    homing_encoder: Any,
     period: int,
     temporal_samples: int,
     source_id: str,
@@ -291,6 +349,7 @@ def _execute_homing_edge(
                 "recognized_place_id": match,
                 "target_score": score,
                 "acceptance_eligible": repetition >= program.min_repetitions,
+                "evaluator_position_index": len(session.audit.positions) - 1,
             }
         )
         final_signature, final_views, final_role = signature, views, role
@@ -304,11 +363,13 @@ def _execute_homing_edge(
         "target_place_id": target_id,
         "source_scan_role": query_role,
         "reference_scan_role": source_reference_role,
+        "homing_encoder": homing_encoder.VERSION,
         "action_roles": list(program.to_roles()),
         "alignment": alignment.model_dump(mode="json"),
         "steps": steps,
         "used_repetitions": len(steps),
         "success": success,
+        "evaluator_position_index": len(session.audit.positions) - 1,
         "evaluator_metrics": _segment_metrics(session.audit.positions, start_index),
     }
     return result, final_signature, final_views, final_role
@@ -325,15 +386,14 @@ def _run_round_trip(
     memory_path: Path,
     modality: str,
     encoder: Any,
-    homing_modality: str,
-    homing_encoder: RGBEdgeSpectrumPanoramaEncoder,
+    homing_encoders: tuple[Any, ...],
     period: int,
     temporal_samples: int,
     place_ids: tuple[str, ...],
     reference_roles: dict[str, str],
     reference_views: dict[str, tuple[tuple[int, ...], ...]],
     outward_roles: tuple[tuple[str, ...], ...],
-    homing_program: VisualHomingProgram,
+    homing_programs: tuple[VisualHomingProgram, ...],
     homing_edge_count: int,
 ) -> tuple[Session, dict[str, Any]]:
     session = _open_session(seed, commands, movement_programs)
@@ -350,6 +410,7 @@ def _run_round_trip(
         memory_path, modality, place_ids[0], signature
     )
     outward_matches = [start_match]
+    outward_position_indices = [len(session.audit.positions) - 1]
     outward_executions = []
     route_role = f"{phase}-a"
     for edge_index, ((source_id, target_id), roles) in enumerate(
@@ -377,13 +438,21 @@ def _run_round_trip(
         )
         match, _score = _recognition(memory_path, modality, target_id, signature)
         outward_matches.append(match)
+        outward_position_indices.append(len(session.audit.positions) - 1)
     if outward_matches[-1] != place_ids[-1]:
         raise RuntimeError(f"{phase} did not visually localize the homing source")
 
     homing_matches = [outward_matches[-1]]
     homing_edges = []
     reverse_pairs = tuple(pairwise(reversed(place_ids)))[:homing_edge_count]
-    for edge_index, (source_id, target_id) in enumerate(reverse_pairs, start=1):
+    for edge_index, (
+        (source_id, target_id),
+        homing_program,
+        homing_encoder,
+    ) in enumerate(
+        zip(reverse_pairs, homing_programs, homing_encoders, strict=True), start=1
+    ):
+        homing_modality = homing_encoder.VERSION
         result, signature, route_views, route_role = _execute_homing_edge(
             session,
             output=output,
@@ -417,6 +486,7 @@ def _run_round_trip(
             break
     return session, {
         "outward_matches": outward_matches,
+        "outward_position_indices": outward_position_indices,
         "homing_matches": homing_matches,
         "outward_executions": outward_executions,
         "homing_edges": homing_edges,
@@ -446,6 +516,32 @@ def main() -> None:
         help="override the outward route's motion duration for finer visual servoing",
     )
     parser.add_argument("--homing-settle-ticks", type=int, default=10)
+    parser.add_argument(
+        "--homing-encoder",
+        choices=tuple(HOMING_ENCODERS),
+        default="spectrum-r4",
+        help="versioned arrival-recognition modality",
+    )
+    parser.add_argument(
+        "--homing-edge-encoder",
+        action="append",
+        choices=tuple(HOMING_ENCODERS),
+        default=[],
+        help=(
+            "repeat once per requested reverse edge to preregister a distinct "
+            "versioned arrival modality"
+        ),
+    )
+    parser.add_argument(
+        "--homing-edge-spec",
+        action="append",
+        default=[],
+        metavar="TURN,MOTION,MIN,MAX,FRAMES,SETTLE",
+        help=(
+            "repeat once per requested reverse edge to preregister an edge-specific "
+            "closed-loop program; when omitted, the global homing options are reused"
+        ),
+    )
     parser.add_argument("--temporal-samples", type=int, default=1)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -493,17 +589,33 @@ def main() -> None:
         parser.error("adaptive homing currently requires edge source evidence")
     encoder = PANORAMA_ENCODERS["edge"]()
     modality = encoder.VERSION
-    homing_encoder = RGBEdgeSpectrumPanoramaEncoder()
-    homing_modality = homing_encoder.VERSION
+    if args.homing_edge_encoder:
+        if len(args.homing_edge_encoder) != args.homing_edge_count:
+            parser.error(
+                "--homing-edge-encoder must be repeated exactly "
+                "--homing-edge-count times"
+            )
+        homing_encoder_keys = tuple(args.homing_edge_encoder)
+    else:
+        homing_encoder_keys = (args.homing_encoder,) * args.homing_edge_count
+    homing_encoders = tuple(HOMING_ENCODERS[key]() for key in homing_encoder_keys)
+    homing_encoder = homing_encoders[0]
     place_ids_by_role = source_report["place_ids"]
     place_ids = tuple(place_ids_by_role[key] for key in "abcd")
-    homing_calibration = _install_homing_modality(
-        memory_path,
-        evidence,
-        encoder=homing_encoder,
-        period=period,
-        place_ids=place_ids,
-    )
+    unique_homing_encoders = {
+        encoder.VERSION: encoder for encoder in homing_encoders
+    }
+    homing_calibrations = {
+        version: _install_homing_modality(
+            memory_path,
+            evidence,
+            encoder=edge_encoder,
+            period=period,
+            place_ids=place_ids,
+        )
+        for version, edge_encoder in unique_homing_encoders.items()
+    }
+    homing_calibration = homing_calibrations[homing_encoder.VERSION]
     reference_roles = dict(zip(place_ids, REFERENCE_SCAN_ROLES, strict=True))
     reference_views = {
         place_id: _load_reference_views(
@@ -540,6 +652,22 @@ def main() -> None:
         ),
         settle_ticks=args.homing_settle_ticks,
     )
+    if args.homing_edge_spec:
+        try:
+            homing_programs = tuple(
+                _parse_homing_edge_spec(raw) for raw in args.homing_edge_spec
+            )
+        except (ValueError, TypeError) as exc:
+            parser.error(str(exc))
+        if len(homing_programs) != args.homing_edge_count:
+            parser.error(
+                "--homing-edge-spec must be repeated exactly --homing-edge-count times"
+            )
+    else:
+        homing_programs = (homing_program,) * args.homing_edge_count
+    if any(program.turn_steps >= period for program in homing_programs):
+        parser.error("homing edge turn steps must be inside the learned camera period")
+    homing_program = homing_programs[0]
     movement_programs = (("forward",), ("forward", "jump"))
     heldout = source_report["conditions"]["heldout"]
     commands = natural_world_commands(
@@ -558,18 +686,18 @@ def main() -> None:
             memory_path=memory_path,
             modality=modality,
             encoder=encoder,
-            homing_modality=homing_modality,
-            homing_encoder=homing_encoder,
+            homing_encoders=homing_encoders,
             period=period,
             temporal_samples=args.temporal_samples,
             place_ids=place_ids,
             reference_roles=reference_roles,
             reference_views=reference_views,
             outward_roles=outward_plan.travel_action_roles,
-            homing_program=homing_program,
+            homing_programs=homing_programs,
             homing_edge_count=args.homing_edge_count,
         )
         sessions.append(discovery)
+        _annotate_arrival_errors(discovery, discovery_result, place_ids)
         expected_home = list(reversed(place_ids))[: args.homing_edge_count + 1]
         if discovery_result["homing_matches"] != expected_home:
             (args.output / "failed-discovery.json").write_text(
@@ -599,32 +727,34 @@ def main() -> None:
             memory_path=memory_path,
             modality=modality,
             encoder=encoder,
-            homing_modality=homing_modality,
-            homing_encoder=homing_encoder,
+            homing_encoders=homing_encoders,
             period=period,
             temporal_samples=args.temporal_samples,
             place_ids=place_ids,
             reference_roles=reference_roles,
             reference_views=reference_views,
             outward_roles=outward_plan.travel_action_roles,
-            homing_program=homing_program,
+            homing_programs=homing_programs,
             homing_edge_count=args.homing_edge_count,
         )
         sessions.append(validation)
+        _annotate_arrival_errors(validation, validation_result, place_ids)
         validation_success = validation_result["homing_matches"] == expected_home
         reverse_frontier_ids = {}
         if validation_success:
             with ExplorationMemory.open(memory_path) as memory:
-                for edge_index, (source_id, target_id) in enumerate(
-                    tuple(pairwise(reversed(place_ids)))[: args.homing_edge_count],
-                    start=1,
+                reverse_pairs = tuple(pairwise(reversed(place_ids)))[
+                    : args.homing_edge_count
+                ]
+                for edge_index, ((source_id, target_id), edge_program) in enumerate(
+                    zip(reverse_pairs, homing_programs, strict=True), start=1
                 ):
                     reverse_frontier_ids[f"{source_id}->{target_id}"] = (
                         _record_resolved_frontier(
                             memory,
                             source_id,
                             target_id,
-                            homing_program.to_roles(),
+                            edge_program.to_roles(),
                             episode_id=4,
                             step=edge_index * 2,
                             cost=float(
@@ -657,14 +787,6 @@ def main() -> None:
             for record in action_records
         )
         expected_outward = list(place_ids)
-        discovery_used = [
-            int(item["used_repetitions"])
-            for item in discovery_result["homing_edges"]
-        ]
-        validation_used = [
-            int(item["used_repetitions"])
-            for item in validation_result["homing_edges"]
-        ]
         return_path = tuple(return_plan.place_path) if return_plan is not None else ()
         gate = {
             "source_run_accepted": True,
@@ -681,8 +803,11 @@ def main() -> None:
             ]
             == expected_home,
             "closed_loop_stopped_on_match_within_budget": all(
-                used <= args.max_homing_steps
-                for used in (*discovery_used, *validation_used)
+                int(edge["used_repetitions"]) <= program.max_repetitions
+                for result in (discovery_result, validation_result)
+                for edge, program in zip(
+                    result["homing_edges"], homing_programs, strict=True
+                )
             ),
             "physically_remote_round_trips": all(
                 result["evaluator_metrics"]["maximum_excursion"] is not None
@@ -692,6 +817,11 @@ def main() -> None:
             "reverse_edges_physically_traversed": all(
                 edge["evaluator_metrics"]["maximum_excursion"] is not None
                 and edge["evaluator_metrics"]["maximum_excursion"] >= 2.0
+                for result in (discovery_result, validation_result)
+                for edge in result["homing_edges"]
+            ),
+            "reverse_edges_reach_targets": all(
+                edge["evaluator_metrics"]["target_distance_3d"] <= 1.75
                 for result in (discovery_result, validation_result)
                 for edge in result["homing_edges"]
             ),
@@ -725,6 +855,7 @@ def main() -> None:
             "terrain_modified": False,
             "encoder": encoder.VERSION,
             "homing_encoder": homing_encoder.VERSION,
+            "homing_encoders": [encoder.VERSION for encoder in homing_encoders],
             "homing_edge_count": args.homing_edge_count,
             "inferred_camera_period": period,
             "temporal_samples": args.temporal_samples,
@@ -732,8 +863,15 @@ def main() -> None:
             "place_ids": place_ids_by_role,
             "homing_program": homing_program.model_dump(mode="json"),
             "homing_action_roles": list(homing_program.to_roles()),
+            "homing_programs": [
+                program.model_dump(mode="json") for program in homing_programs
+            ],
+            "homing_action_roles_by_edge": [
+                list(program.to_roles()) for program in homing_programs
+            ],
             "source_reference_roles": reference_roles,
             "homing_calibration": homing_calibration,
+            "homing_calibrations": homing_calibrations,
             "outward_plan": outward_plan.model_dump(mode="json"),
             "discovery": discovery_result,
             "validation": validation_result,
@@ -768,6 +906,11 @@ def main() -> None:
             "homing_motion_slot": homing_program.motion_slot,
             "homing_move_frames": homing_program.move_frames,
             "homing_settle_ticks": homing_program.settle_ticks,
+            "homing_edge_specs": [
+                program.model_dump(mode="json") for program in homing_programs
+            ],
+            "homing_encoder": args.homing_encoder,
+            "homing_edge_encoders": list(homing_encoder_keys),
             "temporal_samples": args.temporal_samples,
         }
         (args.output / "config.json").write_text(

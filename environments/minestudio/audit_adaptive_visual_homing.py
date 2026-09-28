@@ -19,12 +19,20 @@ from PIL import Image
 
 from minecraft_scientist.exploration import (
     ExplorationMemory,
+    RGBEdgeCompactSpectrumPanoramaEncoder,
     RGBEdgeSpectrumPanoramaEncoder,
     VisualFrontierProgram,
     VisualHomingProgram,
     align_panorama_heading,
     temporal_median_rgb,
 )
+
+HOMING_ENCODERS = {
+    RGBEdgeSpectrumPanoramaEncoder.VERSION: RGBEdgeSpectrumPanoramaEncoder,
+    RGBEdgeCompactSpectrumPanoramaEncoder.VERSION: (
+        RGBEdgeCompactSpectrumPanoramaEncoder
+    ),
+}
 
 
 def _load(path: Path) -> Any:
@@ -63,6 +71,18 @@ def _close_metrics(left: dict[str, Any], right: dict[str, Any]) -> bool:
         and right.get(key) is not None
         and math.isclose(float(left[key]), float(right[key]), abs_tol=1e-12)
         for key in ("maximum_excursion", "return_error")
+    )
+
+
+def _position_distance_3d(
+    positions: list[dict[str, float]], left_index: int, right_index: int
+) -> float:
+    left = positions[left_index]
+    right = positions[right_index]
+    return math.sqrt(
+        (float(left["xpos"]) - float(right["xpos"])) ** 2
+        + (float(left["ypos"]) - float(right["ypos"])) ** 2
+        + (float(left["zpos"]) - float(right["zpos"])) ** 2
     )
 
 
@@ -131,6 +151,8 @@ def _source_paths(root: Path) -> dict[str, Path]:
         "navigation_probe.py": Path(__file__).with_name("navigation_probe.py"),
         "frontier_program.py": repository
         / "src/minecraft_scientist/exploration/frontier_program.py",
+        "exploration_init.py": repository
+        / "src/minecraft_scientist/exploration/__init__.py",
         "memory.py": repository / "src/minecraft_scientist/exploration/memory.py",
         "perception.py": repository
         / "src/minecraft_scientist/exploration/perception.py",
@@ -160,9 +182,19 @@ def audit(root: Path) -> dict[str, Any]:
 
     encoder_key = "edge" if str(report["encoder"]).startswith("rgb-edge") else "lab"
     encoder = PANORAMA_ENCODERS[encoder_key]()
-    if report["homing_encoder"] != RGBEdgeSpectrumPanoramaEncoder.VERSION:
+    homing_edge_count = int(report["homing_edge_count"])
+    homing_encoder_versions = tuple(
+        report.get(
+            "homing_encoders", [report["homing_encoder"]] * homing_edge_count
+        )
+    )
+    if len(homing_encoder_versions) != homing_edge_count or any(
+        version not in HOMING_ENCODERS for version in homing_encoder_versions
+    ):
         raise ValueError("unsupported homing encoder in audit artifact")
-    homing_encoder = RGBEdgeSpectrumPanoramaEncoder()
+    homing_encoders = tuple(
+        HOMING_ENCODERS[version]() for version in homing_encoder_versions
+    )
     period = int(report["inferred_camera_period"])
     panoramas = {}
     views = {}
@@ -181,8 +213,18 @@ def audit(root: Path) -> dict[str, Any]:
         for place_id, role in report["source_reference_roles"].items()
     }
     homing_calibration_valid = True
-    if report["homing_encoder"] == RGBEdgeSpectrumPanoramaEncoder.VERSION:
-        for item in report["homing_calibration"].values():
+    homing_calibrations = report.get(
+        "homing_calibrations",
+        {report["homing_encoder"]: report["homing_calibration"]},
+    )
+    unique_homing_encoders = {
+        encoder.VERSION: encoder for encoder in homing_encoders
+    }
+    homing_calibration_valid = homing_calibration_valid and (
+        set(homing_calibrations) == set(unique_homing_encoders)
+    )
+    for version, homing_encoder in unique_homing_encoders.items():
+        for item in homing_calibrations[version].values():
             positives = [
                 homing_encoder.encode_signatures(
                     _load_reference_views(
@@ -218,11 +260,28 @@ def audit(root: Path) -> dict[str, Any]:
             )
 
     program = VisualHomingProgram.model_validate(report["homing_program"])
+    programs = tuple(
+        VisualHomingProgram.model_validate(item)
+        for item in report.get(
+            "homing_programs", [report["homing_program"]] * homing_edge_count
+        )
+    )
+    roles_by_edge = report.get(
+        "homing_action_roles_by_edge",
+        [report["homing_action_roles"]] * homing_edge_count,
+    )
     roles_valid = list(program.to_roles()) == report["homing_action_roles"]
-    roles_valid = roles_valid and program.turn_steps < period
+    roles_valid = roles_valid and len(programs) == homing_edge_count
+    roles_valid = roles_valid and len(roles_by_edge) == homing_edge_count
+    roles_valid = roles_valid and all(
+        list(edge_program.to_roles()) == edge_roles
+        and edge_program.turn_steps < period
+        for edge_program, edge_roles in zip(programs, roles_by_edge, strict=True)
+    )
     roles_valid = roles_valid and not any(
         token in role
-        for role in program.to_roles()
+        for edge_program in programs
+        for role in edge_program.to_roles()
         for token in ("forward", "jump", "back", "left", "right", "obj_")
     )
     memory_path = root / "exploration.sqlite3"
@@ -252,11 +311,16 @@ def audit(root: Path) -> dict[str, Any]:
                 alignments_valid = alignments_valid and (
                     alignment.model_dump(mode="json") == execution["alignment"]
                 )
-            for edge in phase_result["homing_edges"]:
+            for edge_index, edge in enumerate(phase_result["homing_edges"]):
+                homing_encoder = homing_encoders[edge_index]
                 edge_program = VisualHomingProgram.from_roles(
                     tuple(edge["action_roles"])
                 )
-                roles_valid = roles_valid and edge_program == program
+                roles_valid = roles_valid and edge_program == programs[edge_index]
+                roles_valid = roles_valid and (
+                    edge.get("homing_encoder", report["homing_encoder"])
+                    == homing_encoder.VERSION
+                )
                 alignment = align_panorama_heading(
                     reference_views[edge["source_place_id"]],
                     views[edge["source_scan_role"]],
@@ -284,11 +348,11 @@ def audit(root: Path) -> dict[str, Any]:
                         match == step["recognized_place_id"]
                         and score.model_dump(mode="json") == step["target_score"]
                         and step["acceptance_eligible"]
-                        == (index >= program.min_repetitions)
+                        == (index >= edge_program.min_repetitions)
                     )
                     if (
                         match == edge["target_place_id"]
-                        and index >= program.min_repetitions
+                        and index >= edge_program.min_repetitions
                         and first_acceptance is None
                     ):
                         first_acceptance = index
@@ -296,12 +360,11 @@ def audit(root: Path) -> dict[str, Any]:
                     edge["used_repetitions"] == len(edge["steps"])
                     and edge["success"] is True
                     and first_acceptance == len(edge["steps"])
-                    and len(edge["steps"]) <= program.max_repetitions
+                    and len(edge["steps"]) <= edge_program.max_repetitions
                 )
         memory_integrity = memory.verify_integrity()
         memory_summary_valid = memory.summary() == report["memory"]
         place_ids = tuple(report["place_ids"][key] for key in "abcd")
-        homing_edge_count = int(report["homing_edge_count"])
         expected_home = tuple(reversed(place_ids))[: homing_edge_count + 1]
         return_plan = memory.plan_route(expected_home[0], expected_home[-1])
         return_plan_valid = return_plan is not None and (
@@ -318,13 +381,32 @@ def audit(root: Path) -> dict[str, Any]:
     evaluator_metrics_valid = True
     for phase in ("discovery", "validation"):
         session_index = int(evaluator[f"{phase}_session_index"])
-        recomputed = _metrics(evaluator["sessions"][session_index]["positions"])
+        positions = evaluator["sessions"][session_index]["positions"]
+        recomputed = _metrics(positions)
         evaluator_metrics_valid = evaluator_metrics_valid and _close_metrics(
             recomputed, evaluator[f"{phase}_metrics"]
         )
         evaluator_metrics_valid = evaluator_metrics_valid and _close_metrics(
             recomputed, report[phase]["evaluator_metrics"]
         )
+        place_indices = dict(
+            zip(
+                (report["place_ids"][key] for key in "abcd"),
+                report[phase]["outward_position_indices"],
+                strict=True,
+            )
+        )
+        for edge in report[phase]["homing_edges"]:
+            target_distance = _position_distance_3d(
+                positions,
+                int(edge["evaluator_position_index"]),
+                int(place_indices[edge["target_place_id"]]),
+            )
+            evaluator_metrics_valid = evaluator_metrics_valid and math.isclose(
+                target_distance,
+                float(edge["evaluator_metrics"]["target_distance_3d"]),
+                abs_tol=1e-12,
+            )
     evaluator_separate = all(
         any(key in item["raw_metadata_keys"] for key in ("xpos", "location_stats"))
         for item in evaluator["sessions"]
@@ -339,9 +421,12 @@ def audit(root: Path) -> dict[str, Any]:
         and _digest(root / "source" / name) == expected
         for name, expected in report["source_sha256"].items()
     )
+    current_paths = _source_paths(root)
     current_sources_valid = all(
-        path.is_file() and _digest(path) == report["source_sha256"][name]
-        for name, path in _source_paths(root).items()
+        name in current_paths
+        and current_paths[name].is_file()
+        and _digest(current_paths[name]) == expected
+        for name, expected in report["source_sha256"].items()
     )
     expected_outward = [report["place_ids"][key] for key in "abcd"]
     expected_home = list(reversed(expected_outward))[

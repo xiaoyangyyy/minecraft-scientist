@@ -177,10 +177,12 @@ episode discovers D after noon/clear training and night/rain calibration, and a
 later process restart independently replays all three edges. It infers no reverse
 transition from action symmetry.
 
-The subsequent adaptive-homing gate adds a second, independently calibrated visual
-modality rather than widening the exact place matcher. `RGBEdgeSpectrumPanoramaEncoder`
-uses the low-frequency log magnitude of each edge grid, making sub-block screen
+The subsequent adaptive-homing gate adds independently calibrated visual modalities
+rather than widening the exact place matcher. `RGBEdgeSpectrumPanoramaEncoder` uses
+the low-frequency log magnitude of each edge grid, making sub-block screen
 translation less destructive while preserving more geometry than a histogram.
+`RGBEdgeCompactSpectrumPanoramaEncoder` is a separately versioned radius-3 modality;
+its persisted boundaries cannot be confused with the wider radius-4 descriptor.
 `ModalityPlaceScore` exposes distance, local acceptance radius and clearance without
 mutating memory. `VisualHomingProgram` serializes relative turn/motion slots,
 minimum and maximum repetitions, motion frames and settling ticks. Execution remains
@@ -188,10 +190,14 @@ closed-loop: every intervention is followed by a fresh panorama, early target-li
 views before the minimum are recorded but cannot stop the program, and a budget
 exhaustion cannot create an edge.
 
-On the accepted v19 artifact, both fresh midnight/thunder sessions traverse
-A→B→C→D and independently validate the bounded D→C prefix. Only then does SQLite
-gain the fourth directed transition and a D→C return plan. C→B and B→A are still
-absent; this is not a claim of full homing or SLAM.
+The executor accepts one preregistered program and one versioned arrival modality per
+directed edge. On the accepted v23 artifact, both fresh midnight/thunder sessions
+traverse A→B→C→D and independently validate D→C→B. Evaluator-only checkpoints add a
+stronger gate: the final pose must be within 1.75 three-dimensional blocks of the
+target's outward pose, and the audit recomputes that distance from isolated raw
+coordinates. The measured errors are 0.399 blocks at C and 0.386 at B in both
+sessions. Only then does SQLite gain two reverse transitions and a D→C→B return
+plan. B→A remains absent; this is not a claim of full homing or SLAM.
 
 `LocalCausalEngine` accepts `(context, intervention, outcome)` samples. It rejects
 controller failures and samples carrying possible confounders before computing a

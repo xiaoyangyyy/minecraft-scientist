@@ -525,22 +525,32 @@ count, frame budget and post-motion settling budget. It scans after every action
 stops at the first target-spectrum match after the minimum intervention count, and
 fails closed if the maximum is exhausted.
 
-Reproduce the accepted D→C discovery plus fresh-session shadow validation with:
+The next gate keeps arrival recognition versioned per directed edge instead of
+forcing every terrain segment through one visual bandwidth. The wider spectrum is
+retained for D→C, while a separately versioned radius-3 compact spectrum tolerates
+the viewpoint change at B. The compact representation was selected on a failed
+development trajectory, but its place radii still use only copied v6
+training/calibration PNGs and frozen negative places; none of the development
+frames become memory exemplars.
+
+Reproduce the accepted D→C→B discovery plus fresh-session shadow validation with:
 
 ```powershell
-wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/adaptive_visual_homing_benchmark.py --source-run /mnt/d/minecraft-scientist/runs/natural-visual-expedition-seed201-v6 --homing-edge-count 1 --min-homing-steps 6 --max-homing-steps 8 --homing-turn-steps 6 --homing-motion-slot 1 --homing-move-frames 4 --homing-settle-ticks 10 --temporal-samples 3 --output /mnt/d/minecraft-scientist/runs/adaptive-visual-homing-seed201-v19-spectrum
-wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/audit_adaptive_visual_homing.py /mnt/d/minecraft-scientist/runs/adaptive-visual-homing-seed201-v19-spectrum --write
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/adaptive_visual_homing_benchmark.py --source-run /mnt/d/minecraft-scientist/runs/natural-visual-expedition-seed201-v6 --homing-edge-count 2 --homing-edge-spec 6,1,6,8,4,10 --homing-edge-spec 6,1,1,8,1,10 --homing-edge-encoder spectrum-r4 --homing-edge-encoder spectrum-r3 --temporal-samples 3 --output /mnt/d/minecraft-scientist/runs/adaptive-visual-homing-seed201-v23-edge2-multimodal
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/audit_adaptive_visual_homing.py /mnt/d/minecraft-scientist/runs/adaptive-visual-homing-seed201-v23-edge2-multimodal --write
 ```
 
-Both new sessions independently recognize A→B→C→D under midnight/thunder and then
-recognize D→C on the sixth bounded reverse intervention. Evaluator-only telemetry
-measures 4.893 blocks on each accepted reverse traversal. Only after validation is
-D→C added as the fourth directed transition; the persistent return plan is D→C.
-The run stores 1,068 PNGs, 42 hash-chain memory events, frozen source/evidence
-manifests and an independent audit with every check true.
+Both new sessions independently recognize A→B→C→D under midnight/thunder, stop
+D→C on intervention 6 and C→B on intervention 5. Evaluator-only telemetry now
+recomputes three-dimensional arrival error against the target's outward checkpoint:
+0.399 blocks for C and 0.386 blocks for B in both sessions. Only after independent
+validation are both reverse edges persisted, producing five directed transitions,
+57 hash-chain events and the executable D→C→B return plan. The run stores 1,548
+PNGs, frozen source/evidence manifests and an independent audit with all 19 checks
+true.
 
-This is a verified one-edge reverse prefix, not complete homing. C→B and B→A remain
-absent, and cross-biome generalization, resource-driven exploration, survival,
+This is a verified two-edge reverse prefix, not complete homing. B→A remains absent,
+and cross-seed/biome generalization, resource-driven exploration, survival,
 long-horizon recovery and metric SLAM remain open.
 
 A concrete label-free `GridVisualController` maps opaque screen regions and hotbar

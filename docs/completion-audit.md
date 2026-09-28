@@ -482,18 +482,21 @@ hashes, temporal medians, cyclic alignment, frontier selection, route compositio
 telemetry separation and frozen source hashes. Evidence is in
 `runs/natural-visual-expedition-seed201-v6/{report.json,integrity-audit.json,events.jsonl,evaluator-audit.json,exploration.sqlite3,scans}`.
 
-This is bounded multi-frontier exploration plus one independently validated reverse
+This is bounded multi-frontier exploration plus an independently validated reverse
 prefix, not a completion claim for the broader visual/open-world goal. The accepted
-`adaptive-visual-homing-seed201-v19-spectrum` artifact keeps exact localization and
-translation-tolerant target acceptance in separate calibrated modalities. Two fresh
-midnight/thunder sessions each recognize A→B→C→D and then D→C; evaluator-only
-telemetry measures 4.893 blocks on both reverse traversals. D→C is promoted only
-after shadow validation, producing four directed transitions and 42 replay-valid
-memory events. The independent audit recomputes all 1,068 PNG-derived signatures,
-boundaries, alignments, first eligible stops, route projection, telemetry separation
-and frozen hashes as `valid: true`.
+`adaptive-visual-homing-seed201-v23-edge2-multimodal` artifact keeps exact
+localization and two versioned translation-tolerant arrival modalities separate.
+Two fresh midnight/thunder sessions each recognize A→B→C→D and then D→C→B. Both
+stop after 6 and 5 reverse interventions respectively. Evaluator-only telemetry
+recomputes arrival error against the outward target checkpoints: 0.399 blocks at C
+and 0.386 at B in both sessions. Promotion after shadow validation produces five
+directed transitions, a D→C→B return plan and 57 replay-valid memory events. The
+independent audit recomputes all 1,548 PNG-derived signatures, both calibration
+families, alignments, first eligible stops, physical arrival errors, route
+projection, telemetry separation and frozen hashes; all 19 checks are true.
 
-C→B and B→A remain unresolved and absent. Cross-biome generalization, full homing,
+B→A remains unresolved and absent. Cross-seed/biome generalization, full homing,
 resource-driven exploration, survival and long-horizon recovery remain open.
-The expanded release gate passes 191 tests plus one expected visual-extra skip on
-Windows and 185 tests plus five expected platform/optional-extra skips in Linux.
+The expanded release gate passes 188 tests with three expected optional/platform
+skips on Windows and 191 tests with two expected skips in the MineStudio Linux
+environment.

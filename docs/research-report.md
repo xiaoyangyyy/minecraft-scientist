@@ -224,7 +224,19 @@ v6 结果本身仍是有界的单向多地点探索，没有因动作对称性�
 SQLite 投影及坐标隔离，所有检查为真：
 `runs/adaptive-visual-homing-seed201-v19-spectrum/{report.json,integrity-audit.json,exploration.sqlite3}`。
 
-这只是经过验证的一条反向前缀，不是完整 homing 或 SLAM。C→B、B→A 仍未写入；跨
+v23 进一步把动作程序和到达视觉模态都改为逐边版本化。D→C 继续使用半径 4 的频谱与
+4 帧动作，C→B 使用独立版本的半径 3 紧凑频谱与单帧动作。紧凑频谱由一次失败的开发
+轨迹选型，但正式地点半径仍只使用 v6 冻结训练/校准 PNG 与其他地点负例，开发图像不
+进入记忆原型。
+
+两个新的午夜雷暴会话都在第 6 步到达 C、在第 5 步到达 B。新增的评估器门禁不再只
+检查“移动过”：它从隔离坐标中复算终点到外向目标检查点的三维距离，两个会话均为
+C 点 0.399 格、B 点 0.386 格。shadow validation 后 SQLite 才加入 D→C 与 C→B，形成
+5 条有向边、57 条哈希链事件和 D→C→B 可执行返程。1,548 张 PNG、两套视觉校准、
+逐边首次命中停止、物理到达误差和源码/证据哈希均由独立审计重算，19 项全部为真：
+`runs/adaptive-visual-homing-seed201-v23-edge2-multimodal/{report.json,integrity-audit.json,exploration.sqlite3}`。
+
+这只是经过验证的两条反向前缀，不是完整 homing 或 SLAM。B→A 仍未写入；跨 seed、
 biome、资源驱动探索、长期故障恢复和生存仍是下一阶段问题。
 
 ## 可复现入口

@@ -592,6 +592,31 @@ class RGBEdgeSpectrumPanoramaEncoder(RGBPanoramaEncoder):
         super().__init__(scene_encoder or RGBEdgeSpectrumSceneEncoder())
 
 
+class RGBEdgeCompactSpectrumSceneEncoder(RGBEdgeSpectrumSceneEncoder):
+    """Lower-band edge spectrum for sub-block natural-terrain viewpoint shifts.
+
+    The fixed radius is intentionally versioned separately from the wider spectrum:
+    changing descriptor bandwidth changes the modality's calibrated geometry and
+    must never silently reuse persisted place boundaries.
+    """
+
+    VERSION = "rgb-edge-spectrum-r3-view-v1"
+
+    def __init__(self) -> None:
+        super().__init__(low_frequency_radius=3)
+
+
+class RGBEdgeCompactSpectrumPanoramaEncoder(RGBPanoramaEncoder):
+    """Yaw-invariant panorama over the fixed compact edge spectrum."""
+
+    VERSION = "rgb-edge-spectrum-r3-panorama-v1"
+
+    def __init__(
+        self, scene_encoder: RGBEdgeCompactSpectrumSceneEncoder | None = None
+    ) -> None:
+        super().__init__(scene_encoder or RGBEdgeCompactSpectrumSceneEncoder())
+
+
 def infer_visual_rotation_period(
     anchor: tuple[int, ...],
     scan: Iterable[Iterable[int]],

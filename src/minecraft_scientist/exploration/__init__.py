@@ -17,6 +17,8 @@ from .memory import (
 from .perception import (
     AnonymousSceneEncoder,
     PanoramaAlignment,
+    RGBEdgeCompactSpectrumPanoramaEncoder,
+    RGBEdgeCompactSpectrumSceneEncoder,
     RGBEdgeHistogramPanoramaEncoder,
     RGBEdgeHistogramSceneEncoder,
     RGBEdgePanoramaEncoder,
@@ -45,6 +47,8 @@ __all__ = [
     "PlaceCalibration",
     "PlaceMemory",
     "PlaceTransition",
+    "RGBEdgeCompactSpectrumPanoramaEncoder",
+    "RGBEdgeCompactSpectrumSceneEncoder",
     "RGBEdgeHistogramPanoramaEncoder",
     "RGBEdgeHistogramSceneEncoder",
     "RGBEdgePanoramaEncoder",

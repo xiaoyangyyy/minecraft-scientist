@@ -9,6 +9,8 @@ import pytest
 from minecraft_scientist.exploration import (
     AnonymousSceneEncoder,
     ExplorationMemory,
+    RGBEdgeCompactSpectrumPanoramaEncoder,
+    RGBEdgeCompactSpectrumSceneEncoder,
     RGBEdgeHistogramPanoramaEncoder,
     RGBEdgeHistogramSceneEncoder,
     RGBEdgePanoramaEncoder,
@@ -295,6 +297,21 @@ def test_edge_spectrum_panorama_tolerates_spatial_translation() -> None:
     assert len(reference) == panorama_encoder.dimensions == 150
     assert math.dist(reference, shifted) < 25
     assert scene_encoder.dimensions == 75
+
+
+def test_compact_edge_spectrum_has_distinct_persisted_modality() -> None:
+    scene_encoder = RGBEdgeCompactSpectrumSceneEncoder()
+    panorama_encoder = RGBEdgeCompactSpectrumPanoramaEncoder(scene_encoder)
+    views = tuple(
+        np.roll(_rgb_fixture(), shift, axis=1) for shift in (-30, -10, 10, 30)
+    )
+
+    signature = panorama_encoder.encode(views)
+
+    assert scene_encoder.low_frequency_radius == 3
+    assert scene_encoder.VERSION == "rgb-edge-spectrum-r3-view-v1"
+    assert panorama_encoder.VERSION == "rgb-edge-spectrum-r3-panorama-v1"
+    assert len(signature) == panorama_encoder.dimensions == 294
 
 
 def test_temporal_median_rgb_removes_transient_weather_streaks() -> None:
