@@ -11,6 +11,10 @@ from minecraft_scientist.exploration import (
     ExplorationMemory,
     RGBEdgeCompactSpectrumPanoramaEncoder,
     RGBEdgeCompactSpectrumSceneEncoder,
+    RGBEdgeDualBandSpectrumPanoramaEncoder,
+    RGBEdgeDualBandSpectrumSceneEncoder,
+    RGBEdgeExpandedSpectrumPanoramaEncoder,
+    RGBEdgeExpandedSpectrumSceneEncoder,
     RGBEdgeHistogramPanoramaEncoder,
     RGBEdgeHistogramSceneEncoder,
     RGBEdgePanoramaEncoder,
@@ -19,6 +23,7 @@ from minecraft_scientist.exploration import (
     RGBEdgeSpectrumSceneEncoder,
     RGBPanoramaEncoder,
     RGBSceneEncoder,
+    VisualEvidenceHomingProgram,
     VisualHomingProgram,
     align_panorama_heading,
     infer_visual_rotation_period,
@@ -78,6 +83,36 @@ def test_visual_homing_program_round_trips_without_semantic_controls() -> None:
     with pytest.raises(ValueError, match="malformed visual homing"):
         VisualHomingProgram.from_roles(
             (*roles[:4], "max-repetitions:-1", *roles[5:])
+        )
+
+
+def test_visual_evidence_homing_integrates_only_its_bounded_window() -> None:
+    program = VisualEvidenceHomingProgram(
+        turn_steps=6,
+        motion_slot=1,
+        min_repetitions=6,
+        max_repetitions=6,
+        move_frames=4,
+        settle_ticks=10,
+        evidence_window=2,
+        required_matches=1,
+    )
+
+    assert not program.should_stop((False, False, False, True, False))
+    assert program.should_stop((False, False, False, False, True, False))
+    assert program.evidence_match_count((True, False, False)) == 0
+    assert VisualEvidenceHomingProgram.from_roles(program.to_roles()) == program
+    assert program.to_roles()[0] == "visual-homing-v4"
+    with pytest.raises(ValueError, match="exceeds its window"):
+        VisualEvidenceHomingProgram(
+            turn_steps=0,
+            motion_slot=0,
+            min_repetitions=1,
+            max_repetitions=1,
+            move_frames=1,
+            settle_ticks=0,
+            evidence_window=1,
+            required_matches=2,
         )
 
 
@@ -312,6 +347,39 @@ def test_compact_edge_spectrum_has_distinct_persisted_modality() -> None:
     assert scene_encoder.VERSION == "rgb-edge-spectrum-r3-view-v1"
     assert panorama_encoder.VERSION == "rgb-edge-spectrum-r3-panorama-v1"
     assert len(signature) == panorama_encoder.dimensions == 294
+
+
+def test_expanded_edge_spectrum_has_distinct_persisted_modality() -> None:
+    scene_encoder = RGBEdgeExpandedSpectrumSceneEncoder()
+    panorama_encoder = RGBEdgeExpandedSpectrumPanoramaEncoder(scene_encoder)
+    views = tuple(
+        np.roll(_rgb_fixture(), shift, axis=1) for shift in (-30, -10, 10, 30)
+    )
+
+    signature = panorama_encoder.encode(views)
+
+    assert scene_encoder.low_frequency_radius == 5
+    assert scene_encoder.VERSION == "rgb-edge-spectrum-r5-view-v1"
+    assert panorama_encoder.VERSION == "rgb-edge-spectrum-r5-panorama-v1"
+    assert len(signature) == panorama_encoder.dimensions == 726
+
+
+def test_dual_band_edge_spectrum_has_distinct_persisted_modality() -> None:
+    scene_encoder = RGBEdgeDualBandSpectrumSceneEncoder()
+    panorama_encoder = RGBEdgeDualBandSpectrumPanoramaEncoder(scene_encoder)
+    views = tuple(
+        np.roll(_rgb_fixture(), shift, axis=1) for shift in (-30, -10, 10, 30)
+    )
+
+    signature = panorama_encoder.encode(views)
+
+    assert tuple(item.low_frequency_radius for item in scene_encoder.encoders) == (
+        1,
+        6,
+    )
+    assert scene_encoder.VERSION == "rgb-edge-spectrum-r1-r6-view-v1"
+    assert panorama_encoder.VERSION == "rgb-edge-spectrum-r1-r6-panorama-v1"
+    assert len(signature) == panorama_encoder.dimensions == 1068
 
 
 def test_temporal_median_rgb_removes_transient_weather_streaks() -> None:

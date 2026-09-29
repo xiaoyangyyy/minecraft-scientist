@@ -20,7 +20,10 @@ from PIL import Image
 from minecraft_scientist.exploration import (
     ExplorationMemory,
     RGBEdgeCompactSpectrumPanoramaEncoder,
+    RGBEdgeDualBandSpectrumPanoramaEncoder,
+    RGBEdgeExpandedSpectrumPanoramaEncoder,
     RGBEdgeSpectrumPanoramaEncoder,
+    VisualEvidenceHomingProgram,
     VisualFrontierProgram,
     VisualHomingProgram,
     align_panorama_heading,
@@ -32,7 +35,27 @@ HOMING_ENCODERS = {
     RGBEdgeCompactSpectrumPanoramaEncoder.VERSION: (
         RGBEdgeCompactSpectrumPanoramaEncoder
     ),
+    RGBEdgeDualBandSpectrumPanoramaEncoder.VERSION: (
+        RGBEdgeDualBandSpectrumPanoramaEncoder
+    ),
+    RGBEdgeExpandedSpectrumPanoramaEncoder.VERSION: (
+        RGBEdgeExpandedSpectrumPanoramaEncoder
+    ),
 }
+ARRIVAL_TOLERANCE_3D = 0.75
+HomingProgram = VisualHomingProgram | VisualEvidenceHomingProgram
+
+
+def _homing_program_from_payload(payload: dict[str, Any]) -> HomingProgram:
+    if "evidence_window" in payload or "required_matches" in payload:
+        return VisualEvidenceHomingProgram.model_validate(payload)
+    return VisualHomingProgram.model_validate(payload)
+
+
+def _homing_program_from_roles(roles: tuple[str, ...]) -> HomingProgram:
+    if roles and roles[0] == VisualEvidenceHomingProgram.VERSION:
+        return VisualEvidenceHomingProgram.from_roles(roles)
+    return VisualHomingProgram.from_roles(roles)
 
 
 def _load(path: Path) -> Any:
@@ -259,9 +282,9 @@ def audit(root: Path) -> dict[str, Any]:
                 )
             )
 
-    program = VisualHomingProgram.model_validate(report["homing_program"])
+    program = _homing_program_from_payload(report["homing_program"])
     programs = tuple(
-        VisualHomingProgram.model_validate(item)
+        _homing_program_from_payload(item)
         for item in report.get(
             "homing_programs", [report["homing_program"]] * homing_edge_count
         )
@@ -313,9 +336,7 @@ def audit(root: Path) -> dict[str, Any]:
                 )
             for edge_index, edge in enumerate(phase_result["homing_edges"]):
                 homing_encoder = homing_encoders[edge_index]
-                edge_program = VisualHomingProgram.from_roles(
-                    tuple(edge["action_roles"])
-                )
+                edge_program = _homing_program_from_roles(tuple(edge["action_roles"]))
                 roles_valid = roles_valid and edge_program == programs[edge_index]
                 roles_valid = roles_valid and (
                     edge.get("homing_encoder", report["homing_encoder"])
@@ -329,6 +350,7 @@ def audit(root: Path) -> dict[str, Any]:
                     alignment.model_dump(mode="json") == edge["alignment"]
                 )
                 first_acceptance = None
+                target_evidence: list[bool] = []
                 for index, step in enumerate(edge["steps"], start=1):
                     signature = homing_encoder.encode_signatures(
                         _load_reference_views(
@@ -344,17 +366,22 @@ def audit(root: Path) -> dict[str, Any]:
                     score = memory.score_modality_place(
                         homing_encoder.VERSION, edge["target_place_id"], signature
                     )
+                    target_evidence.append(match == edge["target_place_id"])
+                    evidence_match_count = edge_program.evidence_match_count(
+                        target_evidence
+                    )
                     recognition_valid = recognition_valid and (
                         match == step["recognized_place_id"]
                         and score.model_dump(mode="json") == step["target_score"]
                         and step["acceptance_eligible"]
                         == (index >= edge_program.min_repetitions)
+                        and step.get(
+                            "evidence_match_count",
+                            int(match == edge["target_place_id"]),
+                        )
+                        == evidence_match_count
                     )
-                    if (
-                        match == edge["target_place_id"]
-                        and index >= edge_program.min_repetitions
-                        and first_acceptance is None
-                    ):
+                    if edge_program.should_stop(target_evidence) and first_acceptance is None:
                         first_acceptance = index
                 stopping_valid = stopping_valid and (
                     edge["used_repetitions"] == len(edge["steps"])
@@ -364,7 +391,8 @@ def audit(root: Path) -> dict[str, Any]:
                 )
         memory_integrity = memory.verify_integrity()
         memory_summary_valid = memory.summary() == report["memory"]
-        place_ids = tuple(report["place_ids"][key] for key in "abcd")
+        all_place_ids = tuple(report["place_ids"][key] for key in "abcd")
+        place_ids = tuple(report.get("route_place_ids", all_place_ids))
         expected_home = tuple(reversed(place_ids))[: homing_edge_count + 1]
         return_plan = memory.plan_route(expected_home[0], expected_home[-1])
         return_plan_valid = return_plan is not None and (
@@ -374,11 +402,21 @@ def audit(root: Path) -> dict[str, Any]:
         reverse_transitions = {
             (item.source_place_id, item.target_place_id)
             for item in memory.transitions()
-            if item.action_roles and item.action_roles[0] == VisualHomingProgram.VERSION
+            if item.action_roles
+            and item.action_roles[0]
+            in (
+                VisualHomingProgram.VERSION,
+                VisualEvidenceHomingProgram.VERSION,
+            )
         }
         reverse_edges_valid = reverse_transitions == set(pairwise(expected_home))
 
     evaluator_metrics_valid = True
+    physical_arrivals_valid = math.isclose(
+        float(report.get("arrival_tolerance_3d", math.inf)),
+        ARRIVAL_TOLERANCE_3D,
+        abs_tol=1e-12,
+    )
     for phase in ("discovery", "validation"):
         session_index = int(evaluator[f"{phase}_session_index"])
         positions = evaluator["sessions"][session_index]["positions"]
@@ -407,6 +445,9 @@ def audit(root: Path) -> dict[str, Any]:
                 float(edge["evaluator_metrics"]["target_distance_3d"]),
                 abs_tol=1e-12,
             )
+            physical_arrivals_valid = physical_arrivals_valid and (
+                target_distance <= ARRIVAL_TOLERANCE_3D
+            )
     evaluator_separate = all(
         any(key in item["raw_metadata_keys"] for key in ("xpos", "location_stats"))
         for item in evaluator["sessions"]
@@ -428,11 +469,16 @@ def audit(root: Path) -> dict[str, Any]:
         and _digest(current_paths[name]) == expected
         for name, expected in report["source_sha256"].items()
     )
-    expected_outward = [report["place_ids"][key] for key in "abcd"]
+    all_place_ids = [report["place_ids"][key] for key in "abcd"]
+    outward_edge_count = int(report.get("outward_edge_count", 3))
+    expected_outward = all_place_ids[: outward_edge_count + 1]
+    route_place_ids_valid = report.get("route_place_ids", all_place_ids) == (
+        expected_outward
+    )
     expected_home = list(reversed(expected_outward))[
         : int(report["homing_edge_count"]) + 1
     ]
-    report_relations_valid = all(
+    report_relations_valid = route_place_ids_valid and all(
         report[phase]["outward_matches"] == expected_outward
         and report[phase]["homing_matches"] == expected_home
         and len(report[phase]["homing_edges"])
@@ -449,6 +495,7 @@ def audit(root: Path) -> dict[str, Any]:
         "memory_integrity": memory_integrity,
         "memory_summary_valid": memory_summary_valid,
         "opaque_action_roles_valid": roles_valid,
+        "physical_arrivals_within_tolerance": physical_arrivals_valid,
         "public_telemetry_clean": public_clean,
         "report_relations_valid": report_relations_valid,
         "return_plan_recomputed": return_plan_valid,

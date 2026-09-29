@@ -239,6 +239,21 @@ C 点 0.399 格、B 点 0.386 格。shadow validation 后 SQLite 才加入 D→C
 这只是经过验证的两条反向前缀，不是完整 homing 或 SLAM。B→A 仍未写入；跨 seed、
 biome、资源驱动探索、长期故障恢复和生存仍是下一阶段问题。
 
+B→A 的后续诊断证明该边不是可安全反放的动作：多个朝向和连续跳跃都会跌入低 10 格
+的沟谷。新的 `natural_visual_detour` 门禁因此不再强迫直接逆边，而是在 B 的开放方向
+中分别执行 B→候选点→B。方向选择只使用 RGB 新颖度、双频边缘地点排序和三帧时序
+中值；每个候选使用独立 MineStudio 会话，坐标只在选择结束后由评估器验收。
+
+在冻结的 seed 201 午夜雷暴环境中，最开放的 heading 4 下落 10 格并被拒绝；heading 0
+移动 5.227 格到新地点 E，返回 B 的三维误差为 0.134 格且没有垂直跌落。另一全新会话
+重复相同结果后，SQLite 才加入 B→E 和 E→B 两条 resolved 边，`plan_route` 可双向返回
+对应可执行程序。独立审计从全部 PNG 重算时序中值、全景特征、排序识别、动作对齐、
+候选选择和评估器距离，并核对记忆投影、上游证据及冻结源码哈希，20 项全部为真：
+`runs/natural-visual-detour-seed201-v6-audited/{report.json,integrity-audit.json,exploration.sqlite3}`。
+
+这证明 Agent 能在一条真实不可逆边旁自主选出局部安全且可返回的新拓扑节点，但尚未
+连接 E→A，也不等于大尺度开放世界探索、跨 biome 泛化或长期生存。
+
 ## 可复现入口
 
 ```powershell

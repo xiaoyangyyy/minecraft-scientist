@@ -617,6 +617,63 @@ class RGBEdgeCompactSpectrumPanoramaEncoder(RGBPanoramaEncoder):
         super().__init__(scene_encoder or RGBEdgeCompactSpectrumSceneEncoder())
 
 
+class RGBEdgeExpandedSpectrumSceneEncoder(RGBEdgeSpectrumSceneEncoder):
+    """Higher-band edge spectrum for sloped-terrain arrival recognition."""
+
+    VERSION = "rgb-edge-spectrum-r5-view-v1"
+
+    def __init__(self) -> None:
+        super().__init__(low_frequency_radius=5)
+
+
+class RGBEdgeExpandedSpectrumPanoramaEncoder(RGBPanoramaEncoder):
+    """Yaw-invariant panorama over the fixed expanded edge spectrum."""
+
+    VERSION = "rgb-edge-spectrum-r5-panorama-v1"
+
+    def __init__(
+        self, scene_encoder: RGBEdgeExpandedSpectrumSceneEncoder | None = None
+    ) -> None:
+        super().__init__(scene_encoder or RGBEdgeExpandedSpectrumSceneEncoder())
+
+
+class RGBEdgeDualBandSpectrumSceneEncoder:
+    """Concatenate complementary global and structured edge-frequency bands."""
+
+    VERSION = "rgb-edge-spectrum-r1-r6-view-v1"
+
+    def __init__(self) -> None:
+        self.encoders = (
+            RGBEdgeSpectrumSceneEncoder(low_frequency_radius=1),
+            RGBEdgeSpectrumSceneEncoder(low_frequency_radius=6),
+        )
+
+    @property
+    def dimensions(self) -> int:
+        return sum(encoder.dimensions for encoder in self.encoders)
+
+    def encode(self, frame: np.ndarray) -> tuple[int, ...]:
+        signature = tuple(
+            value
+            for encoder in self.encoders
+            for value in encoder.encode(frame)
+        )
+        if len(signature) != self.dimensions:
+            raise AssertionError("RGB dual-band spectrum descriptor width changed")
+        return signature
+
+
+class RGBEdgeDualBandSpectrumPanoramaEncoder(RGBPanoramaEncoder):
+    """Yaw-invariant panorama over fixed radius-1 and radius-6 spectra."""
+
+    VERSION = "rgb-edge-spectrum-r1-r6-panorama-v1"
+
+    def __init__(
+        self, scene_encoder: RGBEdgeDualBandSpectrumSceneEncoder | None = None
+    ) -> None:
+        super().__init__(scene_encoder or RGBEdgeDualBandSpectrumSceneEncoder())
+
+
 def infer_visual_rotation_period(
     anchor: tuple[int, ...],
     scan: Iterable[Iterable[int]],

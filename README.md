@@ -553,6 +553,35 @@ This is a verified two-edge reverse prefix, not complete homing. B→A remains a
 and cross-seed/biome generalization, resource-driven exploration, survival,
 long-horizon recovery and metric SLAM remain open.
 
+The natural visual detour gate addresses the first non-reversible edge instead of
+assuming that every saved action can be played backwards. From B it ranks visually
+open headings, runs each B→candidate→B program in an isolated simulator session,
+and selects only from candidates whose RGB evidence returns to B. A dual-band edge
+spectrum supplies condition-shift retrieval, while three-frame temporal medians
+suppress thunder/rain transients. Coordinates remain evaluator-only and cannot
+influence candidate selection. A selected edge is written to SQLite only after a
+fresh-session shadow validation also returns within 0.75 blocks.
+
+Reproduce the accepted B↔E discovery and independent audit with:
+
+```powershell
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/natural_visual_detour_benchmark.py --source-run /mnt/d/minecraft-scientist/runs/natural-visual-expedition-seed201-v6 --candidate-count 2 --moves 3 --move-frames 4 --temporal-samples 3 --output /mnt/d/minecraft-scientist/runs/natural-visual-detour-seed201-v6-audited
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/audit_natural_visual_detour.py /mnt/d/minecraft-scientist/runs/natural-visual-detour-seed201-v6-audited --write
+```
+
+The most open heading (4) falls 10 blocks and is rejected. Heading 0 traverses
+5.227 blocks to a novel E and returns to B within 0.134 blocks with no vertical
+drop; the independent validation repeats the same physical result. Only then are
+B→E and E→B persisted as resolved transitions and exposed by `plan_route`. The
+independent auditor recomputes every temporal median and panorama from PNGs,
+recognition ranks, action alignment, candidate selection, evaluator distances,
+SQLite projections, source/evidence hashes and telemetry isolation; all 20 checks
+are true.
+
+This establishes a validated local detour, not a completed B→E→A route. Connecting
+E to A, scaling the search beyond two preregistered open headings, and cross-seed or
+cross-biome validation remain open.
+
 A concrete label-free `GridVisualController` maps opaque screen regions and hotbar
 slots to MineStudio env actions. Tests verify action translation and semantic
 isolation; the accepted live experiment additionally audits successful opaque

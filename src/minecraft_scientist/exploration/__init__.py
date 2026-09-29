@@ -1,6 +1,10 @@
 """Persistent memory and planning primitives for open-ended exploration."""
 
-from .frontier_program import VisualFrontierProgram, VisualHomingProgram
+from .frontier_program import (
+    VisualEvidenceHomingProgram,
+    VisualFrontierProgram,
+    VisualHomingProgram,
+)
 from .memory import (
     ExplorationMemory,
     FrontierMemory,
@@ -19,6 +23,10 @@ from .perception import (
     PanoramaAlignment,
     RGBEdgeCompactSpectrumPanoramaEncoder,
     RGBEdgeCompactSpectrumSceneEncoder,
+    RGBEdgeDualBandSpectrumPanoramaEncoder,
+    RGBEdgeDualBandSpectrumSceneEncoder,
+    RGBEdgeExpandedSpectrumPanoramaEncoder,
+    RGBEdgeExpandedSpectrumSceneEncoder,
     RGBEdgeHistogramPanoramaEncoder,
     RGBEdgeHistogramSceneEncoder,
     RGBEdgePanoramaEncoder,
@@ -49,6 +57,10 @@ __all__ = [
     "PlaceTransition",
     "RGBEdgeCompactSpectrumPanoramaEncoder",
     "RGBEdgeCompactSpectrumSceneEncoder",
+    "RGBEdgeDualBandSpectrumPanoramaEncoder",
+    "RGBEdgeDualBandSpectrumSceneEncoder",
+    "RGBEdgeExpandedSpectrumPanoramaEncoder",
+    "RGBEdgeExpandedSpectrumSceneEncoder",
     "RGBEdgeHistogramPanoramaEncoder",
     "RGBEdgeHistogramSceneEncoder",
     "RGBEdgePanoramaEncoder",
@@ -57,6 +69,7 @@ __all__ = [
     "RGBEdgeSpectrumSceneEncoder",
     "RGBPanoramaEncoder",
     "RGBSceneEncoder",
+    "VisualEvidenceHomingProgram",
     "VisualFrontierProgram",
     "VisualHomingProgram",
     "align_panorama_heading",

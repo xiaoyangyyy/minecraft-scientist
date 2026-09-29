@@ -497,6 +497,24 @@ projection, telemetry separation and frozen hashes; all 19 checks are true.
 
 B→A remains unresolved and absent. Cross-seed/biome generalization, full homing,
 resource-driven exploration, survival and long-horizon recovery remain open.
-The expanded release gate passes 188 tests with three expected optional/platform
-skips on Windows and 191 tests with two expected skips in the MineStudio Linux
-environment.
+The current Windows release gate passes 191 tests with three expected
+optional/platform skips. The last recorded MineStudio Linux full-suite run passed
+191 tests with two expected skips; the new real detour artifact is validated
+separately by its 20-check independent audit.
+
+The next accepted artifact stops treating B→A as an action-reversal problem. The
+`natural_visual_detour` gate probes visually open headings from B in isolated fresh
+sessions and selects candidates using RGB evidence only. Three-frame temporal
+medians and a separately versioned dual-band edge spectrum handle the held-out
+midnight/thunder condition. Heading 4 falls 10 blocks and is rejected; heading 0
+travels 5.227 blocks to novel E and returns within 0.134 blocks without vertical
+drop. A separate shadow-validation session repeats the result before B→E and E→B
+are promoted into the persistent graph.
+
+The artifact at `runs/natural-visual-detour-seed201-v6-audited` passes all 15 runtime
+gates. Its independent audit recomputes candidate generation and selection, PNG
+temporal medians and panorama descriptors, ranked recognition, cyclic action
+alignment, 3D return distances, route projections, journal integrity, telemetry
+separation and both source manifests; all 20 audit checks are true. This proves a
+local validated B↔E detour. E→A connectivity, wider frontier search, cross-seed and
+cross-biome generalization, long-horizon recovery and survival remain incomplete.
