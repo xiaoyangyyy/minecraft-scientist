@@ -576,3 +576,23 @@ and telemetry separation. This is a verified negative result, not a second accep
 expansion. Visual appearance similarity still fails as a reliable geometric goal
 progress proxy; better navigation evidence and held-out trajectory validation remain
 necessary for the full objective.
+
+### Dense correspondence development (2026-10-01)
+
+The new optional local LoFTR adapter, two-view motion estimator, sensitivity check
+and bidirectional pixel refinement are documented in
+`docs/dense-correspondence-development.md`. They consume cropped public pixels and
+explicit verified local weights; default offline dependencies and accepted map
+behavior are unchanged. Independent raw-image/model/geometry replay passes 23
+checks per resolution, but only 3/8 movements are correct at 224 pixels and 1/8 at
+448; the latter includes a false WAIT translation. Sensitivity and precision
+repair reject all motion, each with valid independent replay. Abstention is not
+navigation success; none of these candidates is promoted. The next required
+development is short-step temporal correspondence and multi-frame geometry.
+
+Final regression passes 293 tests with two expected skips on Windows and 295 with
+two on WSL; clean default-only installation passes 227 with 11 optional skips.
+Targeted Ruff and package builds pass. The current MVP regression preserves 1.0
+accuracy/task success, 47 experiments, detection delay 1, eight revision experiments,
+three symbols/13 reuses and eight saved transfer interventions. This adds verified
+diagnosis and guarded research infrastructure, not completion of the full goal.

@@ -669,6 +669,14 @@ accepted memory; monocular tracking remains unachieved on that night/thunder rou
 See `docs/visual-geometry-development.md` for positive/negative evidence and
 `docs/quality-roadmap.md` for the full remaining project gates.
 
+Local LoFTR correspondence, geometric sensitivity and bidirectional pixel
+refinement are also evaluated as optional development tools. Independent audits
+find only 3/8 correct movement estimates at 224 pixels and 1/8 at 448; conservative
+checks reject unstable motion rather than promoting it into the planner. This is
+a documented negative result, not working visual navigation. Runtime, checkpoint
+identity, reproduction and evidence are in `docs/dense-correspondence-development.md`.
+No API key or remote inference is used.
+
 ```powershell
 uv run --extra geometry pytest
 ```

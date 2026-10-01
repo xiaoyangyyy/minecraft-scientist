@@ -90,3 +90,12 @@ route failed node-B recognition; reference-scale normalization then passed a new
 five-node replay with 24 independently recomputed checks and zero physical waypoint
 error. The acquisition audit runs offline on Windows without the simulator stack.
 Geometry still abstains on that higher-resolution sequence. Gate 1 remains incomplete.
+
+The correspondence follow-up is in `docs/dense-correspondence-development.md`.
+Local pretrained matching supplies more points, but independent replay/scoring
+finds only 3/8 correct movements at 224 pixels and 1/8 at 448, including a false
+translation in a WAIT control. Sensitivity rejects unstable fits; bidirectional
+pixel refinement leaves insufficient geometry. All movement is then abstained,
+which is not useful navigation. This changes the next action to short-step
+temporal tracking and multi-frame geometry, not relaxed acceptance thresholds.
+Existing accepted memory and the full remaining gates stay intact.
