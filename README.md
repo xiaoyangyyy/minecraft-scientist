@@ -685,6 +685,14 @@ movement passes full reliability validation. These are guarded development
 results, not working open-world navigation. See
 `docs/temporal-motion-development.md` for corrected evidence and reproduction.
 
+A fixed 2×2 noon/midnight × clear/thunder acquisition now supplies 804 consecutive
+RGB frames with identical evaluator trajectories across all four natural sessions.
+Independent replay finds 2/8 and 1/8 correct fully validated post-WAIT motions in
+clear scenes, versus zero in thunder; all moving-endpoint estimates still fail.
+This localizes a weather-related correspondence problem without proving robust
+navigation. See `docs/controlled-motion-development.md` for the full trial/control
+counts, replay evidence and remaining clear-scene coverage problem.
+
 ```powershell
 uv run --extra geometry pytest
 ```

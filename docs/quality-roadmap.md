@@ -109,3 +109,14 @@ intermediate PnP and sensitivity checks are implemented. Four independently repl
 full/short-window experiments pass 26 provenance/computation checks each, but none
 supports reliable movement. The next action is controlled WAIT/short-move/settled
 RGB acquisition, not relaxed geometry gates. The full project remains incomplete.
+
+The controlled follow-up in `docs/controlled-motion-development.md` implements a
+fixed MOVE/WAIT diagnostic and four natural time/weather acquisitions. All 804
+RGB frames align with public actions; four independent component replays pass
+30 checks each, and the factorial audit proves identical reported physical paths.
+Clear scenes yield 2/8 and 1/8 correct validated post-WAIT motions, thunder scenes
+zero; stable point counts collapse under thunder in both lighting conditions.
+This is new bounded motion evidence and a weather-related diagnosis, not useful
+navigation coverage. Next implement stationary-context dynamic-feature rejection
+and investigate robust refinement before minimal-pose rejection, then validate on
+fresh disjoint trajectories. Do not drop failed controls or reduce the full scope.

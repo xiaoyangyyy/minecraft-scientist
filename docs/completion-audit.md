@@ -621,3 +621,30 @@ package builds pass. `runs/temporal-regression-mvp-seed0/benchmark.json` is
 byte-identical to the preceding MVP report, preserving all core metrics and the
 3-versus-11 intervention transfer result. Accepted map and core behavior remain
 unchanged. Full project completion remains unproven.
+
+### Controlled motion and light/weather factorial (2026-10-01)
+
+`docs/controlled-motion-development.md` documents a new preregistered 42-action
+schedule: natural terrain, all four opaque movement handles, short/long moves,
+post-action WAIT, public rotation calibration and complete controls. Four fresh
+sessions capture 804 consecutive RGB frames. Component auditors independently
+replay every image/action/calibration/prediction before evaluator access and pass
+30 checks each. `runs/controlled-motion-factorial-seed201-v1/audit.json` replays
+those components and passes six matrix checks; all 201 reported position/angle
+records are identical across cells.
+
+Noon/clear and midnight/clear retain median common tracks 131.5/170 and correctly
+validate 2/8 and 1/8 post-WAIT motions. Both thunder cells retain median three
+tracks and validate zero. Moving-endpoint coverage remains zero throughout. All
+13 actual controls per cell are correctly rejected by the full method; one
+nominal late-WAIT control still physically moves and is correctly counted as a
+movement failure instead of a successful negative. The endpoint-only baseline
+has false control translations in two cells. There is one session per cell and
+no multi-seed statistical/generalization claim or planner promotion.
+
+Current tests pass 361/two skips on Windows and 363/two skips on WSL; clean default
+installation passes 253/16 optional skips. Targeted Ruff/build pass and the core
+MVP report remains unchanged. Next priorities are static-background seed selection
+and robust early endpoint refinement, followed by fresh held-out acquisition.
+This advances diagnosis and guarded real-motion evidence without completing the
+original scientific/open-world/long-operation objective.
