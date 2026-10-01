@@ -660,6 +660,19 @@ fixture-supplied central target crop.
 
 ## Architecture and extension boundary
 
+RGB geometry is now an explicitly experimental optional branch, not a replacement
+for the accepted topological planner. Its conservative bootstrap rejects unsupported
+poses, and an independent evaluator measures disjoint trajectory error rather than
+equating more tracked frames with better navigation. A fresh 448-pixel route replay
+with reference-resolution normalization passes 24 audit checks and preserves the
+accepted memory; monocular tracking remains unachieved on that night/thunder route.
+See `docs/visual-geometry-development.md` for positive/negative evidence and
+`docs/quality-roadmap.md` for the full remaining project gates.
+
+```powershell
+uv run --extra geometry pytest
+```
+
 See `docs/architecture.md`. Mineflayer and structured simulators implement the same
 agent-visible contract and never expose benchmark truth. The live observation
 command expects an existing server; server download and EULA acceptance remain an

@@ -4,6 +4,12 @@ This audit compares the current repository with the original self-evolving symbo
 Minecraft system, not merely with the smaller offline MVP. A green unit test is not
 treated as proof of live Minecraft behavior.
 
+The current full-project execution gates are in `docs/quality-roadmap.md`.
+Subsequent RGB-geometry development and its rejected tracking results are recorded
+in `docs/visual-geometry-development.md`. Reference-scale normalization preserves
+the accepted five-node route in a fresh 448-pixel replay (24 independent checks,
+zero physical waypoint error), but geometric goal navigation remains incomplete.
+
 | Requirement | Current evidence | Status |
 |---|---|---|
 | Python 3.11, uv, Git, src layout | `pyproject.toml`, `uv.lock`, package build | Complete |

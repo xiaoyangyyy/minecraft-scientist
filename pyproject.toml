@@ -15,6 +15,7 @@ dependencies = [
 [project.optional-dependencies]
 openai = ["openai>=2,<3"]
 visual = ["pillow>=10,<13"]
+geometry = ["pillow>=10,<13", "opencv-python-headless>=4.8,<5"]
 train = [
     "gymnasium>=1.1,<2",
     "torch>=2.7,<3",
