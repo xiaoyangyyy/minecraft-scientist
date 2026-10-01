@@ -582,6 +582,32 @@ This establishes a validated local detour, not a completed B→E→A route. Conn
 E to A, scaling the search beyond two preregistered open headings, and cross-seed or
 cross-biome validation remain open.
 
+The goal-frontier gate takes the next step from persistent E. Each candidate starts
+in a fresh MineStudio session, records the current A panorama as goal memory,
+replays the stored A→B→E route, and follows one visually open heading. Candidate
+ranking uses only RGB distance to remembered A, visual novelty and deterministic
+tie-breaking. Coordinates are still evaluator-only: after selection they may reject
+a candidate that did not physically make progress, but cannot choose its direction.
+
+Reproduce the accepted directed E→F expansion and independent audit with:
+
+```powershell
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/natural_visual_goal_frontier_benchmark.py --source-run /mnt/d/minecraft-scientist/runs/natural-visual-detour-seed201-v6-audited --candidate-count 2 --moves 3 --move-frames 4 --allow-directed-frontier --temporal-samples 3 --output /mnt/d/minecraft-scientist/runs/natural-visual-goal-frontier-seed201-v10-audited
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/audit_natural_visual_goal_frontier.py /mnt/d/minecraft-scientist/runs/natural-visual-goal-frontier-seed201-v10-audited --write
+```
+
+Heading 7 moves 4.426 blocks from E to novel F and reduces the evaluator-only
+distance to A from 9.668 to 6.376 blocks. A separate session repeats both values.
+Earlier return experiments showed that F→E is not a safe straight inverse, so the
+accepted memory contains exactly one new resolved transition, E→F, and deliberately
+contains no F→E edge. All runtime gates pass; the independent audit recomputes the
+RGB selector, PNG temporal medians, action alignments, physical progress, directed
+SQLite topology, source manifests and telemetry isolation, with all 21 checks true.
+
+This is verified goal-directed frontier expansion and a more honest directed
+cognitive map. It does not yet connect F to A or prove unrestricted exploration,
+cross-seed/biome generalization, survival, or long-horizon recovery.
+
 A concrete label-free `GridVisualController` maps opaque screen regions and hotbar
 slots to MineStudio env actions. Tests verify action translation and semantic
 isolation; the accepted live experiment additionally audits successful opaque

@@ -31,7 +31,7 @@ treated as proof of live Minecraft behavior.
 | Live continuous equation curriculum | 3 opaque tokens, 10 heights, transfer 1.0, v1 superseded/v2 accepted | Complete on local Fabric server |
 | Offline baseline matrix | random, stateless context, Voyager-style skill memory, fixed DSL, full library over 10 seeds | Complete for documented offline scope |
 | Context-only/Voyager LLM harness | 20 shared-evidence pairs across tool/machine/transform: context 0.8000, Voyager 0.7280, symbolic 0.9646; 95% CIs and cost ledger | Complete for expanded DeepSeek evaluation |
-| MineStudio/visual observation path | opaque RGB adapter; tool-region transfer, camera search, motor discovery, continuous detour, persisted reuse, and two-layout route branching in real Linux simulator | Complete for documented fixtures; natural-scene generalization open |
+| MineStudio/visual observation path | opaque RGB adapter; tool-region transfer, camera search, motor discovery, persisted natural-terrain routes, reversible detour, and goal-directed directed frontier expansion in real Linux simulator | Complete for documented bounded runs; cross-seed/biome generalization open |
 | Trained planner in live Minecraft loop | `runs/minecraft-live-benchmark-learned`: 47 experiments, all metrics 1.0, checkpoint recorded in both sub-runs | Complete on local Fabric server |
 
 ## Current external gates
@@ -46,9 +46,9 @@ interventions. Planner efficiency intervals cross zero in this sample.
    DeepSeek rather than inferred from an offline substitute.
 2. MineStudio now launches in the installed WSL/Linux/JDK8 runtime. Controlled
    grounded change regions, camera search, movement-effect discovery, and one
-   obstacle-detour fixture and coordinate-free route reuse across held-out control
-   mappings are verified; natural-scene object identity and multi-layout map
-   generalization remain open.
+   obstacle-detour fixture, coordinate-free route reuse, and bounded natural-scene
+   directed frontier expansion are verified; cross-seed/biome object identity and
+   large-scale map generalization remain open.
 
 The local Fabric and DeepSeek external-LLM paths are empirically verified.
 MineStudio visual results remain a separate optional gate and are not substituted
@@ -518,3 +518,18 @@ alignment, 3D return distances, route projections, journal integrity, telemetry
 separation and both source manifests; all 20 audit checks are true. This proves a
 local validated B↔E detour. E→A connectivity, wider frontier search, cross-seed and
 cross-biome generalization, long-horizon recovery and survival remain incomplete.
+
+The accepted goal-frontier follow-up reopens that memory and plans A→B→E in three
+fresh sessions. It records the current A panorama as the goal, probes headings 8
+and 7 from E in isolated sessions, ranks them only by RGB goal distance and novelty,
+then shadow-validates heading 7. Both the selected and validation trajectories move
+4.426 blocks from E and reduce evaluator-only distance to A from 9.668 to 6.376.
+
+The artifact at `runs/natural-visual-goal-frontier-seed201-v10-audited` passes every
+runtime gate and all 21 independent audit checks. The audit reconstructs temporal
+medians, panoramas, candidate generation and selection, cyclic alignments, physical
+progress, source acceptance, frozen hashes and the SQLite projection. Exactly one
+new resolved transition, E→F, is present; no F→E edge or return plan is invented.
+This proves goal-directed directed frontier expansion from persistent visual memory.
+F→A connectivity, broader search, cross-seed/biome generalization, survival and
+long-horizon recovery remain incomplete.

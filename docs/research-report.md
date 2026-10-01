@@ -254,6 +254,21 @@ B→A 的后续诊断证明该边不是可安全反放的动作：多个朝向�
 这证明 Agent 能在一条真实不可逆边旁自主选出局部安全且可返回的新拓扑节点，但尚未
 连接 E→A，也不等于大尺度开放世界探索、跨 biome 泛化或长期生存。
 
+新的 `natural_visual_goal_frontier` 门禁从持久化 E 继续向记忆中的 A 扩张。每个候选
+都在全新 MineStudio 会话中先拍摄当前 A 全景，再从 SQLite 重放 A→B→E，最后执行一个
+视觉开放方向。策略只按 F 与当次 A 的 RGB 距离、F 与 E 的视觉新颖度及固定 tie-break
+排序；隔离坐标只能在决策之后否决没有真实推进的结果，不能参与选方向。
+
+heading 7 从 E 向新地点 F 移动 4.426 格，把到 A 的评估距离从 9.668 降到 6.376 格，
+shadow-validation 会话复现相同物理结果。开发阶段对多种转向、细粒度和连续返程的测试
+表明 F→E 并不是可靠直线逆边，因此正式记忆只加入一条 E→F resolved transition，明确
+不伪造 F→E。独立审计从 PNG、评估轨迹和 SQLite 重新计算候选生成、RGB 排序、时序
+中值、动作对齐、目标推进、单向拓扑、记忆完整性和两套冻结哈希，21 项全部为真：
+`runs/natural-visual-goal-frontier-seed201-v10-audited/{report.json,integrity-audit.json,exploration.sqlite3}`。
+
+这把证据从“找到局部可逆绕行”推进到“面向记忆目标的单向前沿扩张”，但 F→A 尚未
+连通；跨 seed/biome 泛化、资源驱动探索、长期生存与故障恢复仍未完成。
+
 ## 可复现入口
 
 ```powershell
