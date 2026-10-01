@@ -497,7 +497,7 @@ projection, telemetry separation and frozen hashes; all 19 checks are true.
 
 B→A remains unresolved and absent. Cross-seed/biome generalization, full homing,
 resource-driven exploration, survival and long-horizon recovery remain open.
-The current Windows release gate passes 191 tests with three expected
+The preceding detour Windows release gate passed 191 tests with three expected
 optional/platform skips. The last recorded MineStudio Linux full-suite run passed
 191 tests with two expected skips; the new real detour artifact is validated
 separately by its 20-check independent audit.
@@ -533,3 +533,40 @@ new resolved transition, E→F, is present; no F→E edge or return plan is inve
 This proves goal-directed directed frontier expansion from persistent visual memory.
 F→A connectivity, broader search, cross-seed/biome generalization, survival and
 long-horizon recovery remain incomplete.
+
+The general goal-search runner now accepts its own independently audited output,
+replays arbitrary-length persisted routes with per-node visual localization, and
+ranks candidates against an immutable goal panorama. The ranking schema excludes
+evaluator fields. Each novel node requires discovery, shadow validation and a third
+fresh-session replay before its transition is resolved.
+
+In `runs/natural-visual-goal-search-seed201-v1`, four isolated F probes select heading
+11. Both selected and validation trajectories move 6.942 blocks without vertical
+drop and reduce distance to A from 6.376 to 5.349. A final independent restart
+recognizes A/B/E/F/G and arrives at G with 0.000 blocks of checkpoint error. The
+memory contains seven places, seven transitions and 60 replay-valid journal events.
+All 22 independent audit checks pass, including recomputation of 1,512 PNG files,
+the pixel-only candidate ranking, all route localizations, three-session arrival
+evidence, exactly one added directed edge, both memory projections and frozen
+source/evidence hashes. The public trace has 1,416 transitions with no privileged
+coordinate tokens. G→A remains absent; cross-seed/biome generalization, survival and
+long-horizon recovery are still incomplete.
+
+The general goal-search release checks pass 195 tests with two expected skips on
+Windows (the visual extra is installed) and 197 tests with two expected skips in
+the installed MineStudio WSL environment. The added ranking tests cover semantic
+alias rejection, deterministic ordering, goal revisits, incompatible signatures
+and rejection of privileged input fields. Targeted Ruff and Python compilation
+checks pass, and both source distribution and wheel build successfully.
+
+Recursive continuation is exercised by `runs/natural-visual-goal-search-seed201-v2`.
+All four isolated probes recognize A/B/E/F/G from persisted memory. The RGB selector
+chooses heading 3, but its evaluator-only goal distance increases from 5.349 to
+5.366, so the run is rejected and exits nonzero. No alternate candidate is promoted
+using privileged evidence, and the database remains byte-identical to its input.
+The independent rejection audit passes all 17 checks, recomputing PNG descriptors,
+localization, pixel-only ranking, physical metrics, immutable memory, frozen hashes
+and telemetry separation. This is a verified negative result, not a second accepted
+expansion. Visual appearance similarity still fails as a reliable geometric goal
+progress proxy; better navigation evidence and held-out trajectory validation remain
+necessary for the full objective.

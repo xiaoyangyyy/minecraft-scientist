@@ -269,6 +269,32 @@ shadow-validation 会话复现相同物理结果。开发阶段对多种转向�
 这把证据从“找到局部可逆绕行”推进到“面向记忆目标的单向前沿扩张”，但 F→A 尚未
 连通；跨 seed/biome 泛化、资源驱动探索、长期生存与故障恢复仍未完成。
 
+后续 `natural_visual_goal_search` 把路线重放推广到 SQLite 中任意长度的已验证有向路径，
+并允许把自己经过独立审计的输出作为下一轮输入。目标 A 的保存全景跨轮保持不变；
+候选排序模块只接受 RGB 特征、方向槽和匿名地点 ID，并拒绝坐标等额外字段。每个
+探测会话都逐点定位既有路线，只有胜者通过物理推进验收和全新会话的 shadow validation
+后才拟合候选新节点；第三次独立重启必须重放全路线、识别新节点且通过物理到达误差
+检查，最后才写入 resolved transition。
+
+第一轮从 F 的四个开放方向中选择 heading 11。F→G 移动 6.942 格，没有垂直跌落，
+到 A 的距离从 6.376 降到 5.349 格；发现与 shadow-validation 结果一致。第三次重启
+识别 A/B/E/F/G，G 的到达误差为 0.000 格。SQLite 保留 7 个地点、7 条有向边和 60 条
+可回放事件，独立审计复算 1,512 张 PNG 和 1,416 条公开 transition，22 项全部为真：
+`runs/natural-visual-goal-search-seed201-v1/{report.json,integrity-audit.json,exploration.sqlite3}`。
+
+这新增了可连续迭代的目标搜索入口及新节点跨重启识别验证。G→A 尚无已验证连接；
+这组证据仍限于 seed 201 的固定午夜雷暴条件，不能证明跨 seed/biome 泛化或生存。
+
+第二轮直接读取第一轮的审计产物，从 G 运行四个候选；所有会话均正确识别 A/B/E/F/G。
+但 RGB 排序选出的 heading 3 把到 A 的距离从 5.349 增至 5.366 格，因此门禁失败，
+SQLite 与输入源逐字节一致，没有新增节点或有向边。系统没有借助评估坐标换选更有利
+的其他方向。拒绝审计重算 RGB 排序、扫描图像、地点定位和物理指标，核对记忆不变、
+源哈希及公开事件隔离，17 项全部为真：
+`runs/natural-visual-goal-search-seed201-v2/{report.json,rejection-audit.json,exploration.sqlite3}`。
+
+该反例说明“全景外观更像目标”不能稳定替代几何目标进展。后续应优先改进视觉导航
+证据并用留出轨迹评估，而不能仅通过增大探测预算或依赖评估坐标宣称目标导航完成。
+
 ## 可复现入口
 
 ```powershell

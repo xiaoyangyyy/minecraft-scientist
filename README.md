@@ -608,6 +608,49 @@ This is verified goal-directed frontier expansion and a more honest directed
 cognitive map. It does not yet connect F to A or prove unrestricted exploration,
 cross-seed/biome generalization, survival, or long-horizon recovery.
 
+The general goal-search runner can now consume either that accepted frontier or its
+own audited output. It retrieves an arbitrary-length route from SQLite and checks
+every node against frozen visual memory during fresh-session replay. A saved goal
+panorama remains immutable across rounds. The ranking module accepts only pixel
+signatures and opaque place IDs; candidate physics are checked after the direction
+has been selected. A novel node is fitted from the discovery and shadow-validation
+views, then must be recognized during a third independent restart before its
+directed transition is committed.
+
+```powershell
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/natural_visual_goal_search_benchmark.py --source-run /mnt/d/minecraft-scientist/runs/natural-visual-goal-frontier-seed201-v10-audited --candidate-count 4 --moves 3 --move-frames 4 --temporal-samples 3 --output /mnt/d/minecraft-scientist/runs/natural-visual-goal-search-seed201-v1
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/audit_natural_visual_goal_search.py /mnt/d/minecraft-scientist/runs/natural-visual-goal-search-seed201-v1 --write
+```
+
+In the accepted first round, four isolated probes from F select heading 11 using
+the persisted A goal panorama. F→G moves 6.942 blocks with no vertical drop and
+reduces distance to A from 6.376 to 5.349 blocks in both discovery and shadow
+validation. The final independent restart recognizes A/B/E/F/G and reaches G with
+0.000 blocks of checkpoint error. SQLite retains seven places, seven transitions
+and 60 replay-valid journal events. All 22 independent audit checks pass over 1,512
+PNG files and 1,416 public transitions. Set `--source-run` to this audited v1 output
+to continue from G with the same runner. G still has no validated route to A;
+cross-seed/biome generalization and long-horizon survival remain open.
+
+The second round (`runs/natural-visual-goal-search-seed201-v2`) tests that recursive
+continuation from G. All four fresh sessions recognize the complete A/B/E/F/G
+route, but the RGB ranking chooses heading 3 whose physical distance to A increases
+from 5.349 to 5.366 blocks. The runner rejects it and exits nonzero; accepted memory
+remains byte-identical to the source. It does not substitute a physically favorable
+runner-up using evaluator coordinates. The rejection audit independently recomputes
+the RGB ranking, all saved scans and physical metrics, checks the unchanged database
+and reports all 17 checks true:
+
+```powershell
+wsl -d MinecraftScientist -u root --exec /opt/minecraft-scientist-visual/bin/python /mnt/d/minecraft-scientist/environments/minestudio/audit_visual_goal_search_rejection.py /mnt/d/minecraft-scientist/runs/natural-visual-goal-search-seed201-v2 --write
+```
+
+This exposes a remaining representation problem: panorama similarity is not a
+reliable measure of geometric goal progress. Improving visual navigation evidence
+and evaluating it on held-out trajectories takes priority over further claims of
+goal-reaching capability. The accepted first round remains a bounded success;
+the second round is explicitly rejected evidence.
+
 A concrete label-free `GridVisualController` maps opaque screen regions and hotbar
 slots to MineStudio env actions. Tests verify action translation and semantic
 isolation; the accepted live experiment additionally audits successful opaque
