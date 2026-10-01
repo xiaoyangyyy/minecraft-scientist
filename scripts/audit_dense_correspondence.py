@@ -12,6 +12,7 @@ from PIL import Image
 from probe_dense_correspondence import public_pairs
 
 from minecraft_scientist.evaluation.relative_motion import score_relative_motion
+from minecraft_scientist.exploration.camera_intrinsics import CameraResizeSpec
 from minecraft_scientist.exploration.dense_correspondence import (
     DenseCorrespondenceConfig,
     DenseCorrespondences,
@@ -77,6 +78,7 @@ def runtime_sources() -> dict[str, Path]:
     return {
         Path(path).name: Path(path)
         for path in (
+            CameraResizeSpec.camera.__code__.co_filename,
             DenseRGBMatcher.match.__code__.co_filename,
             estimate_two_view_motion.__code__.co_filename,
             _features.__code__.co_filename,
@@ -150,9 +152,14 @@ def audit(route: Path, development: Path, checkpoint: Path) -> dict:
         for name in sorted(config["reference_sha256"])
     ]
     geometry_config = VisualGeometryConfig()
-    reference_height, reference_width = references[0].shape[:2]
+    _, reference_width = references[0].shape[:2]
     focal, count, mad = _calibrate_focal(
-        [_features(frame, geometry_config, cv2) for frame in references],
+        [
+            (points + (0.5, 0.5), descriptors)
+            for points, descriptors in [
+                _features(frame, geometry_config, cv2) for frame in references
+            ]
+        ],
         reference_width,
         geometry_config,
         cv2,
@@ -167,12 +174,15 @@ def audit(route: Path, development: Path, checkpoint: Path) -> dict:
         return {"valid": False, "checks": checks, "evaluation": None}
     first = _rgb(route / "frames" / f"frame-{config['pairs'][0]['first']:05d}.png")
     height, width = first.shape[:2]
-    expected_camera = np.array(
-        (
-            (focal * width / reference_width, 0, width / 2),
-            (0, focal * height / reference_height, height / 2),
-            (0, 0, 1),
-        )
+    resize = CameraResizeSpec.model_validate(config["camera_resize"])
+    expected_camera = resize.camera(focal * width / reference_width)
+    checks["public_resize_dimensions"] = resize.observation_size == (
+        width,
+        height,
+    ) and (
+        tuple(acquisition["render_size"]) == resize.render_size
+        if acquisition.get("render_size") is not None
+        else config["render_size_source"] == "explicit_client_configuration"
     )
     checks["camera_resize_recomputed"] = bool(
         np.allclose(expected_camera, config["camera_intrinsics"])

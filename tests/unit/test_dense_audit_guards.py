@@ -90,22 +90,18 @@ def _stub_run(tmp_path, auditor, monkeypatch):
     config.update(
         {
             "pairs": pairs,
-            "source_sha256": {
-                name: "0" * 64
-                for name in (
-                    "dense_correspondence.py",
-                    "two_view_motion.py",
-                    "visual_geometry.py",
-                    "visual_odometry.py",
-                    "probe_dense_correspondence.py",
-                )
-            },
+            "source_sha256": {name: "0" * 64 for name in source_paths},
             "input_report_sha256": "0" * 64,
             "checkpoint_sha256": "0" * 64,
             "reference_focal_pixels": 90.0,
             "reference_focal_sample_count": 20,
             "reference_focal_relative_mad": 0.01,
-            "camera_intrinsics": [[90.0, 0, 112], [0, 90.0, 112], [0, 0, 1]],
+            "camera_intrinsics": [[90.0, 0, 111.5], [0, 160.0, 111.5], [0, 0, 1]],
+            "camera_resize": {
+                "render_size": (640, 360),
+                "observation_size": (224, 224),
+            },
+            "render_size_source": "explicit_client_configuration",
             "matcher": {},
             "motion": {},
             "evaluation_thresholds": {},
@@ -150,7 +146,7 @@ def _stub_run(tmp_path, auditor, monkeypatch):
     monkeypatch.setattr(
         auditor, "_rgb", lambda path: np.zeros((224, 224, 3), dtype=np.uint8)
     )
-    monkeypatch.setattr(auditor, "_features", lambda *args: None)
+    monkeypatch.setattr(auditor, "_features", lambda *args: (np.empty((0, 2)), None))
     return development, matches, motion, backend
 
 

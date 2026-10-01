@@ -99,3 +99,13 @@ pixel refinement leaves insufficient geometry. All movement is then abstained,
 which is not useful navigation. This changes the next action to short-step
 temporal tracking and multi-frame geometry, not relaxed acceptance thresholds.
 Existing accepted memory and the full remaining gates stay intact.
+
+The temporal follow-up is in `docs/temporal-motion-development.md`. Inspection of
+the installed client identified an incorrect equal-axis camera assumption after
+widescreen-to-square resize. The public resize repair improves the 448 dense
+baseline to 3/8 correct movements (224 remains 3/8); substantial errors remain.
+Identity-preserving adjacent tracks, calibrated essential refitting, held-out
+intermediate PnP and sensitivity checks are implemented. Four independently replayed
+full/short-window experiments pass 26 provenance/computation checks each, but none
+supports reliable movement. The next action is controlled WAIT/short-move/settled
+RGB acquisition, not relaxed geometry gates. The full project remains incomplete.

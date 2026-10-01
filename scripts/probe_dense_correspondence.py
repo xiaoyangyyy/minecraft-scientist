@@ -10,6 +10,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from minecraft_scientist.exploration.camera_intrinsics import CameraResizeSpec
 from minecraft_scientist.exploration.dense_correspondence import (
     DenseCorrespondenceConfig,
     DenseRGBMatcher,
@@ -103,6 +104,7 @@ def main() -> None:
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--sha256", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--render-size", type=int, nargs=2)
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
     report_bytes = (args.route / "report.json").read_bytes()
@@ -114,6 +116,7 @@ def main() -> None:
     source_paths = {
         Path(path).name: Path(path)
         for path in (
+            CameraResizeSpec.camera.__code__.co_filename,
             DenseRGBMatcher.match.__code__.co_filename,
             estimate_two_view_motion.__code__.co_filename,
             _features.__code__.co_filename,
@@ -141,9 +144,14 @@ def main() -> None:
     geometry_config = VisualGeometryConfig()
     reference_paths = sorted((args.route / "goal-reference").glob("view-*.png"))
     reference = [_rgb(path) for path in reference_paths]
-    height, width = reference[0].shape[:2]
+    _, width = reference[0].shape[:2]
     focal, count, mad = _calibrate_focal(
-        [_features(frame, geometry_config, cv2) for frame in reference],
+        [
+            (points + (0.5, 0.5), descriptors)
+            for points, descriptors in [
+                _features(frame, geometry_config, cv2) for frame in reference
+            ]
+        ],
         width,
         geometry_config,
         cv2,
@@ -151,18 +159,30 @@ def main() -> None:
     if focal is None:
         raise ValueError("public focal calibration was rejected")
     observation_height, observation_width = _rgb(inputs[pairs[0]["first"]]).shape[:2]
-    camera = np.array(
-        (
-            (focal * observation_width / width, 0, observation_width / 2),
-            (0, focal * observation_height / height, observation_height / 2),
-            (0, 0, 1),
+    render_size = args.render_size or acquisition.get("render_size")
+    if render_size is None:
+        raise ValueError(
+            "legacy acquisition requires public --render-size WIDTH HEIGHT"
         )
+    if (
+        acquisition.get("render_size") is not None
+        and list(render_size) != acquisition["render_size"]
+    ):
+        raise ValueError("explicit render dimensions disagree with acquisition")
+    resize = CameraResizeSpec(
+        render_size=tuple(render_size),
+        observation_size=(observation_width, observation_height),
     )
+    camera = resize.camera(focal * observation_width / width)
     config = {
         "pairs": pairs,
         "matcher": match_config.model_dump(mode="json"),
         "motion": motion_config.model_dump(mode="json"),
         "camera_intrinsics": camera.tolist(),
+        "camera_resize": resize.model_dump(mode="json"),
+        "render_size_source": "acquisition_report"
+        if acquisition.get("render_size") is not None
+        else "explicit_client_configuration",
         "reference_focal_pixels": focal,
         "reference_focal_sample_count": count,
         "reference_focal_relative_mad": mad,

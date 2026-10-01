@@ -596,3 +596,28 @@ Targeted Ruff and package builds pass. The current MVP regression preserves 1.0
 accuracy/task success, 47 experiments, detection delay 1, eight revision experiments,
 three symbols/13 reuses and eight saved transfer interventions. This adds verified
 diagnosis and guarded research infrastructure, not completion of the full goal.
+
+### Public camera resize and temporal motion follow-up (2026-10-01)
+
+`docs/temporal-motion-development.md` records a real camera-model correction:
+MineStudio's full-frame widescreen-to-square resize requires unequal x/y focal
+axes and pixel-center-aware resizing. Public RGB scans still estimate horizontal
+focal; no hidden FOV, coordinate or pose enters inference. Corrected dense runs
+pass 24 independent replay checks each and score 3/8 movements at both resolutions,
+with 4/5 and 5/5 correct controls at 224 and 448. Older equal-axis results remain
+historical, not clean evidence attributing all failures to the matcher.
+
+New continuous RGB tracks never reseed lost identities; calibrated endpoint
+refitting, disjoint intermediate PnP validation and fixed sensitivity checks
+have deterministic synthetic tests and frozen real replays. All four full/short
+experiments pass 26 audit checks each, but zero movements pass full validation.
+The single correct short-window endpoint cannot bypass the reliability gate.
+These negative results change the next action to controlled acquisition; they
+do not establish navigation, generalization or the integrated scientific loop.
+
+Current regression: Windows 328 passed/two skips, WSL 330 passed/two skips,
+clean default installation 241 passed/14 optional skips. Targeted Ruff and both
+package builds pass. `runs/temporal-regression-mvp-seed0/benchmark.json` is
+byte-identical to the preceding MVP report, preserving all core metrics and the
+3-versus-11 intervention transfer result. Accepted map and core behavior remain
+unchanged. Full project completion remains unproven.

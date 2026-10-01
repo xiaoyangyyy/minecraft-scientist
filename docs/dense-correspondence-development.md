@@ -4,6 +4,13 @@ This is development on natural seed 201, not held-out navigation acceptance.
 All candidates remain outside the default planner and accepted map. The full
 project gates in `quality-roadmap.md` remain incomplete.
 
+**Historical camera-model caveat:** the original results below used an incorrect
+equal-axis focal assumption for a widescreen image stretched to a square. The
+public resize correction and temporal follow-up are in
+`temporal-motion-development.md`. Corrected dense runs score 3/8 MOVE at both
+resolutions, with 4/5 controls at 224 and 5/5 at 448; neither accepts navigation.
+Do not attribute all earlier failures solely to the correspondence model.
+
 ## Method and public input boundary
 
 The classical branch had too few stable correspondences on the night/thunder
@@ -113,7 +120,7 @@ PyTorch/OpenCV versions above are required for matching audited results.
 ```bash
 /usr/local/bin/uv pip install --python /opt/minecraft-scientist-visual/bin/python kornia==0.8.3 kornia-rs==0.2.0
 /opt/minecraft-scientist-visual/bin/python scripts/fetch_loftr_checkpoint.py --output runs/loftr-new
-/opt/minecraft-scientist-visual/bin/python scripts/probe_dense_correspondence.py runs/dense-visual-route-seed201-v1 --checkpoint runs/loftr-new/loftr_outdoor.ckpt --sha256 21f5bec5968178e8bc8b7633441836fe5de4f47d861dd2cd7dc38e271b0479ec --output runs/dense-new
+/opt/minecraft-scientist-visual/bin/python scripts/probe_dense_correspondence.py runs/dense-visual-route-seed201-v1 --checkpoint runs/loftr-new/loftr_outdoor.ckpt --sha256 21f5bec5968178e8bc8b7633441836fe5de4f47d861dd2cd7dc38e271b0479ec --render-size 640 360 --output runs/dense-new
 /opt/minecraft-scientist-visual/bin/python scripts/audit_dense_correspondence.py runs/dense-visual-route-seed201-v1 runs/dense-new --checkpoint runs/loftr-new/loftr_outdoor.ckpt --output runs/dense-new/audit.json
 /opt/minecraft-scientist-visual/bin/python scripts/diagnose_motion_stability.py runs/dense-new --output runs/stability-new
 /opt/minecraft-scientist-visual/bin/python scripts/audit_motion_stability.py runs/dense-visual-route-seed201-v1 runs/dense-new runs/stability-new --output runs/stability-new/audit.json
@@ -123,6 +130,9 @@ PyTorch/OpenCV versions above are required for matching audited results.
 
 The SHA above locks the observed checkpoint, not future upstream URL contents.
 A changed checkpoint requires separate provenance, not bypassing verification.
+The current producer corrects camera resize geometry; the historical numbers
+above require their source snapshots. Current reproduction does not recreate
+those legacy calibration assumptions.
 
 ## Regression and next action
 

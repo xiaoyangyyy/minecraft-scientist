@@ -671,11 +671,19 @@ See `docs/visual-geometry-development.md` for positive/negative evidence and
 
 Local LoFTR correspondence, geometric sensitivity and bidirectional pixel
 refinement are also evaluated as optional development tools. Independent audits
-find only 3/8 correct movement estimates at 224 pixels and 1/8 at 448; conservative
+initially found only 3/8 correct movement estimates at 224 pixels and 1/8 at 448; conservative
 checks reject unstable motion rather than promoting it into the planner. This is
 a documented negative result, not working visual navigation. Runtime, checkpoint
 identity, reproduction and evidence are in `docs/dense-correspondence-development.md`.
 No API key or remote inference is used.
+
+The subsequent public camera-resize repair corrects unequal focal axes and pixel
+centers: dense matching now scores 3/8 movements at both resolutions, still with
+wrong supported poses. Continuous identity-preserving RGB tracking and held-out
+intermediate-frame geometry are implemented and independently replayed, but no
+movement passes full reliability validation. These are guarded development
+results, not working open-world navigation. See
+`docs/temporal-motion-development.md` for corrected evidence and reproduction.
 
 ```powershell
 uv run --extra geometry pytest
