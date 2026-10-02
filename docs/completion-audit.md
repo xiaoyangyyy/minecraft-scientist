@@ -954,3 +954,13 @@ The first fresh adaptive visibility run completes 172 RGB frames/eight probes,
 with seven raw integrity gates passing and 102-to-240 retained IDs per completion.
 These are acquisition records, not independent causal/map/pose evidence. Its
 public-first independent audit is still required. No navigation gate is promoted.
+
+The independent adaptive-map replay subsequently completes all 46 records and
+118 prefixes, with all 26 checks passing before/through private scoring. It finds
+four/eight correct combined local poses but retains a 36.654909-degree wrong
+second-leg direction. Both supported first-leg maps remain ambiguous under new
+views. All thirteen actual stationary controls reject translation; one nominal
+settle control really moves and remains unsupported. Full denominators, source
+boundaries, aborted-trial tests and the next phase-relative controller correction
+are in `docs/visibility-map-validation-development.md`. Navigation and all broad
+project requirements remain unachieved.

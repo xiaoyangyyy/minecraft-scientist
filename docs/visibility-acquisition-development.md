@@ -112,3 +112,11 @@ under the actual new views, and report all lost/ambiguous/incorrect results and
 costs. A successful request or source audit alone is insufficient. Then validate
 fresh disjoint seeds/terrain/conditions and integrate verified map/science/recovery
 loops. No full-project requirement or physical error tolerance is reduced.
+
+That complete replay now finishes in `docs/visibility-map-validation-development.md`:
+all 26 checks pass, five/eight controls create effective turns, and four/eight
+combined local poses are correct. A second-leg direction still errs by 36.654909
+degrees. Both supported first-leg maps remain ambiguous after new views, so
+navigation is not promoted. Phase-relative loss/excitation and further independent
+second-leg validation remain necessary, alongside the full held-out/integration/
+long-recovery/release scope.

@@ -88,14 +88,14 @@ Neither local multi-seed verification
 proves remote CI execution, fresh live-server gates, learned-planner release
 comparisons, broad visual generalization or integrated long-horizon exploration.
 
-The visibility-controller checkpoint regression passes **700 tests/two
-skips on Windows**, **702/two on WSL**, and **401/58 optional or platform skips**
+The adaptive-map audit checkpoint regression passes **718 tests/two
+skips on Windows**, **720/two on WSL**, and **401/60 optional or platform skips**
 in a clean default-only installation.
 Targeted Ruff and both package builds pass. Default-only checks have no optional
 visual/MineStudio/OpenAI runtime and still exercise the complete release verifier.
-Two later capture-wrapper orchestration tests additionally pass; they are not
-included in those full-suite counts. Fresh live adaptive acquisition/policy/pose
-audits remain separately required.
+Those counts include the capture-wrapper tests and sixteen new adaptive-control/
+map pipeline tests. Fresh policy/map replay now passes, but its retained direction
+error prevents navigation promotion; see `docs/visibility-map-validation-development.md`.
 Default-only checks pass offline after populating the locked dependency cache;
 the initial isolated offline setup failed on a missing NumPy wheel. Installation
 downloads are separate from the algorithm's offline/no-model runtime contract.

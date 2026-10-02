@@ -772,6 +772,12 @@ navigation success. A source-bound fresh acquisition runner is implemented; its
 independent control/map/pose validation remains required. See
 `docs/visibility-acquisition-development.md` for limits, costs and reproduction.
 
+The fresh adaptive acquisition now independently replays all 118 prefixes and
+passes 26 checks. It retains four/eight correct combined local intervals, but a
+36.65-degree second-leg error remains and first-leg maps are still ambiguous.
+No navigation promotion follows; `docs/visibility-map-validation-development.md`
+records the complete result and a phase-relative acquisition correction to test.
+
 The scientific core has a portable offline release verifier:
 
 ```powershell

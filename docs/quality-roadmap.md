@@ -287,3 +287,16 @@ completion. This is not yet independent policy/map/pose validation or navigation
 accuracy; that complete public-first audit is the next action. Keep the script
 bytes frozen through that audit (one minor formatter change remains), then version
 further acquisitions without rewriting historical source ledgers.
+
+The public-first independent adaptive-map audit now completes all 46 records/
+118 prefixes and passes 26 checks. Five/eight control pairs are physically
+non-collinear; four/eight combined local intervals are correct. The 128-to-130
+second-leg direction is still wrong by 36.654909 degrees, and both supported
+first-leg maps remain ambiguous after subsequent views. Thirteen stationary
+controls reject; one moving nominal settle control remains unsupported. No
+navigation promotion follows. `docs/visibility-map-validation-development.md`
+also records a public controller-state issue: second-leg completion reuses the
+already-triggered first-leg global loss criterion. Next test phase-relative new
+loss with unchanged IDs/absolute gates/budgets, then fresh excitation and
+second-leg map validation. Do not substitute diagnostic green checks for the
+full held-out, science/map integration, long-recovery and release requirements.
