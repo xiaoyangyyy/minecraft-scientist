@@ -58,10 +58,10 @@ unlearned primitive substitution, forged transfer events, changed repeat bytes,
 invalid budgets and incomplete runs. A failure preserves partial evidence and
 exits nonzero, not a smaller passing seed subset.
 
-## Current results (2026-10-01)
+## Current results (2026-10-02)
 
-`runs/core-release-seeds0-29-v3/report.json` on Windows and
-`runs/core-release-seeds0-29-wsl-v3/report.json` on WSL each pass all six release
+`runs/core-release-seeds0-29-v4/report.json` on Windows and
+`runs/core-release-seeds0-29-wsl-v4/report.json` on WSL each pass all six release
 checks for all thirty seeds. Each platform runs sixty complete benchmarks and
 reproduces eighteen artifacts per seed, including the transfer traces and
 experience database. All four learned-law accuracies, revised-law recovery and
@@ -72,13 +72,15 @@ is 53.9333; it is not the total cost of auxiliary transfer/revision/replay runs.
 
 The v1 thirty-seed releases precede the executable-symbol transfer correction and
 contain fifteen artifacts per repetition. The v2 eighteen-artifact runs precede
-the added partial-output refusal checks. Both are historical checks, not the
-current source-frozen release. Neither local multi-seed verification
+the added partial-output refusal checks. The v3 releases precede the addition of
+the optional plane-motion source; v4 freezes that current package source too.
+These earlier runs are historical checks, not the current source-frozen release.
+Neither local multi-seed verification
 proves remote CI execution, fresh live-server gates, learned-planner release
 comparisons, broad visual generalization or integrated long-horizon exploration.
 
-Final regression passes **439 tests/two skips on Windows**, **441/two on WSL**,
-and **295/35 optional or platform skips** in a clean default-only installation.
+Final regression passes **454 tests/two skips on Windows**, **456/two on WSL**,
+and **295/37 optional or platform skips** in a clean default-only installation.
 Targeted Ruff and both package builds pass. Default-only checks have no optional
 visual/MineStudio/OpenAI runtime and still exercise the complete release verifier.
 
@@ -90,6 +92,23 @@ It retains 47 experiments, accuracy/task success 1.0, detection delay one, eight
 repairs, three symbols/thirteen reuses and transfer **three versus eleven**
 interventions. The new transfer evidence verifies the last comparison through
 actual primitive execution rather than changing these legacy metric fields.
+
+## CI definition versus executed evidence
+
+`.github/workflows/core-ci.yml` now defines four Python 3.11 jobs: Windows/Linux,
+each with default dependencies or the optional geometry extra. Each uses the lock,
+runs the complete test suite, the thirty-seed/two-repeat core verifier, the original
+MVP command and both package builds, retaining partial evidence even on failure.
+Repository access is read-only and checkout credentials are not persisted.
+
+The workflow YAML, triggers, matrix and permission declaration are checked locally;
+its acceptance commands have current Windows/WSL evidence. **No Git remote is
+configured and no hosted CI job has executed.** Public GitHub metadata access
+timed out during setup, so the workflow currently uses conventional major action
+refs; immutable SHA pinning and hosted-run validation remain publication gates.
+Do not call this a verified remote CI release or treat local WSL as a hosted Linux
+runner. Java/MineStudio/train extras and live/visual research gates are deliberately
+not substituted by these offline jobs.
 
 ## Commands
 

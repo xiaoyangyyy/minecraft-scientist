@@ -678,7 +678,7 @@ fails rather than receiving a substituted successful recipe; incomplete validati
 invalid operations and noncompliant success are rejected.
 
 `docs/core-release-verification.md` documents the new portable offline verifier.
-Current Windows/WSL v3 releases each complete thirty seeds, two full repeats per
+Current Windows/WSL v4 releases each complete thirty seeds, two full repeats per
 seed, eighteen byte-identical artifacts per repeat and all six release checks.
 The verifier independently reexecutes symbol transfer, validates theory ancestry,
 requires complete artifact sets and replays checkpointed SQLite without writes.
@@ -694,7 +694,36 @@ as the current eighteen-artifact release. Reliable goal navigation, held-out
 seed/terrain RGB generalization, integrated natural scientific exploration and
 long-operation recovery remain incomplete. The overall goal stays active.
 
-Final regression: Windows 439 passed/two skips, WSL 441/two, clean default-only
-installation 295/35 optional or platform skips. Targeted Ruff and source/wheel
+Final regression: Windows 454 passed/two skips, WSL 456/two, clean default-only
+installation 295/37 optional or platform skips. Targeted Ruff and source/wheel
 builds pass. Existing reports/partial transfer traces reject before experiments;
 no overwrite is inferred from an incomplete output directory.
+
+### Plane-aware competition and CI definition (2026-10-02)
+
+`docs/plane-motion-development.md` records the optional `plane-competition`
+estimator. Homography branches and a general essential-model proposal fit only
+training rays; off-plane selection chooses once and independent shadow rays can
+veto, never replace the chosen branch. Intermediate PnP and sixteen sensitivity
+trials use unchanged gates. Reports retain all candidate diagnostics and every
+failure, with no evaluator input to fitting or selection.
+
+Both seed-201 clear/thunder runs retain thirty pairs and pass thirty replay checks.
+Each scores zero protected moving/settled positives and thirteen correct actual
+negative controls; one physically moving late-WAIT positive fails in each. A bare
+clear endpoint scores one positive but is not promoted. The clear baseline had
+two protected settled positives, so this is not an overall improvement or reliable
+navigation. The new hypothesis is tested and rejected as a replacement, not called
+successful because its integrity audit is green. Fourteen added geometry tests
+plus registration coverage verify the branch/partition/holdout contracts. A
+borderline narrow-plane synthetic case differs under OpenCV 4.8/4.13; both must
+obey identical measured gates, while a separate broad-plane positive passes both.
+
+`.github/workflows/core-ci.yml` defines four locked Python 3.11 default/geometry
+Windows/Linux jobs including tests, thirty-seed release repeats, MVP acceptance,
+builds and failed evidence retention. YAML/triggers/matrix/permissions are locally
+validated. There is no configured remote, GitHub metadata queries timed out, and
+hosted execution/action SHA pinning remain unverified. The v4 core releases
+freeze the added plane-motion package file; v3 is preserved as prior-source
+evidence. Neither local CI-definition checks nor this unsuccessful RGB method
+close the open visual, natural scientific integration or long-recovery gates.

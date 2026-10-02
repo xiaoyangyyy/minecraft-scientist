@@ -699,6 +699,13 @@ establishes reliable navigation: moving-endpoint coverage remains zero, and the
 bobbing pair scores 2/8 versus 1/8 fully validated settled movements. The shared
 SDK runtime is untouched. See `docs/stationary-consensus-motion-development.md`.
 
+An explicit plane/essential motion-competition variant now retains competing
+homography branches, selects using independent off-plane rays and allows shadow
+validation only to veto. Both clear and thunder development runs pass replay
+audits but recover zero fully validated moving/settled motions, so the variant is
+not promoted. See `docs/plane-motion-development.md`; positive navigation coverage
+remains the unresolved requirement, not merely more green audit checks.
+
 The scientific core has a portable offline release verifier:
 
 ```powershell
@@ -711,6 +718,11 @@ learned primitive and independently replay saved actions, preserving the seed-ze
 3-versus-11 intervention result. Equation validation/crisis experiment design uses
 only public observations. See `docs/core-release-verification.md` for boundaries
 and reproduction; these results do not complete open-world scientific exploration.
+
+`.github/workflows/core-ci.yml` defines locked Python 3.11 Windows/Linux default
+and geometry test/build/release jobs. Its YAML is locally checked, but no Git
+remote or hosted run exists yet; immutable action pins and hosted validation remain
+open. Local release verification must not be presented as remote CI execution.
 
 ```powershell
 uv run --extra geometry pytest

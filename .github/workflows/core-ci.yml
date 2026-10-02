@@ -1,0 +1,68 @@
+name: Portable scientific core
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    name: ${{ matrix.os }} / ${{ matrix.profile }} / Python 3.11
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        profile: [default, geometry]
+    defaults:
+      run:
+        shell: bash
+    env:
+      PYTHONHASHSEED: "0"
+      PROFILE: ${{ matrix.profile }}
+      UV_NO_PROGRESS: "1"
+    steps:
+      # Conventional supported major refs; immutable action SHA pinning must be
+      # verified before publishing. Local GitHub access was unavailable at setup.
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install fixed uv and locked dependencies
+        run: |
+          python -m pip install uv==0.11.3
+          if [ "$PROFILE" = "geometry" ]; then
+            uv sync --locked --extra geometry
+          else
+            uv sync --locked
+          fi
+      - name: Tests with only the declared optional profile
+        run: uv run --no-sync pytest --junitxml=runs/ci-tests.xml
+      - name: Thirty-seed scientific release with exact repeats and trace replay
+        run: uv run --no-sync python scripts/verify_core_release.py --seed 0 --seeds 30 --output runs/ci-core-release
+      - name: Original MVP acceptance command
+        run: uv run --no-sync minecraft-scientist benchmark --suite mvp --seed 0 --output runs/ci-mvp
+      - name: Build source and wheel distributions
+        run: uv build
+      - name: Retain passing and failing evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-${{ matrix.os }}-${{ matrix.profile }}
+          path: |
+            runs/ci-tests.xml
+            runs/ci-core-release/
+            runs/ci-mvp/
+            dist/
+          if-no-files-found: warn
+          retention-days: 7

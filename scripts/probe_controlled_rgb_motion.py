@@ -22,7 +22,13 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument(
-        "--variant", choices=("static-context", "consensus", "static-consensus")
+        "--variant",
+        choices=(
+            "static-context",
+            "consensus",
+            "static-consensus",
+            "plane-competition",
+        ),
     )
     args = parser.parse_args()
     acquisition, report, checks = validate_acquisition(args.route)

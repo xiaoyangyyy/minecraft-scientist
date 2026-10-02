@@ -16,7 +16,7 @@ until each required gate has current, inspectable evidence.
 | Persistent cognitive map | Recover journal and projections after restart; bounded exemplars; executable directed routes; reject false loops; retain unknowns, failures and theory references | Persistent route reuse verified; longer exploration and recovery need expansion |
 | Open-world scientific exploration | Select reachable experiments by information gain, execute them in natural worlds, expand/reuse the map, discover mechanisms and revise theories with a fixed budget | Natural navigation and live scientific fixtures remain separate; integration incomplete |
 | Reliable goal navigation | Use agent-visible spatial evidence; independently verify arrival; no privileged runner-up selection; compare against appearance-only navigation on held-out trajectories | Appearance-only goal search has a verified counterexample |
-| Reproducible engineering | Clean installation, automated portable core checks, explicit optional backends, bounded processes/timeouts, frozen source/data provenance, meaningful tests and documentation | Portable offline core verifier passes thirty seeds/two repeats on both platforms; clean default tests/build pass locally; remote CI and full release consolidation remain |
+| Reproducible engineering | Clean installation, automated portable core checks, explicit optional backends, bounded processes/timeouts, frozen source/data provenance, meaningful tests and documentation | Current offline core verifier passes thirty seeds/two repeats on both platforms; four-job CI is defined and locally parsed, but immutable action pins/hosted execution and full release consolidation remain |
 
 ## Execution order
 
@@ -120,3 +120,22 @@ This is new bounded motion evidence and a weather-related diagnosis, not useful
 navigation coverage. Next implement stationary-context dynamic-feature rejection
 and investigate robust refinement before minimal-pose rejection, then validate on
 fresh disjoint trajectories. Do not drop failed controls or reduce the full scope.
+
+The stationary/consensus/camera follow-up is documented in
+`docs/stationary-consensus-motion-development.md`; it does not establish a
+navigation gain. The next explicit plane/essential competition, documented in
+`docs/plane-motion-development.md`, retains branch ambiguity and independent
+training/selection/shadow partitions. Both existing clear/thunder sessions pass
+thirty replay checks but yield zero protected moving/settled positives, so the
+candidate is not promoted. Most clear failures lack the required training-plane
+support; most thunder failures lack enough common rays. Plane decomposition alone
+therefore does not solve the measured coverage problem. Next evaluate public
+keyframe/active-parallax selection and non-collinear acquisition before any planner
+integration; fresh held-out trajectories remain required.
+
+The current v4 offline releases freeze the added optional package source and pass
+thirty seeds/two repeats/eighteen exact artifacts on both Windows and WSL. The
+four-job core/geometry CI definition is locally parsed, not remotely executed;
+GitHub metadata access timed out and no Git remote is configured. Action SHA
+pinning, hosted CI, live release revalidation and the full visual/scientific
+integration gates remain open. No required gate is removed by these additions.

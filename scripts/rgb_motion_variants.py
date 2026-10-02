@@ -17,6 +17,11 @@ from minecraft_scientist.exploration.multiview_motion import (
     estimate_multiview_motion,
     estimate_temporal_endpoint,
 )
+from minecraft_scientist.exploration.plane_motion import (
+    PlaneMotionConfig,
+    analyze_plane_motion,
+    estimate_plane_endpoint,
+)
 from minecraft_scientist.exploration.stationary_context import (
     StationaryContextConfig,
     stationary_background_seeds,
@@ -26,13 +31,14 @@ from minecraft_scientist.exploration.temporal_tracks import (
     track_frame_chain,
 )
 
-VARIANTS = ("static-context", "consensus", "static-consensus")
+VARIANTS = ("static-context", "consensus", "static-consensus", "plane-competition")
 
 
 def runtime_sources():
     return baseline_sources() | {
         "stationary_context.py": Path(stationary_background_seeds.__code__.co_filename),
         "consensus_motion.py": Path(estimate_consensus_endpoint.__code__.co_filename),
+        "plane_motion.py": Path(analyze_plane_motion.__code__.co_filename),
         Path(__file__).name: Path(__file__),
     }
 
@@ -49,6 +55,9 @@ def configuration(route, acquisition, report, seed, *, variant):
         else "legacy_refit_after_pose",
     )
     config["scope"] += f"; preregistered {variant} development ablation"
+    if variant == "plane-competition":
+        config["endpoint_solver"] = "plane_essential_independent_branch_competition"
+        config["plane_motion"] = PlaneMotionConfig().model_dump(mode="json")
     return config
 
 
@@ -93,6 +102,12 @@ def infer_pair(route, pair, config, index):
     camera = np.asarray(config["camera_intrinsics"])
     tracks = track_frame_chain(frames, config=temporal, seed_pixels=seeds)
     estimator = estimate_consensus_endpoint if consensus else estimate_temporal_endpoint
+    plane = config["variant"] == "plane-competition"
+    if plane:
+        estimator = partial(
+            estimate_plane_endpoint,
+            plane_config=PlaneMotionConfig.model_validate(config["plane_motion"]),
+        )
     motion = estimate_multiview_motion(
         tracks,
         camera,
@@ -109,7 +124,7 @@ def infer_pair(route, pair, config, index):
         config=multiview.two_view,
         seed=config["seed"] + index,
     )
-    return {
+    result = {
         "pair": pair,
         "chain_indices": list(indices),
         "context_indices": list(context),
@@ -121,6 +136,28 @@ def infer_pair(route, pair, config, index):
         "endpoint_tracks": endpoints.model_dump(mode="json"),
         "endpoint_motion": endpoint.model_dump(mode="json"),
     }
+    if plane:
+        for key, matches, expected in (
+            (
+                "plane_chain_analysis",
+                tracks.endpoint_correspondences(),
+                motion.candidate,
+            ),
+            ("plane_endpoint_analysis", endpoints.endpoint_correspondences(), endpoint),
+        ):
+            analysis = analyze_plane_motion(
+                matches,
+                camera,
+                config=multiview.two_view,
+                seed=config["seed"] + index,
+                plane_config=PlaneMotionConfig.model_validate(config["plane_motion"]),
+            )
+            if analysis.endpoint != expected:
+                raise ValueError(
+                    "plane branch diagnostics differ from executable inference"
+                )
+            result[key] = analysis.model_dump(mode="json")
+    return result
 
 
 def backend(variant):

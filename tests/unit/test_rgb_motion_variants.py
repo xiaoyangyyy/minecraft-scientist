@@ -28,7 +28,9 @@ def test_stationary_context_is_past_only_and_motion_boundary_is_half_open(varian
         variants.context_indices({"first": 1}, [], 3)
 
 
-@pytest.mark.parametrize("variant", ["static-context", "consensus", "static-consensus"])
+@pytest.mark.parametrize(
+    "variant", ["static-context", "consensus", "static-consensus", "plane-competition"]
+)
 def test_registered_variants_do_not_change_camera_or_validation_thresholds(
     variants, monkeypatch, variant
 ):
@@ -44,6 +46,12 @@ def test_registered_variants_do_not_change_camera_or_validation_thresholds(
         assert config[key] == baseline[key]
     assert config["static_context"]["context_frames"] == 3
     assert config["variant"] == variant
+    if variant == "plane-competition":
+        assert config["plane_motion"]["minimum_off_plane_points"] == 8
+        assert (
+            config["endpoint_solver"]
+            == "plane_essential_independent_branch_competition"
+        )
 
 
 def test_unregistered_variant_rejected_without_geometry_or_evaluator(
@@ -81,5 +89,6 @@ def test_variant_sources_include_both_algorithms_and_registry(variants):
         "stationary_context.py",
         "consensus_motion.py",
         "rgb_motion_variants.py",
+        "plane_motion.py",
     } <= set(sources)
     assert all(path.is_file() for path in sources.values())
