@@ -732,6 +732,13 @@ matched original-prefix comparison and the stronger observability requirement.
 
 The scientific core has a portable offline release verifier:
 
+Public-only prospective action selection now has a fresh real RGB acquisition and
+complete independent planning/prefix replay. Its first plan fails to create any
+effective turns (0/8), despite passing all 42 integrity checks. Conditional future
+view diversity is diagnostic only, not a repaired pose or navigation gate. See
+`docs/active-parallax-development.md`; all failed trials and frozen V1 sources
+are retained before evolving the selector.
+
 ```powershell
 uv run python scripts/verify_core_release.py --seed 0 --seeds 30 --output runs/new-core-release
 ```
