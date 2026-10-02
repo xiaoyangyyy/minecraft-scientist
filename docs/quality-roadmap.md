@@ -255,3 +255,15 @@ Its subsequent full 164-prefix inference and 42-check independent audit complete
 retaining four/eight correct combined local poses and the same wrong second-leg
 direction. Source-registration repair restores current evidence but does not fix
 the geometric counterexample. Action-boundary subsequent views remain next work.
+
+The action-switch follow-up (`docs/action-switch-motion-development.md`) freezes
+original/alternative maps before future tracking, retains identical surviving
+partitions and completes all 54 independent checks. Its optional veto keeps only
+three correct pair records/two unique intervals, discarding eight correct records.
+The 32.412640-degree error loses all points and is unavailable, not detected.
+No navigation promotion follows. Next implement visibility-aware online control
+before point loss, then fresh disjoint validation and stable landmark lifecycle;
+do not loosen geometry or declare abstention success. The checkpoint passes full
+Windows/WSL regressions 672/674 (two skips each), default-only offline 378/56,
+and both V11 thirty-seed/two-repeat/eighteen-artifact core releases (97 entries).
+All original held-out/integration/long-recovery/full-release requirements remain.

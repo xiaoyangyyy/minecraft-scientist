@@ -137,3 +137,9 @@ that locator; old manifests are preserved and intentionally fail current-source
 checks. See `docs/source-ledger-development.md` for tests, corrected prior replay
 and new acquisition boundary. Do not present the historical 54-check computation
 as a current-source visual release after this correction.
+
+The corrected-source subsequent action-switch experiment is documented in
+`docs/action-switch-motion-development.md`. All 54 checks pass, but the wrong
+direction loses all tracked points before its holdout views; several correct
+maps also fail. This is not a navigation repair. Next acquire diverse views while
+the original identities are still visible rather than extending fixed waits.

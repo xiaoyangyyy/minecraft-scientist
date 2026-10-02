@@ -758,6 +758,13 @@ The later decorator-source registration correction intentionally makes old visua
 manifests historical; `docs/source-ledger-development.md` records the corrected
 prior replay and fresh-acquisition boundary without rewriting earlier evidence.
 
+Frozen-map validation after the next public action switch also fails to repair
+navigation: it retains three correct pair records but loses eight correct ones;
+the known wrong pose becomes unobservable after all original points disappear,
+not reliably detected. All 54 replay checks pass. The next implementation target
+is visibility-aware online acquisition, not later fixed views or relaxed gates.
+See `docs/action-switch-motion-development.md` for the complete negative result.
+
 The scientific core has a portable offline release verifier:
 
 ```powershell

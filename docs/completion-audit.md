@@ -915,3 +915,20 @@ The corrected-source fresh prefix inference subsequently completes all 46 pairs/
 eight correct combined local poses and the wrong 32.412640-degree 152→154 leg.
 All actual stationary controls reject translation; two moving nominal settle
 controls remain unsupported. Current provenance is restored, accuracy is not.
+
+### Action-switch temporal holdout (2026-10-02)
+
+The corrected-source development session now has a complete frozen-map subsequent
+view replay, with all 54 independent checks passing. The optional diagnostic
+retains three correct pair records/two unique intervals, but loses eight correct
+records. The known wrong direction is unavailable after complete point loss, not
+reliably identified. Reference failures cannot be rescued by passing alternatives;
+no replacement pose or navigation promotion is implemented. See
+`docs/action-switch-motion-development.md` for all denominators and costs.
+
+Thirty-seven new tests and full regressions pass Windows 672/two skips, WSL
+674/two, default-only offline 378/56 after locked installation-cache setup.
+V11 core releases freeze 97 entries and reproduce all eighteen artifacts across
+thirty seeds/two repeats on each platform; seed-zero MVP bytes remain unchanged.
+None proves outstanding held-out navigation, natural science/map integration,
+long recovery or full release gates. The full objective remains incomplete.
