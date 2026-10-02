@@ -60,8 +60,8 @@ exits nonzero, not a smaller passing seed subset.
 
 ## Current results (2026-10-02)
 
-`runs/core-release-seeds0-29-v4/report.json` on Windows and
-`runs/core-release-seeds0-29-wsl-v4/report.json` on WSL each pass all six release
+`runs/core-release-seeds0-29-v5/report.json` on Windows and
+`runs/core-release-seeds0-29-wsl-v5/report.json` on WSL each pass all six release
 checks for all thirty seeds. Each platform runs sixty complete benchmarks and
 reproduces eighteen artifacts per seed, including the transfer traces and
 experience database. All four learned-law accuracies, revised-law recovery and
@@ -73,14 +73,16 @@ is 53.9333; it is not the total cost of auxiliary transfer/revision/replay runs.
 The v1 thirty-seed releases precede the executable-symbol transfer correction and
 contain fifteen artifacts per repetition. The v2 eighteen-artifact runs precede
 the added partial-output refusal checks. The v3 releases precede the addition of
-the optional plane-motion source; v4 freezes that current package source too.
+the optional plane-motion source; v4 freezes that source, while v5 additionally
+freezes the optional chronological keyframe policy. The structured core behavior
+is unchanged by those optional modules.
 These earlier runs are historical checks, not the current source-frozen release.
 Neither local multi-seed verification
 proves remote CI execution, fresh live-server gates, learned-planner release
 comparisons, broad visual generalization or integrated long-horizon exploration.
 
-Final regression passes **454 tests/two skips on Windows**, **456/two on WSL**,
-and **295/37 optional or platform skips** in a clean default-only installation.
+Final regression passes **496 tests/two skips on Windows**, **498/two on WSL**,
+and **318/41 optional or platform skips** in a clean default-only installation.
 Targeted Ruff and both package builds pass. Default-only checks have no optional
 visual/MineStudio/OpenAI runtime and still exercise the complete release verifier.
 

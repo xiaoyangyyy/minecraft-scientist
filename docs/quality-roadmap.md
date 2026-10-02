@@ -139,3 +139,18 @@ four-job core/geometry CI definition is locally parsed, not remotely executed;
 GitHub metadata access timed out and no Git remote is configured. Action SHA
 pinning, hosted CI, live release revalidation and the full visual/scientific
 integration gates remain open. No required gate is removed by these additions.
+
+The chronological-keyframe follow-up in `docs/keyframe-motion-development.md`
+implements a fixed public prefix sweep and first-supported latch, with complete
+independent replay before private scoring. Old clear/thunder sessions show no
+coverage gain. A fresh source-bound 6/10-tick natural acquisition captures 229
+images; its 108 prefixes yield three correct settled local intervals versus two
+terminal full-window poses, and one moving pose in both methods. These are local
+intervals, not improved final displacement or navigation; overlapping endpoints
+are not independent successes. Thresholds and accepted memory are unchanged.
+The next action remains stronger active-parallax/non-collinear acquisition and
+fresh disjoint validation before planner integration. Current v5 core releases
+freeze the optional keyframe source and pass on both platforms; full regressions
+are 496/498, with clean default-only installation passing 318 tests. All original
+requirements remain in scope; broad visual/natural scientific integration and
+the other outstanding completion gates stay open.

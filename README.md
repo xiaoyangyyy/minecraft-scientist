@@ -706,6 +706,15 @@ audits but recover zero fully validated moving/settled motions, so the variant i
 not promoted. See `docs/plane-motion-development.md`; positive navigation coverage
 remains the unresolved requirement, not merely more green audit checks.
 
+Chronological RGB-prefix selection now retains every trial and latches the first
+supported local pose without private or future-based replacement. A fresh fixed
+6/10-tick acquisition scores 3/8 correct settled **local** intervals versus 2/8
+terminal full-window poses; moving intervals are 1/8 for both. The extra local pose
+does not recover the final displacement, and most movements still fail. No memory
+promotion or reliable navigation claim follows. Source-bound capture, all positive
+and negative results, reproduction and remaining gates are documented in
+`docs/keyframe-motion-development.md`.
+
 The scientific core has a portable offline release verifier:
 
 ```powershell

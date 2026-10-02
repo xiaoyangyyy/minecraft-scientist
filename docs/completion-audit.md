@@ -678,7 +678,7 @@ fails rather than receiving a substituted successful recipe; incomplete validati
 invalid operations and noncompliant success are rejected.
 
 `docs/core-release-verification.md` documents the new portable offline verifier.
-Current Windows/WSL v4 releases each complete thirty seeds, two full repeats per
+Current Windows/WSL v5 releases each complete thirty seeds, two full repeats per
 seed, eighteen byte-identical artifacts per repeat and all six release checks.
 The verifier independently reexecutes symbol transfer, validates theory ancestry,
 requires complete artifact sets and replays checkpointed SQLite without writes.
@@ -694,8 +694,8 @@ as the current eighteen-artifact release. Reliable goal navigation, held-out
 seed/terrain RGB generalization, integrated natural scientific exploration and
 long-operation recovery remain incomplete. The overall goal stays active.
 
-Final regression: Windows 454 passed/two skips, WSL 456/two, clean default-only
-installation 295/37 optional or platform skips. Targeted Ruff and source/wheel
+Final regression: Windows 496 passed/two skips, WSL 498/two, clean default-only
+installation 318/41 optional or platform skips. Targeted Ruff and source/wheel
 builds pass. Existing reports/partial transfer traces reject before experiments;
 no overwrite is inferred from an incomplete output directory.
 
@@ -727,3 +727,32 @@ hosted execution/action SHA pinning remain unverified. The v4 core releases
 freeze the added plane-motion package file; v3 is preserved as prior-source
 evidence. Neither local CI-definition checks nor this unsuccessful RGB method
 close the open visual, natural scientific integration or long-recovery gates.
+
+### Chronological keyframe and fresh duration follow-up (2026-10-02)
+
+`docs/keyframe-motion-development.md` documents first-supported public prefix
+selection with explicit local/terminal intervals. Existing clear/thunder captures
+retain 92 prefixes each and pass 33 replay checks, with unchanged positive coverage.
+One old clear local pose is available six image frames before the terminal, not
+three and not a proven runtime/navigation-efficiency gain.
+
+The fixed longer-duration constructor wrapper preserves the canonical capturer,
+SDK and terrain, freezes its source/config before launch, records one exact
+constructor call and restores process settings even on failure. The fresh natural
+seed-201 clear run completes 229 frames; eight independent duration-profile checks
+and full public action/frame/target checks pass. Its original full-window producer
+passes 30 replay checks; the keyframe producer preserves 108 prefixes and passes
+33. Three settled local intervals are correct versus two terminal poses; moving
+coverage is one in eight for each. No selected local direction is wrong and no
+selected local control is falsely translated. Thirteen actual negatives reject;
+one moving late-WAIT positive remains unsupported. The moving-04/settled-04
+success is the same local pose and is counted once when comparing interventions.
+
+All thirty terminal tracks/poses match the separately produced full-window baseline
+with identical seed, camera and thresholds. The extra local pose does not validate
+the final displacement, and one changed-duration session on a development seed
+does not prove a causal duration effect, statistical superiority, held-out visual
+generalization or goal arrival. No candidate is promoted into accepted memory.
+The v5 scientific-core release freezes the keyframe module and passes all thirty
+seeds on both platforms. Reliable navigation, natural scientific integration,
+cross-seed/terrain evaluation and long-operation recovery remain required.
