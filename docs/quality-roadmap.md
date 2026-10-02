@@ -168,3 +168,15 @@ relaxing thresholds or promoting early local intervals as final displacement.
 The optional package source is frozen in current v6 thirty-seed offline releases
 on both platforms. Regressions are 517/519 tests, default-only 329. All broader
 visual, scientific-integration, long-recovery and release requirements remain.
+
+The subsequent-frame veto in `docs/shadow-motion-development.md` is fully
+implemented and replayed over both existing compound acquisitions. Original
+prefix records remain identical; each final audit passes 36 checks. Nevertheless
+the 26.176-degree wrong seed-200 pose still passes, while correct pair predictions
+fall from twelve to seven and the only correct seed-201 pose is lost. It is not
+promoted. The new requirement is explicit public geometric observability/competing
+map discrimination, not merely more time-separated PnP checks: the wrong case's
+two future frames lie inside a WAIT. This is an explanatory lead, not proven
+unique causality. V7 core releases freeze 92 current sources and pass on both
+platforms. All held-out navigation, scientific integration, long-operation and
+complete release gates stay open; this negative method does not shrink the goal.

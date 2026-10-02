@@ -789,3 +789,31 @@ Regressions pass 517/two skips on Windows, 519/two on WSL, default-only 329/42.
 Targeted Ruff, source/wheel builds and unchanged seed-zero MVP acceptance pass.
 Held-out visual generalization, actual goal arrival, integrated natural scientific
 exploration, long-operation recovery and the full release gates remain incomplete.
+
+### Subsequent-frame validation fails to resolve the direction counterexample (2026-10-02)
+
+`docs/shadow-motion-development.md` documents immutable veto-only pose evidence,
+frozen endpoint triangulation and future PnP using original disjoint identities.
+The two subsequent images cannot refit or replace the latched pose. Insufficient
+future budget/identities abstain. All public prefix/shadow computations replay
+before private scoring, with source/evaluator identity checked through completion.
+
+Both existing compound sessions retain every pair and prefix and pass 36 replay
+checks. All original prefix records are unchanged. Seed 200 retains seven correct
+pair predictions and the same 26.176-degree wrong direction, versus twelve correct
+before the veto. Its selected predictions deduplicate to five correct/one wrong
+intervals. Seed 201 loses its sole correct local estimate. The wrong case's two
+future images are publicly scheduled WAIT frames; temporal separation alone does
+not demonstrate discriminating parallax. A biased map remaining reprojection-
+consistent is an explanatory hypothesis, not uniquely established causality.
+
+This optional candidate is not promoted into navigation. Next establish explicit
+public observability/competing-map discrimination and acquire disjoint active-view
+evidence, retaining the wrong case and newly lost positives. Three default schema,
+eleven optional geometry and seven pipeline tests cover the new contracts. V7
+core releases pass thirty seeds/two repeats/eighteen exact artifacts on both
+platforms and freeze 92 source entries. The MVP report is unchanged; Ruff and both
+package builds pass. Reliable navigation, held-out visual generalization, natural
+scientific integration, long-operation recovery and the full release remain open.
+Final regressions pass 538/two skips on Windows, 540/two on WSL and default-only
+332/44 optional/platform skips. All launched verification commands completed.

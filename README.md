@@ -723,6 +723,13 @@ but seed 201 supplies none; a seed-200 leg also passes internal geometry with a
 denominators, stationary controls, duplicate intervals and the retained failure
 are in `docs/compound-motion-development.md`.
 
+A subsequent-image veto now freezes the selected local map/pose and validates two
+new frames using the original disjoint PnP identities. Both full replays pass, but
+the known 26.18-degree wrong direction still passes and several correct poses are
+lost. It remains an optional rejected development candidate, not a navigation
+repair. See `docs/shadow-motion-development.md` for the retained counterexample,
+matched original-prefix comparison and the stronger observability requirement.
+
 The scientific core has a portable offline release verifier:
 
 ```powershell
