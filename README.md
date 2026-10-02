@@ -693,6 +693,25 @@ This localizes a weather-related correspondence problem without proving robust
 navigation. See `docs/controlled-motion-development.md` for the full trial/control
 counts, replay evidence and remaining clear-scene coverage problem.
 
+Past-context background selection, conditioned consensus refinement and an
+explicit private view-bobbing comparison are now independently audited. None
+establishes reliable navigation: moving-endpoint coverage remains zero, and the
+bobbing pair scores 2/8 versus 1/8 fully validated settled movements. The shared
+SDK runtime is untouched. See `docs/stationary-consensus-motion-development.md`.
+
+The scientific core has a portable offline release verifier:
+
+```powershell
+uv run python scripts/verify_core_release.py --seed 0 --seeds 30 --output runs/new-core-release
+```
+
+Windows and WSL each pass thirty worlds with two complete repeats and eighteen
+identical artifacts per seed. Symbol-transfer probes now execute the actually
+learned primitive and independently replay saved actions, preserving the seed-zero
+3-versus-11 intervention result. Equation validation/crisis experiment design uses
+only public observations. See `docs/core-release-verification.md` for boundaries
+and reproduction; these results do not complete open-world scientific exploration.
+
 ```powershell
 uv run --extra geometry pytest
 ```

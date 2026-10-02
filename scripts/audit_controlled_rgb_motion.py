@@ -32,7 +32,21 @@ def audit(route: Path, experiment: Path) -> dict:
         }
     config = json.loads((experiment / "config.json").read_bytes())
     predictions = json.loads((experiment / "report.json").read_bytes())
-    sources, inputs = runtime_sources(), public_inputs(route)
+    configure, infer, source_registry = inference_config, infer_pair, runtime_sources
+    if "variant" in config:
+        from rgb_motion_variants import backend
+
+        try:
+            variant_backend = backend(config["variant"])
+        except ValueError:
+            checks["registered_variant"] = False
+            return {"valid": False, "checks": checks, "evaluation": None}
+        configure, infer, source_registry = (
+            variant_backend.inference_config,
+            variant_backend.infer_pair,
+            variant_backend.runtime_sources,
+        )
+    sources, inputs = source_registry(), public_inputs(route)
     checks.update(
         {
             "runtime_source_set": set(config["source_sha256"]) == set(sources)
@@ -76,7 +90,7 @@ def audit(route: Path, experiment: Path) -> dict:
         ]
     }
     try:
-        expected = inference_config(route, acquisition, report, config["seed"])
+        expected = configure(route, acquisition, report, config["seed"])
     except ValueError:
         checks["public_calibration_recomputed"] = False
         return {"valid": False, "checks": checks, "evaluation": None}
@@ -91,8 +105,7 @@ def audit(route: Path, experiment: Path) -> dict:
     if not all(checks.values()):
         return {"valid": False, "checks": checks, "evaluation": None}
     replay = [
-        infer_pair(route, pair, config, index)
-        for index, pair in enumerate(report["pairs"])
+        infer(route, pair, config, index) for index, pair in enumerate(report["pairs"])
     ]
     checks["all_geometry_replayed"] = _equivalent(replay, predictions["results"])
     checks["sources_inputs_stable"] = all(

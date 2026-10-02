@@ -21,11 +21,24 @@ def main():
     parser.add_argument("route", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--variant", choices=("static-context", "consensus", "static-consensus")
+    )
     args = parser.parse_args()
     acquisition, report, checks = validate_acquisition(args.route)
-    config = inference_config(args.route, acquisition, report, args.seed)
+    configure, infer, source_registry = inference_config, infer_pair, runtime_sources
+    if args.variant is not None:
+        from rgb_motion_variants import backend
+
+        variant_backend = backend(args.variant)
+        configure, infer, source_registry = (
+            variant_backend.inference_config,
+            variant_backend.infer_pair,
+            variant_backend.runtime_sources,
+        )
+    config = configure(args.route, acquisition, report, args.seed)
     args.output.mkdir(parents=True, exist_ok=False)
-    inputs, sources = public_inputs(args.route), runtime_sources()
+    inputs, sources = public_inputs(args.route), source_registry()
     config["input_sha256"] = {name: digest(path) for name, path in inputs.items()}
     config["source_sha256"] = {name: digest(path) for name, path in sources.items()}
     snapshot = args.output / "source-snapshot"
@@ -40,7 +53,7 @@ def main():
     results, failure = [], None
     try:
         for index, pair in enumerate(config["pairs"]):
-            item = infer_pair(args.route, pair, config, index)
+            item = infer(args.route, pair, config, index)
             results.append(item)
             print(
                 json.dumps(

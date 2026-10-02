@@ -257,14 +257,14 @@ def run_full_benchmark(
         world_a, budget=intervention_budget, planner=neural_planner
     )
     transitions_a, samples_a = _ensure_causal_contrasts(world_a, discovery_a)
+    armor_a, platforms_a = _public_inventory(world_a.agent_view.observe())
     untested = [
         (armor_id, height)
-        for armor_id in world_a.evaluator.armor_ids
-        for height in world_a.evaluator.heights
+        for armor_id in armor_a
+        for height in sorted(platforms_a)
         if (armor_id, height) not in discovery_a.tested
     ]
     validation_pair = min(untested) if untested else min(discovery_a.tested)
-    _, platforms_a = _public_inventory(world_a.agent_view.observe())
     validation_records, validation_sample = _trial(
         world_a,
         validation_pair[0],
@@ -324,11 +324,11 @@ def run_full_benchmark(
     transfer_accuracy = _behavioral_accuracy(library_discovery.ir, world_b_library)
 
     world_c = FallWorldFactory.create(seed, law_seed=seed, rule_shift=True)
-    _, platforms_c = _public_inventory(world_c.agent_view.observe())
+    armor_c, platforms_c = _public_inventory(world_c.agent_view.observe())
     counterexample_id: str | None = None
     crisis_delay = 0
-    for armor_id in world_c.evaluator.armor_ids:
-        for height in world_c.evaluator.heights:
+    for armor_id in armor_c:
+        for height in sorted(platforms_c):
             crisis_delay += 1
             _, sample = _trial(world_c, armor_id, height, platforms_c[height])
             prediction = float(
@@ -356,8 +356,8 @@ def run_full_benchmark(
     )
     revision_untested = [
         (armor_id, height)
-        for armor_id in world_c.evaluator.armor_ids
-        for height in world_c.evaluator.heights
+        for armor_id in armor_c
+        for height in sorted(platforms_c)
         if (armor_id, height) not in revision.tested
     ]
     revision_validation_pair = (

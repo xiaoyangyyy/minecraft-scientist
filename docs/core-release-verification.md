@@ -1,0 +1,110 @@
+# Offline scientific-core release verification
+
+`scripts/verify_core_release.py` supplies a portable, default-offline release
+entry point for four-form structured discovery. It does not require Java,
+MineStudio, an API key, OpenCV or an external model. A green result is explicitly
+**not** completion of the visual/open-world project.
+
+## Stronger evidence boundaries
+
+The full equation benchmark now selects independent validation experiments and
+crisis probes from public observations, not from evaluator object/height lists.
+These lists previously repeated publicly visible information, rather than hidden
+law parameters, but the boundary still needed correction. A regression test
+substitutes an evaluator that raises on every access during experiment design;
+separate real tests retain privileged accuracy scoring.
+
+The MVP symbol-transfer probe previously used a boolean to select a fixed recipe.
+It now takes the actual accepted, independently validated primitive and compiles
+its learned body in order. Renaming a primitive does not change behavior; an
+incorrect body is executed and fails instead of being replaced by a successful
+recipe. Unknown operations, missing validation and candidate status reject before
+world creation. Noncompliant success cannot become reuse evidence.
+
+Each MVP run additionally preserves `transfer-evidence.json`,
+`library-transfer-events.jsonl` and `no-library-transfer-events.jsonl`. They bind
+the learned definition to real controlled actions in the same independent world.
+The release verifier reconstructs that world through public observations,
+reexecutes both programs/search policies and compares all saved transitions and
+terminal outputs. It never substitutes success based on a symbol-library flag.
+
+This comparison measures learned executable program reuse versus scratch protocol
+search. It does not prove superiority to a fixed skill library carrying the same
+program, or replace the separately scoped planner/component/LLM comparisons.
+
+## Release contract
+
+Before execution the verifier freezes all package Python sources, itself,
+`pyproject.toml` and `uv.lock`, plus seed list, budget and two repetitions per seed.
+Existing output directories are always refused. Each seed must independently:
+
+- recover tool rules, machine protocols, transformation programs and an equation;
+- pass equation shadow validation, unchanged-law transfer and crisis replacement;
+- persist superseded/accepted tool and equation histories with real counterexamples;
+- retain zero symbols in the no-library condition and positive compression/transfer
+  savings in the library condition;
+- independently replay the executable symbol transfer and its scratch control;
+- validate schema-correct event/theory/symbol artifacts and replay the experience
+  database without writing;
+- reproduce all eighteen artifact byte hashes in a second full run.
+
+The database must be closed and checkpointed, without pending WAL/SHM files,
+before immutable read-only replay. The first development smoke used an ordinary
+read-only SQLite connection, which created auxiliary WAL files and correctly
+failed the exact artifact-set check. That failed directory is retained at
+`runs/core-release-smoke-seed0-v1`; the verifier now avoids that mutation rather
+than ignoring the files. Tests also reject pending WAL, forged theory ancestry,
+unlearned primitive substitution, forged transfer events, changed repeat bytes,
+invalid budgets and incomplete runs. A failure preserves partial evidence and
+exits nonzero, not a smaller passing seed subset.
+
+## Current results (2026-10-01)
+
+`runs/core-release-seeds0-29-v3/report.json` on Windows and
+`runs/core-release-seeds0-29-wsl-v3/report.json` on WSL each pass all six release
+checks for all thirty seeds. Each platform runs sixty complete benchmarks and
+reproduces eighteen artifacts per seed, including the transfer traces and
+experience database. All four learned-law accuracies, revised-law recovery and
+task utility are 1.0 for these finite candidate-language worlds. Every seed learns
+three symbols; reuse ranges from eleven to seventeen. Equation transfer saves
+one experiment in every seed. The mean **reported** benchmark experiment count
+is 53.9333; it is not the total cost of auxiliary transfer/revision/replay runs.
+
+The v1 thirty-seed releases precede the executable-symbol transfer correction and
+contain fifteen artifacts per repetition. The v2 eighteen-artifact runs precede
+the added partial-output refusal checks. Both are historical checks, not the
+current source-frozen release. Neither local multi-seed verification
+proves remote CI execution, fresh live-server gates, learned-planner release
+comparisons, broad visual generalization or integrated long-horizon exploration.
+
+Final regression passes **439 tests/two skips on Windows**, **441/two on WSL**,
+and **295/35 optional or platform skips** in a clean default-only installation.
+Targeted Ruff and both package builds pass. Default-only checks have no optional
+visual/MineStudio/OpenAI runtime and still exercise the complete release verifier.
+
+The current seed-zero MVP report at
+`runs/executable-symbol-regression-mvp-seed0/benchmark.json` remains byte-identical
+to the earlier regression: SHA-256
+`B95AF2E5C152B9F06EDC63004EA87FB183C37E6A5A13BFF53F21A39A4F48AEB8`.
+It retains 47 experiments, accuracy/task success 1.0, detection delay one, eight
+repairs, three symbols/thirteen reuses and transfer **three versus eleven**
+interventions. The new transfer evidence verifies the last comparison through
+actual primitive execution rather than changing these legacy metric fields.
+
+## Commands
+
+From the repository root:
+
+```powershell
+uv run pytest
+uv run python scripts/verify_core_release.py --seed 0 --seeds 30 --output runs/new-core-release
+uv run minecraft-scientist benchmark --suite mvp --seed 0 --output runs/new-mvp
+uv build
+```
+
+The same Python entry point runs in the dedicated WSL environment. Each run freezes
+its executing source bytes; within-platform exact-repeat claims do not imply that
+Windows CRLF output and Linux LF output have identical byte hashes. Core tests run
+on both platforms and public scientific results agree, while runtime identity is
+recorded separately. Use frozen historical source snapshots for old artifact
+replay; current-source checks intentionally fail after substantive source changes.

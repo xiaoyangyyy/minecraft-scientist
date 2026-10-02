@@ -8,6 +8,7 @@ internal geometric validation, not independent ground-truth navigation evidence.
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, FiniteFloat, model_validator
@@ -242,10 +243,10 @@ def _endpoint_sensitivity(
     config: MotionStabilityConfig,
     motion_config: TwoViewMotionConfig,
     seed: int,
+    endpoint_estimator: Callable | None = None,
 ) -> StableMotionEvidence:
-    candidate = estimate_temporal_endpoint(
-        matches, camera, config=motion_config, seed=seed
-    )
+    estimator = endpoint_estimator or estimate_temporal_endpoint
+    candidate = estimator(matches, camera, config=motion_config, seed=seed)
     if not candidate.supported:
         return StableMotionEvidence(
             supported=False, reason="refitted endpoint unsupported", candidate=candidate
@@ -292,7 +293,7 @@ def _endpoint_sensitivity(
             image_shape1=matches.image_shape1,
             raw_match_count=int(valid.sum()),
         )
-        fit = estimate_temporal_endpoint(
+        fit = estimator(
             perturbed, perturbed_camera, config=motion_config, seed=seed + index + 1
         )
         if not fit.supported:
@@ -361,13 +362,13 @@ def estimate_multiview_motion(
     *,
     config: MultiViewMotionConfig | None = None,
     seed: int = 0,
+    endpoint_estimator: Callable | None = None,
 ) -> MultiViewMotionEvidence:
     config = config or MultiViewMotionConfig()
     camera = np.asarray(camera, dtype=float)
     matches = tracks.endpoint_correspondences()
-    candidate = estimate_temporal_endpoint(
-        matches, camera, config=config.two_view, seed=seed
-    )
+    estimator = endpoint_estimator or estimate_temporal_endpoint
+    candidate = estimator(matches, camera, config=config.two_view, seed=seed)
     base = {"candidate": candidate}
     if not candidate.supported:
         return MultiViewMotionEvidence(
@@ -516,6 +517,7 @@ def estimate_multiview_motion(
         config=config.stability,
         motion_config=config.two_view,
         seed=seed,
+        endpoint_estimator=endpoint_estimator,
     )
     base["sensitivity"] = sensitivity
     if not sensitivity.supported:

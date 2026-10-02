@@ -648,3 +648,53 @@ MVP report remains unchanged. Next priorities are static-background seed selecti
 and robust early endpoint refinement, followed by fresh held-out acquisition.
 This advances diagnosis and guarded real-motion evidence without completing the
 original scientific/open-world/long-operation objective.
+
+### Stationary context, consensus and explicit camera profiles (2026-10-01)
+
+`docs/stationary-consensus-motion-development.md` records three registered
+public-only motion variants. Every run retains all thirty pairs and passes thirty
+independent replay checks. Clear consensus validates one settled movement and one
+actual late-WAIT drift, but still zero moving endpoints; both thunder variants
+validate zero movements. All thirteen actual controls per run reject correctly.
+There is no overall positive-coverage improvement or planner promotion.
+
+Two fresh noon/clear acquisitions explicitly supply bobView enabled/disabled
+through bounded process-private runtime copies. Actual launch options, source and
+binding snapshots pass twelve checks per profile, and motion replay passes thirty
+per case. The consolidated comparison passes six checks and confirms identical
+201-frame physical trajectories. Enabled/disabled scores remain 0/8 moving and
+2/8 versus 1/8 settled, with median settled tracks 131.5 versus 134.0. This is one
+session per setting, not statistical superiority or proof of an actual engine
+flag. No shared SDK settings, terrain, physics or accepted map are edited.
+
+### Public equation design and executable-symbol release (2026-10-01)
+
+The full equation benchmark no longer enumerates validation/crisis interventions
+through evaluator IDs/heights. Its public-design boundary has a forbidden-evaluator
+test plus separate real accuracy tests. The symbol-transfer benchmark no longer
+maps a boolean to a fixed canonical recipe: it compiles the accepted learned body,
+executes it and persists both library/scratch transfer traces. Wrong learned order
+fails rather than receiving a substituted successful recipe; incomplete validation,
+invalid operations and noncompliant success are rejected.
+
+`docs/core-release-verification.md` documents the new portable offline verifier.
+Current Windows/WSL v3 releases each complete thirty seeds, two full repeats per
+seed, eighteen byte-identical artifacts per repeat and all six release checks.
+The verifier independently reexecutes symbol transfer, validates theory ancestry,
+requires complete artifact sets and replays checkpointed SQLite without writes.
+All four law recoveries, equation transfer/revision and task utility are 1.0 in
+this finite structured suite. Three symbols are learned in each seed, with eleven
+to seventeen reuses; equation transfer saves one experiment. This is not a live
+or visual release, remote CI evidence or superiority to equal-program skill memory.
+
+The seed-zero MVP report is byte-identical to the earlier report and retains the
+3-versus-11 executable program transfer result. Core release v1 and the failed
+ordinary-read-only SQLite smoke remain historical evidence; they are not relabeled
+as the current eighteen-artifact release. Reliable goal navigation, held-out
+seed/terrain RGB generalization, integrated natural scientific exploration and
+long-operation recovery remain incomplete. The overall goal stays active.
+
+Final regression: Windows 439 passed/two skips, WSL 441/two, clean default-only
+installation 295/35 optional or platform skips. Targeted Ruff and source/wheel
+builds pass. Existing reports/partial transfer traces reject before experiments;
+no overwrite is inferred from an incomplete output directory.

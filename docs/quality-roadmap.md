@@ -9,14 +9,14 @@ until each required gate has current, inspectable evidence.
 
 | Gate | Required behavior and evidence | Current assessment |
 |---|---|---|
-| Executable scientific discovery | Recover equation, rule, state-machine and program theories through controlled interventions; predict unseen interventions; resolve theory crises through independently validated versions | Strong structured and live-fixture evidence exists; revalidate against current release |
-| Evolving symbols | Promote learned executable abstractions only after independent reuse; demonstrate compression and intervention savings against no-library and fixed-library controls | Existing paired ablations; inspect scope and reproduce release matrix |
+| Executable scientific discovery | Recover equation, rule, state-machine and program theories through controlled interventions; predict unseen interventions; resolve theory crises through independently validated versions | Current thirty-seed offline releases pass on Windows/WSL with public equation experiment design; live-fixture release revalidation remains |
+| Evolving symbols | Promote learned executable abstractions only after independent reuse; demonstrate compression and intervention savings against no-library and fixed-library controls | Current transfer executes learned definitions and independently replays both traces over thirty seeds; fixed-library/planner comparison release remains separately required |
 | Honest comparison | Matched budgets, shared evidence, random/context/skill-memory/fixed-symbol/full-system baselines; report per-seed samples, uncertainty and costs | Existing evidence; verify statistical claims and separation of offline/LLM/live results |
 | Visual generalization | Anonymous RGB observations, calibrated positive/negative boundaries, ambiguity rejection, held-out sessions/seeds/terrain/conditions; no evaluator labels in policy | Bounded natural scenes and condition shifts verified; broad terrain/seed generalization incomplete |
 | Persistent cognitive map | Recover journal and projections after restart; bounded exemplars; executable directed routes; reject false loops; retain unknowns, failures and theory references | Persistent route reuse verified; longer exploration and recovery need expansion |
 | Open-world scientific exploration | Select reachable experiments by information gain, execute them in natural worlds, expand/reuse the map, discover mechanisms and revise theories with a fixed budget | Natural navigation and live scientific fixtures remain separate; integration incomplete |
 | Reliable goal navigation | Use agent-visible spatial evidence; independently verify arrival; no privileged runner-up selection; compare against appearance-only navigation on held-out trajectories | Appearance-only goal search has a verified counterexample |
-| Reproducible engineering | Clean installation, automated portable core checks, explicit optional backends, bounded processes/timeouts, frozen source/data provenance, meaningful tests and documentation | Package/tests/build verified locally; portable CI and release evidence need consolidation |
+| Reproducible engineering | Clean installation, automated portable core checks, explicit optional backends, bounded processes/timeouts, frozen source/data provenance, meaningful tests and documentation | Portable offline core verifier passes thirty seeds/two repeats on both platforms; clean default tests/build pass locally; remote CI and full release consolidation remain |
 
 ## Execution order
 
