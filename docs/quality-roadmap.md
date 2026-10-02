@@ -300,3 +300,19 @@ already-triggered first-leg global loss criterion. Next test phase-relative new
 loss with unchanged IDs/absolute gates/budgets, then fresh excitation and
 second-leg map validation. Do not substitute diagnostic green checks for the
 full held-out, science/map integration, long-recovery and release requirements.
+
+The phase-relative correction now executes a fresh 188-frame/eight-probe capture;
+all second legs reach four ticks. Independent replay passes 26 checks over all
+46 records/136 prefixes, but two second-leg directions remain wrong (22.762669/
+20.831977 degrees). Only one correct first-leg interval survives the optional
+diagnostic, with antiparallel shadow motion and an incomplete no-witness family,
+not unique/non-collinear validation. All fourteen stationary controls reject.
+The public map-ID trace identifies the next concrete action: at tick two one
+candidate has 48/48 projected-at-risk landmarks, while generic edge risk is only
+0.117845; by tick three its fitting/withheld support collapses to 7/1. Integrate
+online candidate-specific landmark protection and second-leg subsequent-control
+validation, then independent fresh accuracy/generalization/integration/recovery.
+Do not relax the 20-degree gate or promote generic point retention as navigation.
+Full regressions pass 725/727 on Windows/WSL (two skips each), default-only offline
+408/60, and both V14 thirty-seed releases (98 source entries). Complete evidence
+is in `docs/phase-visibility-development.md`; the full objective remains active.

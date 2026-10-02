@@ -778,6 +778,14 @@ passes 26 checks. It retains four/eight correct combined local intervals, but a
 No navigation promotion follows; `docs/visibility-map-validation-development.md`
 records the complete result and a phase-relative acquisition correction to test.
 
+The phase-relative correction now completes a fresh 188-frame/eight-probe capture
+and all 26 independent map-audit checks. Second legs no longer retrigger old
+first-leg loss, but two supported directions still exceed the fixed error gate;
+no navigation promotion follows. The next diagnosed issue is loss of actual
+fitted/withheld map landmarks despite generic track survival. See
+`docs/phase-visibility-development.md` for all denominators, costs, original-ID
+loss traces and unchanged full-project requirements.
+
 The scientific core has a portable offline release verifier:
 
 ```powershell

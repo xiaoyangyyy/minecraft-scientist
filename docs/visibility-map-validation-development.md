@@ -5,6 +5,10 @@ The original raw capture remains byte-unchanged at revision `0b34945`, including
 its deliberately deferred formatter-only addition. Runtime/core package sources
 remain the V13 98-entry checkpoint.
 
+This is the historical V13/raw-V1 checkpoint after the phase-relative controller
+change. Its source snapshots/results remain unchanged, not current-controller
+acceptance. Fresh V14/raw-V2 evidence is in `phase-visibility-development.md`.
+
 ## Public-first computation
 
 `visibility_capture_common.py` independently verifies the public parent plan,

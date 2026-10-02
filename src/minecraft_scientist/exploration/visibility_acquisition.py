@@ -27,6 +27,7 @@ from .visual_geometry import _cells, _frame
 class VisibilityPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    retention_reference: Literal["phase_start_v2"] = "phase_start_v2"
     minimum_leg_ticks: int = Field(default=2, ge=2, le=8, strict=True)
     maximum_first_ticks: int = Field(default=6, ge=2, le=12, strict=True)
     maximum_second_ticks: int = Field(default=4, ge=2, le=12, strict=True)
@@ -61,6 +62,8 @@ class VisibilityDecision(BaseModel):
     retained_ids: tuple[StrictInt, ...]
     initial_track_count: int = Field(ge=0, strict=True)
     retention_fraction: FiniteFloat = Field(ge=0, le=1)
+    phase_initial_track_count: int = Field(ge=0, strict=True)
+    phase_retention_fraction: FiniteFloat = Field(ge=0, le=1)
     projected_edge_fraction: FiniteFloat = Field(ge=0, le=1)
     occupied_cells: int = Field(ge=0, le=16, strict=True)
     endpoint_tick: int | None = Field(default=None, ge=2, strict=True)
@@ -72,10 +75,27 @@ class VisibilityDecision(BaseModel):
             tuple(sorted(set(self.retained_ids))) != self.retained_ids
             or any(item < 0 for item in self.retained_ids)
             or len(self.retained_ids) > self.initial_track_count
+            or not (
+                len(self.retained_ids)
+                <= self.phase_initial_track_count
+                <= self.initial_track_count
+            )
+            or (
+                self.phase == "first"
+                and self.phase_initial_track_count != self.initial_track_count
+            )
             or not np.isclose(
                 self.retention_fraction,
                 len(self.retained_ids) / self.initial_track_count
                 if self.initial_track_count
+                else 0.0,
+                atol=1e-12,
+                rtol=0,
+            )
+            or not np.isclose(
+                self.phase_retention_fraction,
+                len(self.retained_ids) / self.phase_initial_track_count
+                if self.phase_initial_track_count
                 else 0.0,
                 atol=1e-12,
                 rtol=0,
@@ -130,6 +150,7 @@ class VisibilityController:
         self._previous = None
         self._retained = None
         self._initial_count = 0
+        self._phase_count = None
         self._decisions = []
 
     @property
@@ -200,8 +221,13 @@ class VisibilityController:
         cells = _cells(current_pixels, height, width) if ids else 0
         tick = tracks.frame_count - 1
         phase = "first" if self.endpoint_tick is None else "second"
+        # A switch changes only the loss denominator, never the identities or
+        # absolute support requirement. Reusing global loss in the second leg
+        # would immediately retrigger a threshold already crossed in the first.
+        phase_count = initial_count if phase == "first" else self._phase_count
+        phase_retention = len(ids) / phase_count if phase_count else 0.0
         risk = (
-            retention <= self.policy.retention_trigger
+            phase_retention <= self.policy.retention_trigger
             or edge_fraction >= self.policy.projected_edge_trigger
         )
         insufficient = (
@@ -247,6 +273,8 @@ class VisibilityController:
             retained_ids=ids,
             initial_track_count=initial_count,
             retention_fraction=retention,
+            phase_initial_track_count=phase_count,
+            phase_retention_fraction=phase_retention,
             projected_edge_fraction=edge_fraction,
             occupied_cells=cells,
             endpoint_tick=endpoint,
@@ -259,6 +287,8 @@ class VisibilityController:
             initial_count,
         )
         self.endpoint_tick, self.next_handle = endpoint, handle
+        if instruction == "switch":
+            self._phase_count = len(ids)
         self._decisions.append(decision)
         return decision
 

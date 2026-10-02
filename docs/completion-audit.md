@@ -964,3 +964,30 @@ settle control really moves and remains unsupported. Full denominators, source
 boundaries, aborted-trial tests and the next phase-relative controller correction
 are in `docs/visibility-map-validation-development.md`. Navigation and all broad
 project requirements remain unachieved.
+
+### Phase-relative acquisition and map-identity diagnosis (2026-10-02)
+
+The corrected controller separates new second-phase loss from original-anchor
+loss, retaining original IDs/absolute support and unchanged action/error budgets.
+Fresh acquisition completes 188 frames/eight probes; every second leg reaches
+four ticks. The independent 26-check replay covers all 46 records/136 prefixes,
+with seven unique selected intervals/five correct/two wrong. Second-leg direction
+errors of 22.762669/20.831977 degrees remain above the unchanged 20-degree gate.
+All fourteen stationary controls reject. One correct first-leg map passes the
+optional diagnostic, but its shadow is antiparallel and the no-witness family is
+incomplete, not proof of unique map or reliable navigation.
+
+Public landmark replay shows why another correct first-leg map becomes
+unobservable: its 36 fitting/12 withheld points at tick two fall to 7/1 by tick
+three despite 222 generic survivors. All 48 map points had projected-edge risk
+at tick two, while the generic risk was only 0.117845. Next protect actually fitted
+map identities online and validate second-leg maps after further controls, without
+resurrection, hidden-label policy or relaxed geometry. See
+`docs/phase-visibility-development.md` for complete costs/source boundaries.
+
+Seven new tests and full regressions pass Windows 725/WSL 727 (two skips each),
+default-only offline 408/60. Both V14 thirty-seed/two-repeat/eighteen-artifact core
+releases pass six checks and all 98 current source hashes. Seed-zero MVP bytes
+remain identical. None completes the still-required held-out navigation, natural
+science/map integration, long recovery or consolidated live release/baseline/CI
+requirements. Overall completion remains unproven.

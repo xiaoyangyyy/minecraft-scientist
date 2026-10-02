@@ -143,11 +143,15 @@ def run(plan_directory, output):
             ),
         }
     )
-    package = Path(MineStudioVisualAdapter.step.__code__.co_filename).resolve().parents[1]
-    source_paths.update({
-        f"package/{path.relative_to(package).as_posix()}": path
-        for path in sorted(package.rglob("*.py"))
-    })
+    package = (
+        Path(MineStudioVisualAdapter.step.__code__.co_filename).resolve().parents[1]
+    )
+    source_paths.update(
+        {
+            f"package/{path.relative_to(package).as_posix()}": path
+            for path in sorted(package.rglob("*.py"))
+        }
+    )
     prior = json.loads((plan_directory / "config.json").read_bytes())
     inputs = planner.inputs(
         ROOT / prior["source_acquisition"], ROOT / prior["source_predictions"]

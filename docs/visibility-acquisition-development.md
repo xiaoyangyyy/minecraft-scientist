@@ -1,5 +1,10 @@
 # Visibility-aware causal acquisition
 
+The original-global-loss results below are historical after the phase-relative
+policy correction. `phase-visibility-development.md` records the new explicit
+policy version, fresh acquisition and evidence boundary; old artifacts are not
+rewritten or promoted as current-controller validation.
+
 `exploration/visibility_acquisition.py` implements an executable bounded probe,
 not another pose acceptance threshold. It chooses anonymous movement handles one
 tick at a time from current public RGB tracks. Two distinct handles are requested;

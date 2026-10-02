@@ -60,8 +60,8 @@ exits nonzero, not a smaller passing seed subset.
 
 ## Current results (2026-10-02)
 
-`runs/core-release-seeds0-29-windows-v13/report.json` on Windows and
-`runs/core-release-seeds0-29-wsl-v13/report.json` on WSL each pass all six release
+`runs/core-release-seeds0-29-windows-v14/report.json` on Windows and
+`runs/core-release-seeds0-29-wsl-v14/report.json` on WSL each pass all six release
 checks for all thirty seeds. Each platform runs sixty complete benchmarks and
 reproduces eighteen artifacts per seed, including the transfer traces and
 experience database. All four learned-law accuracies, revised-law recovery and
@@ -80,7 +80,8 @@ public provisional action selection and conditional parallax diagnosis. V9 adds
 the optional bounded competing-map diagnostic and weak-anchor resampling. V10
 adds original-map replay and the optional direction-constrained map search. V11
 adds optional frozen-map action-switch validation. V12 adds a causal visibility
-controller; V13 repairs its anchor-denominator definition. All 98
+controller; V13 repairs its anchor-denominator definition, and V14 separates
+second-phase new loss from original-anchor loss. All 98
 current frozen source hashes match. Core behavior
 is unchanged by those optional modules.
 These earlier runs are historical checks, not the current source-frozen release.
@@ -88,7 +89,7 @@ Neither local multi-seed verification
 proves remote CI execution, fresh live-server gates, learned-planner release
 comparisons, broad visual generalization or integrated long-horizon exploration.
 
-The adaptive-map audit checkpoint regression passes **718 tests/two
+The historical adaptive-map audit checkpoint regression passes **718 tests/two
 skips on Windows**, **720/two on WSL**, and **401/60 optional or platform skips**
 in a clean default-only installation.
 Targeted Ruff and both package builds pass. Default-only checks have no optional
@@ -103,13 +104,22 @@ downloads are separate from the algorithm's offline/no-model runtime contract.
 The subsequent decorator-source locator correction affects experiment scripts,
 not the then-96-entry package/core ledger. V10 is historical after adding the
 action-switch module. V11 matches the prior 97-entry checkpoint; V13 freezes the
-current 98-entry core after visibility-controller refinement. Visual
+prior 98-entry core after anchor-denominator refinement. V14 freezes the current
+phase-relative controller. Visual
 inference/plan/diagnostic manifests have a separate historical
 boundary after that correction, detailed in `docs/source-ledger-development.md`.
 The scientific-core verifier does not substitute for their source checks.
 
+The phase-relative V14 checkpoint passes **725/two skips on Windows**,
+**727/two on WSL**, and **408/60 in the isolated default-only offline installation**.
+All 98 V14 source entries were rechecked after execution on both platforms, with
+zero mismatches. Targeted Ruff/format checks and the package build pass. Fresh
+adaptive capture and independent map auditing complete, but two direction errors
+remain; see `docs/phase-visibility-development.md`. These results are not reliable
+navigation or completion of the broad project requirements.
+
 The current seed-zero MVP report at
-`runs/visibility-regression-mvp-seed0/benchmark.json` remains byte-identical
+`runs/phase-visibility-regression-mvp-seed0/benchmark.json` remains byte-identical
 to the earlier regression: SHA-256
 `B95AF2E5C152B9F06EDC63004EA87FB183C37E6A5A13BFF53F21A39A4F48AEB8`.
 It retains 47 experiments, accuracy/task success 1.0, detection delay one, eight

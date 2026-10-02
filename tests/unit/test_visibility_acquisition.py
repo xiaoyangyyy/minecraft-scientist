@@ -61,9 +61,73 @@ def test_retention_loss_requests_earlier_control_and_never_replenishes_ids():
     assert (
         decision.retained_ids == tuple(range(50))
         and decision.retention_fraction == 50 / 80
+        and decision.phase_initial_track_count == 50
+        and decision.phase_retention_fraction == 1
     )
     decision = controller.observe(tracks(4))
+    assert decision.instruction == "continue"
+    assert controller.observe(tracks(5)).instruction == "continue"
+    decision = controller.observe(tracks(6))
+    assert decision.instruction == "finish" and decision.holdout_ticks == (3, 6)
+
+
+def test_second_phase_new_loss_triggers_at_minimum_without_replenishment():
+    controller = VisibilityController((6, 1))
+    controller.observe(tracks(1))
+    switched = controller.observe(tracks(2, tuple(range(50))))
+    assert switched.phase_initial_track_count == 80
+    early = controller.observe(tracks(3, tuple(range(35))))
+    assert early.instruction == "continue"  # Minimum duration remains two ticks.
+    decision = controller.observe(tracks(4))  # Raw tracker returns lost IDs.
     assert decision.instruction == "finish" and decision.holdout_ticks == (3, 4)
+    assert decision.retained_ids == tuple(range(35))
+    assert decision.initial_track_count == 80
+    assert decision.retention_fraction == 35 / 80
+    assert decision.phase_initial_track_count == 50
+    assert decision.phase_retention_fraction == 35 / 50
+
+
+def test_second_phase_absolute_support_aborts_even_before_loss_trigger():
+    controller = VisibilityController((6, 1))
+    controller.observe(tracks(1))
+    controller.observe(tracks(2, tuple(range(40))))
+    decision = controller.observe(tracks(3, tuple(range(31))))
+    assert decision.phase_retention_fraction > controller.policy.retention_trigger
+    assert decision.instruction == "abort" and not decision.holdout_ticks
+
+
+@pytest.mark.parametrize(
+    "updates",
+    [
+        {"phase_initial_track_count": 81},
+        {"phase_initial_track_count": 30},
+        {"phase_initial_track_count": 80, "phase_retention_fraction": 50 / 80},
+        {"phase_retention_fraction": 0.9},
+    ],
+)
+def test_phase_retention_schema_rejects_inconsistent_denominators(updates):
+    controller = VisibilityController((6, 1))
+    controller.observe(tracks(1))
+    controller.observe(tracks(2, tuple(range(50))))
+    decision = controller.observe(tracks(3, tuple(range(35))))
+    forged = decision.model_dump() | updates
+    with pytest.raises(ValidationError):
+        VisibilityDecision.model_validate(forged)
+
+
+def test_first_phase_normalizer_and_policy_version_are_explicit():
+    policy = VisibilityPolicy()
+    assert policy.model_dump()["retention_reference"] == "phase_start_v2"
+    with pytest.raises(ValidationError):
+        VisibilityPolicy(retention_reference="global_v1")
+    decision = VisibilityController((0, 1)).observe(tracks(1, tuple(range(50))))
+    assert decision.phase_initial_track_count == decision.initial_track_count == 80
+    assert decision.phase_retention_fraction == decision.retention_fraction == 50 / 80
+    with pytest.raises(ValidationError):
+        VisibilityDecision.model_validate(
+            decision.model_dump()
+            | {"phase_initial_track_count": 50, "phase_retention_fraction": 1}
+        )
 
 
 def test_first_action_loss_is_not_normalized_out_of_retention():
