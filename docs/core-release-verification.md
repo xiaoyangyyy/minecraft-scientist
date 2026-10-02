@@ -60,8 +60,8 @@ exits nonzero, not a smaller passing seed subset.
 
 ## Current results (2026-10-02)
 
-`runs/core-release-seeds0-29-windows-v11/report.json` on Windows and
-`runs/core-release-seeds0-29-wsl-v11/report.json` on WSL each pass all six release
+`runs/core-release-seeds0-29-windows-v13/report.json` on Windows and
+`runs/core-release-seeds0-29-wsl-v13/report.json` on WSL each pass all six release
 checks for all thirty seeds. Each platform runs sixty complete benchmarks and
 reproduces eighteen artifacts per seed, including the transfer traces and
 experience database. All four learned-law accuracies, revised-law recovery and
@@ -79,7 +79,8 @@ acquisition schedule. Version v7 adds the optional subsequent-image veto; v8 add
 public provisional action selection and conditional parallax diagnosis. V9 adds
 the optional bounded competing-map diagnostic and weak-anchor resampling. V10
 adds original-map replay and the optional direction-constrained map search. V11
-adds optional frozen-map action-switch validation. All 97
+adds optional frozen-map action-switch validation. V12 adds a causal visibility
+controller; V13 repairs its anchor-denominator definition. All 98
 current frozen source hashes match. Core behavior
 is unchanged by those optional modules.
 These earlier runs are historical checks, not the current source-frozen release.
@@ -87,24 +88,28 @@ Neither local multi-seed verification
 proves remote CI execution, fresh live-server gates, learned-planner release
 comparisons, broad visual generalization or integrated long-horizon exploration.
 
-Final regression after action-switch validation passes **672 tests/two
-skips on Windows**, **674/two on WSL**, and **378/56 optional or platform skips**
+The visibility-controller checkpoint regression passes **700 tests/two
+skips on Windows**, **702/two on WSL**, and **401/58 optional or platform skips**
 in a clean default-only installation.
 Targeted Ruff and both package builds pass. Default-only checks have no optional
 visual/MineStudio/OpenAI runtime and still exercise the complete release verifier.
+Two later capture-wrapper orchestration tests additionally pass; they are not
+included in those full-suite counts. Fresh live adaptive acquisition/policy/pose
+audits remain separately required.
 Default-only checks pass offline after populating the locked dependency cache;
 the initial isolated offline setup failed on a missing NumPy wheel. Installation
 downloads are separate from the algorithm's offline/no-model runtime contract.
 
 The subsequent decorator-source locator correction affects experiment scripts,
 not the then-96-entry package/core ledger. V10 is historical after adding the
-action-switch module; both V11 manifests match the 97-entry checkpoint. Visual
+action-switch module. V11 matches the prior 97-entry checkpoint; V13 freezes the
+current 98-entry core after visibility-controller refinement. Visual
 inference/plan/diagnostic manifests have a separate historical
 boundary after that correction, detailed in `docs/source-ledger-development.md`.
 The scientific-core verifier does not substitute for their source checks.
 
 The current seed-zero MVP report at
-`runs/action-switch-regression-mvp-seed0/benchmark.json` remains byte-identical
+`runs/visibility-regression-mvp-seed0/benchmark.json` remains byte-identical
 to the earlier regression: SHA-256
 `B95AF2E5C152B9F06EDC63004EA87FB183C37E6A5A13BFF53F21A39A4F48AEB8`.
 It retains 47 experiments, accuracy/task success 1.0, detection delay one, eight

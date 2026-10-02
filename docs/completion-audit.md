@@ -932,3 +932,25 @@ V11 core releases freeze 97 entries and reproduce all eighteen artifacts across
 thirty seeds/two repeats on each platform; seed-zero MVP bytes remain unchanged.
 None proves outstanding held-out navigation, natural science/map integration,
 long recovery or full release gates. The full objective remains incomplete.
+
+### Causal visibility-aware acquisition (2026-10-02)
+
+An executable one-tick RGB/public-receipt controller now switches controls before
+declared visibility loss, without pose/hidden-state inputs or track replenishment.
+All sixteen old movement legs are causally replayed/censored, with fifteen switch
+requests and ten independent replay checks passing. Anchor 152 requests at tick
+two with 206 original points. Old fixed-path images cannot evaluate the requested
+counterfactual, so this is not error detection or navigation success.
+
+The fresh adaptive capture wrapper is implemented; independent acquisition,
+causal-policy and frozen-map/pose audits remain required. Full checkpoint tests
+pass 700/702 on Windows/WSL (two skips each), default-only offline 401/58;
+28 targeted tests and two later wrapper tests pass separately. V13 thirty-seed
+core releases freeze 98 entries and pass six checks. See
+`docs/visibility-acquisition-development.md`. Held-out navigation, integrated
+natural science/maps, long recovery and consolidated release remain unachieved.
+
+The first fresh adaptive visibility run completes 172 RGB frames/eight probes,
+with seven raw integrity gates passing and 102-to-240 retained IDs per completion.
+These are acquisition records, not independent causal/map/pose evidence. Its
+public-first independent audit is still required. No navigation gate is promoted.

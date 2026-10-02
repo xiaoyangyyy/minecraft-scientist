@@ -267,3 +267,23 @@ do not loosen geometry or declare abstention success. The checkpoint passes full
 Windows/WSL regressions 672/674 (two skips each), default-only offline 378/56,
 and both V11 thirty-seed/two-repeat/eighteen-artifact core releases (97 entries).
 All original held-out/integration/long-recovery/full-release requirements remain.
+
+The executable causal visibility controller now operates on one-tick RGB/receipt
+callbacks, preserving frozen-prefix pixels and monotonic identities. Independent
+request replay passes ten checks over all sixteen old development movement legs:
+fifteen request earlier control, one is censored. Anchor 152 requests at tick two
+while 206 original points remain. This is an acquisition opportunity, not repaired
+pose accuracy. A fresh natural capture runner is implemented with a 209-frame
+ceiling; independent fresh policy/map/pose validation is next, then disjoint-world
+generalization and the full integration/recovery/release scope. The checkpoint
+passes 700/702 full tests (two skips each), 401/58 default-only offline, 28 targeted
+tests and two additional wrapper tests; V13 core releases freeze 98 entries.
+Do not replace the broad objective with more diagnostic/unit-test success.
+
+Fresh `controlled-rgb-visibility-seed201-clear-v1` acquisition now actually
+executes all eight adaptive probes, completes 172 RGB frames and passes seven
+raw integrity checks. Reported original track retention remains 102-to-240 at
+completion. This is not yet independent policy/map/pose validation or navigation
+accuracy; that complete public-first audit is the next action. Keep the script
+bytes frozen through that audit (one minor formatter change remains), then version
+further acquisitions without rewriting historical source ledgers.

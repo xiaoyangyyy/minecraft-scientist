@@ -765,6 +765,13 @@ not reliably detected. All 54 replay checks pass. The next implementation target
 is visibility-aware online acquisition, not later fixed views or relaxed gates.
 See `docs/action-switch-motion-development.md` for the complete negative result.
 
+A causal visibility-aware controller now requests different anonymous controls
+one tick at a time, preserving original track IDs and excluding failed actions
+from evidence. Real-image replay verifies earlier requests, not counterfactual
+navigation success. A source-bound fresh acquisition runner is implemented; its
+independent control/map/pose validation remains required. See
+`docs/visibility-acquisition-development.md` for limits, costs and reproduction.
+
 The scientific core has a portable offline release verifier:
 
 ```powershell
