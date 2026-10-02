@@ -715,6 +715,14 @@ promotion or reliable navigation claim follows. Source-bound capture, all positi
 and negative results, reproduction and remaining gates are documented in
 `docs/keyframe-motion-development.md`.
 
+Fresh distinct-handle two-leg acquisitions retain 450 RGB frames across the two
+existing development worlds and independently replay all 328 prefix fits. Seed
+200 supplies four correct combined-motion **local** intervals in eight trials,
+but seed 201 supplies none; a seed-200 leg also passes internal geometry with a
+26.18-degree direction error. The method is not promoted into navigation. Full
+denominators, stationary controls, duplicate intervals and the retained failure
+are in `docs/compound-motion-development.md`.
+
 The scientific core has a portable offline release verifier:
 
 ```powershell

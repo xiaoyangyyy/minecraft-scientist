@@ -60,8 +60,8 @@ exits nonzero, not a smaller passing seed subset.
 
 ## Current results (2026-10-02)
 
-`runs/core-release-seeds0-29-v5/report.json` on Windows and
-`runs/core-release-seeds0-29-wsl-v5/report.json` on WSL each pass all six release
+`runs/core-release-seeds0-29-v6/report.json` on Windows and
+`runs/core-release-seeds0-29-wsl-v6/report.json` on WSL each pass all six release
 checks for all thirty seeds. Each platform runs sixty complete benchmarks and
 reproduces eighteen artifacts per seed, including the transfer traces and
 experience database. All four learned-law accuracies, revised-law recovery and
@@ -74,20 +74,21 @@ The v1 thirty-seed releases precede the executable-symbol transfer correction an
 contain fifteen artifacts per repetition. The v2 eighteen-artifact runs precede
 the added partial-output refusal checks. The v3 releases precede the addition of
 the optional plane-motion source; v4 freezes that source, while v5 additionally
-freezes the optional chronological keyframe policy. The structured core behavior
+freezes the optional chronological keyframe policy, and v6 adds the public compound
+acquisition schedule. All 91 current frozen source hashes match. Core behavior
 is unchanged by those optional modules.
 These earlier runs are historical checks, not the current source-frozen release.
 Neither local multi-seed verification
 proves remote CI execution, fresh live-server gates, learned-planner release
 comparisons, broad visual generalization or integrated long-horizon exploration.
 
-Final regression passes **496 tests/two skips on Windows**, **498/two on WSL**,
-and **318/41 optional or platform skips** in a clean default-only installation.
+Final regression passes **517 tests/two skips on Windows**, **519/two on WSL**,
+and **329/42 optional or platform skips** in a clean default-only installation.
 Targeted Ruff and both package builds pass. Default-only checks have no optional
 visual/MineStudio/OpenAI runtime and still exercise the complete release verifier.
 
 The current seed-zero MVP report at
-`runs/executable-symbol-regression-mvp-seed0/benchmark.json` remains byte-identical
+`runs/compound-regression-mvp-seed0/benchmark.json` remains byte-identical
 to the earlier regression: SHA-256
 `B95AF2E5C152B9F06EDC63004EA87FB183C37E6A5A13BFF53F21A39A4F48AEB8`.
 It retains 47 experiments, accuracy/task success 1.0, detection delay one, eight

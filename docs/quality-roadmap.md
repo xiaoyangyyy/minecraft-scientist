@@ -154,3 +154,17 @@ freeze the optional keyframe source and pass on both platforms; full regressions
 are 496/498, with clean default-only installation passing 318 tests. All original
 requirements remain in scope; broad visual/natural scientific integration and
 the other outstanding completion gates stay open.
+
+The distinct-handle compound follow-up in `docs/compound-motion-development.md`
+adds two fresh 225-frame acquisitions on the existing development seeds 200/201.
+All 328 public prefix fits replay independently; both final audits pass 35 checks.
+Only three/four of the eight scheduled trials actually form horizontal turns.
+Seed 200 supplies correct combined-motion local intervals in four trials, versus
+none in seed 201. A seed-200 single leg passes existing geometric/sensitivity
+gates with 26.176-degree direction error, exceeding the fixed tolerance. It is
+retained as a counterexample; integrity success is not navigation acceptance.
+Next implement independent subsequent-frame map/pose validation rather than
+relaxing thresholds or promoting early local intervals as final displacement.
+The optional package source is frozen in current v6 thirty-seed offline releases
+on both platforms. Regressions are 517/519 tests, default-only 329. All broader
+visual, scientific-integration, long-recovery and release requirements remain.

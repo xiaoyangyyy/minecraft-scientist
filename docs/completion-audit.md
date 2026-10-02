@@ -756,3 +756,36 @@ generalization or goal arrival. No candidate is promoted into accepted memory.
 The v5 scientific-core release freezes the keyframe module and passes all thirty
 seeds on both platforms. Reliable navigation, natural scientific integration,
 cross-seed/terrain evaluation and long-operation recovery remain required.
+
+### Distinct-handle compound acquisition and retained direction failure (2026-10-02)
+
+`docs/compound-motion-development.md` records two fresh natural noon/clear sessions
+on existing development seeds 200/201. The source-bound configuration preserves
+startup/reference calibration and declares eight two-leg trials, 50 actions,
+225 RGB frames and 46 complete diagnostic pairs per session. Aliases restore on
+failure, sources freeze before launch and public validation reconstructs targets,
+frames and schedule without telemetry. Shared SDK, camera and terrain are unchanged.
+
+All 164 prefixes per session are retained and independently replayed before any
+private read. Both final audits pass 35 checks. Evaluator-only characterization
+finds horizontal turns in three of eight seed-201 trials and four of eight
+seed-200 trials; different opaque handles do not guarantee a physical turn.
+
+Seed 201 supplies only one correct short second-leg interval, with no full combined
+movement recovered. Seed 200 supplies four correct combined local intervals,
+but these overlap settled/first-leg predictions and are not independent successes.
+Its thirteen selected predictions deduplicate to eight image intervals: seven
+correct and one wrong. The wrong frames 92→96 pass geometric/sensitivity checks
+but have 26.176-degree direction error, over the unchanged 20-degree limit. The
+same terminal leg baseline is wrong; do not uniquely blame keyframe selection.
+All thirteen/fourteen actual designated negative controls reject; seed 201 also
+retains an unsupported physically moving late-WAIT positive.
+
+Neither a local gain nor green integrity checks justify navigation promotion.
+Independent subsequent-frame map/pose validation is the next action, with fresh
+disjoint evaluation still required. Windows/WSL v6 scientific-core releases pass
+30 seeds/two repeats/eighteen exact artifacts, and all 91 frozen sources match.
+Regressions pass 517/two skips on Windows, 519/two on WSL, default-only 329/42.
+Targeted Ruff, source/wheel builds and unchanged seed-zero MVP acceptance pass.
+Held-out visual generalization, actual goal arrival, integrated natural scientific
+exploration, long-operation recovery and the full release gates remain incomplete.
