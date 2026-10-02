@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from contextlib import contextmanager
+from inspect import unwrap
 from pathlib import Path
 
 import controlled_motion_common as canonical
@@ -33,7 +34,7 @@ def validate_acquisition(route):
 
 def runtime_sources():
     return keyframes.runtime_sources() | {
-        "compound_motion.py": Path(compound_bindings.__code__.co_filename),
+        "compound_motion.py": Path(unwrap(compound_bindings).__code__.co_filename),
         "capture_compound_rgb_motion.py": wrapper_path(),
         Path(__file__).name: Path(__file__),
         "probe_compound_rgb_motion.py": Path(__file__).with_name(

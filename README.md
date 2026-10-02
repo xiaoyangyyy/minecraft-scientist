@@ -754,6 +754,9 @@ A training-only direction-constrained search now reproduces all original maps,
 but its additional ambiguity veto would lose three correct pair predictions and
 still miss the wrong direction. It remains diagnostic, not a navigation repair;
 see `docs/pose-direction-search-development.md` for the complete negative result.
+The later decorator-source registration correction intentionally makes old visual
+manifests historical; `docs/source-ledger-development.md` records the corrected
+prior replay and fresh-acquisition boundary without rewriting earlier evidence.
 
 The scientific core has a portable offline release verifier:
 

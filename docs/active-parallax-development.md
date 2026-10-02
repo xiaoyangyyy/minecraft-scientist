@@ -223,3 +223,11 @@ translation. Two nominal settle controls actually move and remain unsupported;
 they are failed controls, not successful negatives. The bounded competition's
 fresh V3 audit passes 54 checks, but its only ambiguity witness flags a correct
 168→170 interval and leaves the wrong 152→154 pose. No navigation promotion.
+
+After the decorated runtime-source locator correction, the new source-bound
+seed-201 prior/plan/capture/prediction chain is recorded in
+`docs/source-ledger-development.md`. The fresh
+`runs/rgb-active-parallax-prefix-seed201-source-v4/audit.json` passes all 42 checks
+and retains the same four/eight correct combined local poses and 32.412640-degree
+wrong leg. Source suffix v4 is not a new selector or an accuracy improvement.
+Earlier visual manifests remain historical; no declaration is rewritten.

@@ -86,10 +86,17 @@ Neither local multi-seed verification
 proves remote CI execution, fresh live-server gates, learned-planner release
 comparisons, broad visual generalization or integrated long-horizon exploration.
 
-Final regression passes **632 tests/two skips on Windows**, **634/two on WSL**,
-and **361/53 optional or platform skips** in a clean default-only installation.
+Final regression after the decorator-source correction passes **635 tests/two
+skips on Windows**, **637/two on WSL**, and **361/54 optional or platform skips**
+in a clean default-only installation.
 Targeted Ruff and both package builds pass. Default-only checks have no optional
 visual/MineStudio/OpenAI runtime and still exercise the complete release verifier.
+
+The subsequent decorator-source locator correction affects experiment scripts,
+not the 96-entry package/core ledger; both V10 manifests still match current core
+sources. Visual inference/plan/diagnostic manifests have a separate historical
+boundary after that correction, detailed in `docs/source-ledger-development.md`.
+The scientific-core verifier does not substitute for their source checks.
 
 The current seed-zero MVP report at
 `runs/pose-direction-regression-mvp-seed0/benchmark.json` remains byte-identical

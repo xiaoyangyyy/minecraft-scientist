@@ -125,3 +125,15 @@ original identities survive and whether reference and competing predictions are
 distinguishable. Investigate the public tracking/endpoint-retention boundary of
 the retained wrong interval without choosing a replacement by private accuracy.
 Sequential terrain-aware experiments and broad held-out validation remain needed.
+
+## Subsequent source-registration correction
+
+The artifacts above freeze revision `2e8b5f0` and its recorded WSL runtime. A
+later cross-platform check found that a decorated compound binding's inference
+source entry pointed to stdlib `contextlib.py`, not the project module. The raw
+capture ledger separately includes the actual project module, but the mislabeled
+entry did not fulfill its intended source contract. `inspect.unwrap` now repairs
+that locator; old manifests are preserved and intentionally fail current-source
+checks. See `docs/source-ledger-development.md` for tests, corrected prior replay
+and new acquisition boundary. Do not present the historical 54-check computation
+as a current-source visual release after this correction.

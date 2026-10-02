@@ -894,3 +894,24 @@ freeze 96 entries and reproduce eighteen artifacts per seed twice; MVP bytes
 remain unchanged. These bounded engineering checks do not prove any remaining
 held-out navigation, natural scientific/map integration, long recovery or full
 release requirement. The full objective remains incomplete and active.
+
+Final cross-platform checking found a mislabeled runtime-source entry:
+`compound_bindings.__code__.co_filename` located its contextmanager wrapper in
+stdlib, not the project hook. Raw acquisition snapshots independently contain
+the real module, but the inference entry's intended identity gate was incomplete.
+The locator now unwraps decorators; tests reject stdlib substitution before private
+scoring. Old active/diagnostic manifests remain historical, never rewritten.
+The old raw compound images reexecute with identical predictions under a corrected
+ledger and pass 35 checks; an unchanged V3 plan is preregistered for fresh capture.
+See `docs/source-ledger-development.md`. This repair does not establish navigation
+or erase any remaining full-project requirement.
+Final post-correction regressions pass Windows 635/two skips, WSL 637/two and
+clean default-only 361/54. Package/core source hashes still match both V10 releases.
+Fresh corrected-source active acquisition completes with 225 RGB frames and all
+raw/six profile gates passing. New prediction/scoring must finish before making
+any new visual-accuracy claim; capture success does not repair navigation.
+The corrected-source fresh prefix inference subsequently completes all 46 pairs/
+164 prefixes, and its independent active audit passes 42 checks. It retains four/
+eight correct combined local poses and the wrong 32.412640-degree 152→154 leg.
+All actual stationary controls reject translation; two moving nominal settle
+controls remain unsupported. Current provenance is restored, accuracy is not.

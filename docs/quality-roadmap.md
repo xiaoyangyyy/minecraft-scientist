@@ -236,3 +236,22 @@ boundaries; do not tune a replacement to private labels. V10 core releases freez
 96 source entries; full regressions pass 632/634 on Windows/WSL and 361 default-only.
 Held-out navigation, integrated natural science/maps, long recovery and full
 release comparison remain open. No required gate is removed.
+
+The source-registration follow-up in `docs/source-ledger-development.md` fixes a
+contextmanager wrapper being mislabeled as the compound project's runtime source.
+Historical raw capture snapshots independently freeze the real module, but the
+inference identity entry was not a correct source check. Decorator unwrapping and
+forged-stdlib tests repair it without excluding checks. Corrected prior replay
+produces identical predictions and passes 35 checks; a new source-bound unchanged
+V3 plan is registered. Previous active/diagnostic manifests are historical after
+the helper correction. Current visual acquisition and subsequent competing-map
+discrimination remain required alongside all held-out/integration/recovery gates.
+Post-correction full regressions pass 635/637 tests on Windows/WSL and 361 in the
+clean default-only environment; V10 package/core source hashes remain current.
+The corrected-source fresh active capture completes with 225 frames and all six
+profile gates; prefix inference/independent scoring remain separate. No new
+accuracy or navigation claim follows from that acquisition integrity result.
+Its subsequent full 164-prefix inference and 42-check independent audit complete,
+retaining four/eight correct combined local poses and the same wrong second-leg
+direction. Source-registration repair restores current evidence but does not fix
+the geometric counterexample. Action-boundary subsequent views remain next work.

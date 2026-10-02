@@ -150,6 +150,35 @@ def test_compound_pipeline_restores_aliases_on_failure(modules):
     assert vars(module) == before
 
 
+def test_stdlib_bytes_cannot_impersonate_project_runtime_source(
+    compound_experiment, monkeypatch
+):
+    common = importlib.import_module("compound_motion_common")
+    canonical = importlib.import_module("controlled_motion_common")
+    auditor = importlib.import_module("audit_compound_rgb_motion")
+    route, output = compound_experiment
+    config_path, report_path = output / "config.json", output / "report.json"
+    config, report = (
+        json.loads(config_path.read_bytes()),
+        json.loads(report_path.read_bytes()),
+    )
+    wrapper = Path(common.compound_bindings.__code__.co_filename)
+    config["source_sha256"]["compound_motion.py"] = canonical.digest(wrapper)
+    (output / "source-snapshot/compound_motion.py").write_bytes(wrapper.read_bytes())
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+    report["config_sha256"] = canonical.digest(config_path)
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+    original = Path.read_bytes
+
+    def reading(path):
+        assert path.name != "evaluator-audit.json"
+        return original(path)
+
+    monkeypatch.setattr(Path, "read_bytes", reading)
+    result = auditor.audit(route, output)
+    assert not result["valid"] and result["evaluation"] is None
+
+
 def test_compound_private_file_identity_cannot_change_between_scoring_stages(
     compound_experiment, pipeline, monkeypatch
 ):
