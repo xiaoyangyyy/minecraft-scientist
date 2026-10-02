@@ -845,3 +845,33 @@ releases freeze 94 source entries and pass thirty seeds/two repeats/eighteen exa
 artifacts on both platforms. MVP bytes remain unchanged; targeted Ruff and both
 builds pass. Held-out seed/terrain/weather navigation, map/scientific integration,
 long operation/recovery and full release validation remain incomplete.
+
+### Bounded competing maps and weak-anchor resampling (2026-10-02)
+
+`docs/pose-competition-development.md` records a complete public-pixel rotation
+grid, training-only translation/sign selection, original map identities and
+withheld intermediate-frame scoring. Every new witness is recomputed before
+private baseline evaluation, and all public/source/evaluator bytes remain bound
+through final scoring. Both existing V2 sessions pass 54 checks. Nevertheless,
+zero real ambiguity witnesses are found: all three known wrong seed-200 poses
+remain, while seed 201 still has zero useful pose coverage. This is a retained
+negative diagnostic, not a repaired estimator or proof of unique map.
+
+The next V3 policy revisits a lone provisional anchor using separately labeled
+experiment proposals, without changing exploitation/geometry thresholds. A fresh
+seed-201 source-bound capture completes with 225 RGB frames/50 actions/46 pairs.
+No navigation promotion occurs. Twenty-eight new tests cover geometric witnesses,
+public/private boundaries, partial failures, schemas and singleton-control naming.
+Final regressions pass Windows 604/two skips, WSL 606/two and default-only 354/51.
+V9 core releases freeze 95 sources and pass thirty seeds/two repeats/eighteen exact
+artifacts; the seed-zero MVP bytes remain unchanged. All held-out navigation,
+natural scientific/map integration, long recovery and full release gates stay open.
+
+The completed V3 42-check audit verifies four/eight effective turns and
+four/eight correct combined local poses, not terminal navigation. Twelve selected
+pair predictions contain eleven correct/one wrong; nine unique intervals contain
+eight correct/one wrong. The surviving 152→154 direction error is 32.412640
+degrees. Twelve actual stationary controls reject translation; two nominal settle
+controls actually move and remain unsupported. Fresh competition replay passes
+54 checks but would veto one correct pose and leave the wrong one. Therefore
+neither internal consistency nor more active coverage establishes reliable motion.

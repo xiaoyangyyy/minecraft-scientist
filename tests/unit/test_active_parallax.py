@@ -49,6 +49,25 @@ def test_single_observation_is_a_proposal_not_an_exploitation_certificate():
     assert not any(item["robustly_noncollinear"] for item in result["ranked_pairs"])
 
 
+@pytest.mark.parametrize("handle", range(4))
+def test_lone_provisional_anchor_is_retested_and_pairs_cover_all_controls(handle):
+    sample = DirectionSample(
+        handle=handle,
+        first=0,
+        second=1,
+        direction=(1, 0, 0),
+        sensitivity_radius_degrees=2,
+    )
+    result = propose_control_pairs((sample,))
+    assert all(handle in pair for pair in result["handle_pairs"])
+    assert {value for pair in result["handle_pairs"] for value in pair} == {0, 1, 2, 3}
+    assert all(
+        item["role"] == "provisional_anchor_resampling" for item in result["selections"]
+    )
+    assert not any(item["robustly_noncollinear"] for item in result["ranked_pairs"])
+    assert all(item["expected_turn_degrees"] is None for item in result["ranked_pairs"])
+
+
 def test_near_opposite_known_pair_is_not_exploited_for_positive_sine_score():
     samples = tuple(
         item.model_copy(

@@ -181,3 +181,45 @@ Full regressions pass Windows 576/two skips, WSL 578/two, and clean default-only
 Both V8 thirty-seed/two-repeat scientific-core releases freeze 94 current sources
 and reproduce eighteen artifacts per seed; MVP seed-zero bytes are unchanged.
 These checks do not complete any outstanding navigation or full-project gate.
+
+## V3: resample a lone provisional anchor
+
+The next selector keeps the same pair/image/action budgets and exploitation
+criteria, but separately permits a one-sample direction to anchor a **proposal**
+when no two-sample anchor exists. Unknown-handle exposure balancing prevents
+repeated least-sampled unknown pairs from excluding the only observed direction.
+The role is `provisional_anchor_resampling`, not exploitation or accepted motion.
+Four randomized-handle tests verify that the singleton is revisited, all four
+handles receive probes, angles stay unknown and no pair gains robust support.
+
+`runs/active-parallax-plan-seed201-v3` publicly replays the complete original prior
+and chooses `(0,1), (0,2), (0,3), (1,0)` before acquisition. All four choices are
+provisional-anchor resampling. The source-bound fresh capture is
+`runs/controlled-rgb-active-parallax-seed201-clear-v3`; it retains 225 RGB frames,
+50 actions and 46 pairs, with all six profile and raw acquisition checks passing.
+No evaluated position determines an action choice. V1/V2 active snapshots remain
+historical after this policy change; no manifests or failed reports are rewritten.
+
+The separate bounded map-competition experiment and its negative real result are
+documented in `docs/pose-competition-development.md`. A small finite rotation
+family fails to identify the known errors; it is not a navigation gate. The
+current V9 offline scientific-core release freezes 95 package/configuration source
+entries and passes thirty seeds/two repeats/eighteen exact artifacts on both
+platforms. Final regressions pass Windows 604/two skips, WSL 606/two and clean
+default-only 354/51. All broader visual/scientific/recovery gates remain required.
+
+The completed V3 independent audit passes all 42 checks. Four of eight trials
+produce effective physical turns, versus zero in the previous V2 seed-201
+acquisition. Moving and settled groups each recover four correct **local** poses
+in eight trials; terminal full-window coverage is three/eight and one/eight,
+respectively. Across all groups, twelve selected pair records include eleven
+correct and one wrong; deduplicating endpoints gives nine intervals, eight
+correct/one wrong. The wrong second-leg interval 152→154 has direction error
+32.412640 degrees, above the unchanged 20-degree tolerance. This is descriptive
+single-development-seed progress, not a causal comparison or held-out navigation.
+
+Of fourteen nominal controls, twelve are physically stationary and all reject
+translation. Two nominal settle controls actually move and remain unsupported;
+they are failed controls, not successful negatives. The bounded competition's
+fresh V3 audit passes 54 checks, but its only ambiguity witness flags a correct
+168→170 interval and leaves the wrong 152→154 pose. No navigation promotion.

@@ -741,6 +741,16 @@ still pass the existing geometry gate. The same selector produces no effective
 turns or useful poses in the second development world. It is not promoted into
 navigation; full failures and next policy/geometry requirements are documented.
 
+The weak-anchor omission is corrected in the next prospective selector. A separate
+bounded competing-map diagnostic preserves original point partitions and finds a
+synthetic ambiguity witness, but does not reject the three real wrong directions.
+It is not a navigation gate or proof of unique pose. Full scope, historical source
+boundaries and reproduction are in `docs/pose-competition-development.md`.
+The fresh weak-anchor seed-201 run improves effective turns and correct combined
+local-pose coverage to four/eight, but retains a 32.41-degree wrong leg direction.
+The real ambiguity witness would discard one correct result rather than that
+error. These development results are not reliable navigation or held-out success.
+
 The scientific core has a portable offline release verifier:
 
 ```powershell

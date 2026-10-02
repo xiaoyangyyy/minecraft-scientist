@@ -200,3 +200,25 @@ or raise the fixed tolerance. V8 core releases freeze 94 current source entries
 on both platforms. Sequential action design must also retest lone provisional
 anchors and retain control failures. All full-project requirements remain open
 where not proved.
+
+The bounded competing-map follow-up in `docs/pose-competition-development.md`
+retains a nineteen-trial training-only rotation/translation family and original
+withheld intermediate points. Both complete existing V2 sessions pass 54 replay
+checks, but the three wrong seed-200 poses remain and seed 201 has no useful
+pose. A synthetic distant-plane witness proves the diagnostic can expose an
+ambiguity; it does not prove real accuracy. A negative finite search is explicitly
+not uniqueness. Next include a sanity replay of the original reference map and
+better jointly refined alternatives under independent subsequent views. Do not
+promote the failed diagnostic or loosen the fixed physical error tolerance.
+V3 separately resamples lone provisional anchors instead of excluding them;
+the source-bound seed-201 fresh acquisition completes with the same 225-frame
+budget. Current V9 core releases freeze 95 sources and full regressions pass
+604/606 tests on Windows/WSL, default-only 354. All full-project gates remain.
+
+The completed V3 audit passes 42 checks and verifies four/eight effective turns
+and four/eight correct combined local poses. One selected second-leg pose remains
+wrong by 32.412640 degrees. The fresh bounded competition passes 54 checks but
+its only witness vetoes a correct pose, not the surviving error. Retain all
+controls (including two physically moving nominal settle controls), improve the
+model search and independent acquisition, and do not promote these local poses
+as terminal displacement or reliable navigation. The full scope is unchanged.

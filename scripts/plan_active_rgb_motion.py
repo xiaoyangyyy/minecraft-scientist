@@ -95,7 +95,7 @@ def build_plan(route, experiment, output):
     paths, runtime = inputs(route, experiment), sources()
     policy = ParallaxPolicy()
     config = {
-        "schema": "active-parallax-plan-v2",
+        "schema": "active-parallax-plan-v3",
         "source_acquisition": route.resolve().relative_to(ROOT).as_posix(),
         "source_predictions": experiment.resolve().relative_to(ROOT).as_posix(),
         "policy": policy.model_dump(mode="json"),
@@ -150,7 +150,7 @@ def validate_plan(directory):
     )
     paths, runtime = inputs(route, experiment), sources()
     if (
-        config["schema"] != "active-parallax-plan-v2"
+        config["schema"] != "active-parallax-plan-v3"
         or config["policy"] != ParallaxPolicy().model_dump(mode="json")
         or plan["completed"] is not True
         or plan["failure"] is not None

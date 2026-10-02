@@ -266,14 +266,20 @@ def propose_control_pairs(
             if len(anchor.samples) >= policy.minimum_samples
         ]
         anchor_strength = max(
-            (1 - anchor.radius_degrees / 180 for anchor in supported_anchors),
+            (
+                (1 - anchor.radius_degrees / 180)
+                * min(1.0, len(anchor.samples) / policy.minimum_samples)
+                for anchor in anchors
+            ),
             default=0.0,
         )
         # Unknown-vs-known controls discriminate a direction; unknown-vs-unknown
         # can accidentally be antipodal and has no calibrated directional anchor.
-        anchored = bool(unknown and supported_anchors)
+        anchor_class = (
+            2 if unknown and supported_anchors else 1 if unknown and anchors else 0
+        )
         return (
-            not anchored,
+            -anchor_class,
             min((exposures[handle] for handle in unknown), default=policy.pair_budget),
             -anchor_strength,
             sum(item["source_samples"]),
@@ -288,11 +294,19 @@ def propose_control_pairs(
             handle in known and len(known[handle].samples) >= policy.minimum_samples
             for handle in item["handles"]
         )
+        provisional_anchor = any(
+            handle not in known for handle in item["handles"]
+        ) and any(handle in known for handle in item["handles"])
         select(
-            item, "anchored_unknown_exploration" if anchored else "coverage_exploration"
+            item,
+            "anchored_unknown_exploration"
+            if anchored
+            else "provisional_anchor_resampling"
+            if provisional_anchor
+            else "coverage_exploration",
         )
     return {
-        "selector_version": "observability-anchored-v2",
+        "selector_version": "observability-anchored-v3",
         "policy": policy.model_dump(mode="json"),
         "hypotheses": [item.model_dump(mode="json") for item in hypotheses],
         "ranked_pairs": ranked,
