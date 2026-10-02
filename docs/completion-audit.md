@@ -875,3 +875,22 @@ degrees. Twelve actual stationary controls reject translation; two nominal settl
 controls actually move and remain unsupported. Fresh competition replay passes
 54 checks but would veto one correct pose and leave the wrong one. Therefore
 neither internal consistency nor more active coverage establishes reliable motion.
+
+### Original-map replay and direction-constrained alternatives (2026-10-02)
+
+The fixed training-only direction search exactly reproduces all twelve selected
+V3 reference maps, eliminating failed reference replay as the explanation for
+this run's no-witness cases. It retains all sixteen trials per selected map and
+passes 54 independent audit checks. Nevertheless, three correct pair predictions
+are ambiguous under the new family, while the wrong 32.412640-degree direction
+survives. This is a verified negative accuracy result, not repaired navigation.
+The distinct earlier finite-grid witness is preserved, not invalidated by a
+different family's negative search. Complete evidence and limitations are in
+`docs/pose-direction-search-development.md`.
+
+Twenty-eight new tests and full regressions pass Windows 632/two skips, WSL
+634/two and clean default-only 361/53. V10 thirty-seed scientific-core releases
+freeze 96 entries and reproduce eighteen artifacts per seed twice; MVP bytes
+remain unchanged. These bounded engineering checks do not prove any remaining
+held-out navigation, natural scientific/map integration, long recovery or full
+release requirement. The full objective remains incomplete and active.

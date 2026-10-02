@@ -750,6 +750,10 @@ The fresh weak-anchor seed-201 run improves effective turns and correct combined
 local-pose coverage to four/eight, but retains a 32.41-degree wrong leg direction.
 The real ambiguity witness would discard one correct result rather than that
 error. These development results are not reliable navigation or held-out success.
+A training-only direction-constrained search now reproduces all original maps,
+but its additional ambiguity veto would lose three correct pair predictions and
+still miss the wrong direction. It remains diagnostic, not a navigation repair;
+see `docs/pose-direction-search-development.md` for the complete negative result.
 
 The scientific core has a portable offline release verifier:
 

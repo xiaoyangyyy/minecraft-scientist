@@ -125,3 +125,10 @@ Retain every wrong and correct development case and measure both lost positives
 and surviving errors. A finite negative search, more abstention or synthetic
 witness detection alone cannot establish useful navigation. V3 weak-anchor
 resampling is a separate action-design correction, not an accuracy repair.
+
+The implemented reference replay and fitted direction-constrained family are
+documented in `docs/pose-direction-search-development.md`. All twelve selected V3
+records reproduce their original map checks. The new family finds three correct
+pair records with alternative explanations, but still misses the wrong direction;
+it is also not promoted. The old finite-grid witness remains valid evidence even
+when the new, different finite family does not find it.

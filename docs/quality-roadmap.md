@@ -222,3 +222,17 @@ its only witness vetoes a correct pose, not the surviving error. Retain all
 controls (including two physically moving nominal settle controls), improve the
 model search and independent acquisition, and do not promote these local poses
 as terminal displacement or reliable navigation. The full scope is unchanged.
+
+The direction-constrained follow-up in
+`docs/pose-direction-search-development.md` exactly replays all twelve original
+V3 maps, then fits sixteen fixed camera-center alternatives from training-only
+endpoints. All 54 independent replay/scoring checks pass, but the optional veto
+would remove three correct pair records while leaving the 32.412640-degree error.
+The wrong interval's alternatives fail training/endpoint gates before withheld
+PnP; the cause is not uniquely established. Neither fitted-family completeness
+nor no-witness results certify motion. Next test frozen explanations against
+genuinely new non-collinear acquisition and investigate tracking/point-retention
+boundaries; do not tune a replacement to private labels. V10 core releases freeze
+96 source entries; full regressions pass 632/634 on Windows/WSL and 361 default-only.
+Held-out navigation, integrated natural science/maps, long recovery and full
+release comparison remain open. No required gate is removed.
