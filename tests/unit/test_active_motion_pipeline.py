@@ -55,7 +55,9 @@ def active_experiment(compound_experiment, pipeline, modules, monkeypatch, tmp_p
             "plan_result": canonical.digest(plan / "plan.json"),
         },
         "capture_config": requested.model_dump(mode="json"),
-        "source_sha256": {name: canonical.digest(path) for name, path in sources.items()},
+        "source_sha256": {
+            name: canonical.digest(path) for name, path in sources.items()
+        },
     }
     (profile / "config.json").write_text(json.dumps(manifest), encoding="utf-8")
     (profile / "report.json").write_text(
@@ -191,11 +193,13 @@ def test_active_pipeline_and_source_factory_restore_on_nested_failure(modules):
         raise RuntimeError("injected")
     assert vars(module) == before
     factory = canonical.capture_sources
-    with pytest.raises(RuntimeError), capture.raw_bindings(
-        canonical, source_function="capture_sources"
+    with (
+        pytest.raises(RuntimeError),
+        capture.raw_bindings(canonical, source_function="capture_sources"),
     ):
-        with pytest.raises(ValueError), capture.raw_bindings(
-            canonical, source_function="capture_sources"
+        with (
+            pytest.raises(ValueError),
+            capture.raw_bindings(canonical, source_function="capture_sources"),
         ):
             pytest.fail("nested active capture accepted")
         raise RuntimeError("injected")

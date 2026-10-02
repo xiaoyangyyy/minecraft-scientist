@@ -817,3 +817,31 @@ package builds pass. Reliable navigation, held-out visual generalization, natura
 scientific integration, long-operation recovery and the full release remain open.
 Final regressions pass 538/two skips on Windows, 540/two on WSL and default-only
 332/44 optional/platform skips. All launched verification commands completed.
+
+### Public active-view planning and conditional observability (2026-10-02)
+
+`docs/active-parallax-development.md` records prospective action choices, source-
+bound capture profiles, complete public planning/prefix replay before telemetry,
+and retained failures. V1 passes 42 integrity checks but produces zero effective
+turns in eight real trials. The positive-score exploitation defect and ignoring
+single-sample directions are corrected by separately labeled exploitation,
+resampling and anchored/coverage exploration. No provisional direction is treated
+as accepted navigation knowledge.
+
+A fresh V2 seed-200 run produces six effective turns/eight trials but only three
+correct combined local poses/eight, with three wrong second-leg directions over
+the unchanged tolerance. The same selector in a fresh seed-201 run produces zero
+effective turns/eight and zero useful poses; all actual combined movements remain
+unsupported. Both final audits pass 42 checks. The singleton prior handle is not
+resampled by the unanchored fill, a retained policy limitation. Improving view
+acquisition in one scene does not fix geometry or cross-world generalization.
+Public conditional future-view diagnosis rejects diversity in the old wrong case,
+but would discard most correct shadow poses too; it remains diagnostic, not a
+default accuracy gate or competing-map discrimination. No navigation promotion.
+
+Thirty-eight new boundary/geometry tests and full regressions pass Windows
+576/two skips, WSL 578/two and clean default-only 347/49. Current V8 scientific-core
+releases freeze 94 source entries and pass thirty seeds/two repeats/eighteen exact
+artifacts on both platforms. MVP bytes remain unchanged; targeted Ruff and both
+builds pass. Held-out seed/terrain/weather navigation, map/scientific integration,
+long operation/recovery and full release validation remain incomplete.

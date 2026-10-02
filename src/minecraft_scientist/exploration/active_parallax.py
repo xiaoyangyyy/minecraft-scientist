@@ -175,13 +175,14 @@ def propose_control_pairs(
             if first == second:
                 continue
             left, right = known.get(first), known.get(second)
+            observable = left is not None and right is not None
             supported = (
-                left is not None
-                and right is not None
+                observable
                 and min(len(left.samples), len(right.samples)) >= policy.minimum_samples
             )
             angle, lower, upper, score = None, None, None, 0.0
-            if supported:
+            overlap = 0.0
+            if observable:
                 angle = math.degrees(
                     math.acos(
                         float(np.clip(np.asarray(left.center) @ right.center, -1, 1))
@@ -189,7 +190,31 @@ def propose_control_pairs(
                 )
                 radius = left.radius_degrees + right.radius_degrees
                 lower, upper = max(0.0, angle - radius), min(180.0, angle + radius)
-                score = math.sin(math.radians(angle)) ** 2 * max(0.0, 1 - radius / 180)
+                width = upper - lower
+                overlap = max(
+                    0.0,
+                    min(upper, policy.maximum_turn_degrees)
+                    - max(lower, policy.minimum_turn_degrees),
+                )
+                overlap = (
+                    overlap / width
+                    if width
+                    else float(
+                        policy.minimum_turn_degrees
+                        <= angle
+                        <= policy.maximum_turn_degrees
+                    )
+                )
+                support = min(
+                    1.0,
+                    min(len(left.samples), len(right.samples)) / policy.minimum_samples,
+                )
+                score = (
+                    math.sin(math.radians(angle)) ** 2
+                    * max(0.0, 1 - radius / 180)
+                    * overlap
+                    * support
+                )
             ranked.append(
                 {
                     "handles": [first, second],
@@ -198,6 +223,7 @@ def propose_control_pairs(
                     if angle is None
                     else [lower, upper],
                     "information_proxy": score,
+                    "conditional_turn_overlap": overlap,
                     "robustly_noncollinear": supported
                     and lower >= policy.minimum_turn_degrees
                     and upper <= policy.maximum_turn_degrees,
@@ -208,21 +234,69 @@ def propose_control_pairs(
                 }
             )
     ranked.sort(key=lambda item: (-item["information_proxy"], item["handles"]))
-    chosen = [item["handles"] for item in ranked if item["information_proxy"] > 0][
-        : policy.exploitation_budget
-    ]
-    exploration = sorted(
-        ranked, key=lambda item: (sum(item["source_samples"]), item["handles"])
-    )
-    for item in exploration:
-        if len(chosen) == policy.pair_budget:
+    chosen, selections = [], []
+    exposures = dict.fromkeys(range(4), 0)
+
+    def select(item, role):
+        chosen.append(item["handles"])
+        selections.append({"handles": item["handles"], "role": role})
+        for handle in item["handles"]:
+            exposures[handle] += 1
+
+    # A tiny positive sin-squared score must not exploit a near-opposite pair.
+    for item in ranked:
+        if len(chosen) == policy.exploitation_budget:
             break
-        if item["handles"] not in chosen:
-            chosen.append(item["handles"])
+        if item["robustly_noncollinear"]:
+            select(item, "conditional_exploitation")
+    # A single sample is a useful experimental lead, never accepted motion.
+    for item in ranked:
+        if len(chosen) == policy.exploitation_budget:
+            break
+        if item["handles"] not in chosen and item["information_proxy"] > 0:
+            select(item, "provisional_direction_resampling")
+
+    def exploration_priority(item):
+        first, second = item["handles"]
+        unknown = [handle for handle in (first, second) if handle not in known]
+        anchors = [known[handle] for handle in (first, second) if handle in known]
+        supported_anchors = [
+            anchor
+            for anchor in anchors
+            if len(anchor.samples) >= policy.minimum_samples
+        ]
+        anchor_strength = max(
+            (1 - anchor.radius_degrees / 180 for anchor in supported_anchors),
+            default=0.0,
+        )
+        # Unknown-vs-known controls discriminate a direction; unknown-vs-unknown
+        # can accidentally be antipodal and has no calibrated directional anchor.
+        anchored = bool(unknown and supported_anchors)
+        return (
+            not anchored,
+            min((exposures[handle] for handle in unknown), default=policy.pair_budget),
+            -anchor_strength,
+            sum(item["source_samples"]),
+            sum(exposures[handle] for handle in (first, second)),
+            item["handles"],
+        )
+
+    while len(chosen) < policy.pair_budget:
+        remaining = [item for item in ranked if item["handles"] not in chosen]
+        item = min(remaining, key=exploration_priority)
+        anchored = any(handle not in known for handle in item["handles"]) and any(
+            handle in known and len(known[handle].samples) >= policy.minimum_samples
+            for handle in item["handles"]
+        )
+        select(
+            item, "anchored_unknown_exploration" if anchored else "coverage_exploration"
+        )
     return {
+        "selector_version": "observability-anchored-v2",
         "policy": policy.model_dump(mode="json"),
         "hypotheses": [item.model_dump(mode="json") for item in hypotheses],
         "ranked_pairs": ranked,
         "handle_pairs": chosen,
+        "selections": selections,
         "scope": "prospective experimental choice from provisional RGB directions; not true motion or navigation acceptance",
     }

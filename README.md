@@ -730,14 +730,18 @@ lost. It remains an optional rejected development candidate, not a navigation
 repair. See `docs/shadow-motion-development.md` for the retained counterexample,
 matched original-prefix comparison and the stronger observability requirement.
 
-The scientific core has a portable offline release verifier:
-
 Public-only prospective action selection now has a fresh real RGB acquisition and
 complete independent planning/prefix replay. Its first plan fails to create any
 effective turns (0/8), despite passing all 42 integrity checks. Conditional future
 view diversity is diagnostic only, not a repaired pose or navigation gate. See
 `docs/active-parallax-development.md`; all failed trials and frozen V1 sources
-are retained before evolving the selector.
+are retained before evolving the selector. The corrected selector produces six
+effective turns in eight fresh seed-200 trials, but three wrong second-leg poses
+still pass the existing geometry gate. The same selector produces no effective
+turns or useful poses in the second development world. It is not promoted into
+navigation; full failures and next policy/geometry requirements are documented.
+
+The scientific core has a portable offline release verifier:
 
 ```powershell
 uv run python scripts/verify_core_release.py --seed 0 --seeds 30 --output runs/new-core-release

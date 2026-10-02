@@ -26,20 +26,87 @@ def _samples():
 
 def test_active_pairs_use_directional_diversity_and_keep_unknown_exploration():
     result = propose_control_pairs(_samples())
-    assert result["handle_pairs"] == [[0, 3], [3, 0], [1, 2], [2, 1]]
+    assert result["handle_pairs"] == [[0, 3], [3, 0], [0, 1], [2, 3]]
     assert result["ranked_pairs"][0]["robustly_noncollinear"]
     assert result["ranked_pairs"][0]["conditional_turn_bounds"] == [86, 94]
     assert all(first != second for first, second in result["handle_pairs"])
     assert propose_control_pairs(_samples()) == result
 
 
-def test_unknown_or_single_observation_does_not_invent_a_direction():
-    for samples in ((), _samples()[::2]):
-        result = propose_control_pairs(samples)
-        assert all(
-            item["expected_turn_degrees"] is None for item in result["ranked_pairs"]
+def test_unknown_directions_remain_unknown_and_exploration_covers_all_handles():
+    result = propose_control_pairs(())
+    assert all(item["expected_turn_degrees"] is None for item in result["ranked_pairs"])
+    assert result["handle_pairs"][:2] == [[0, 1], [2, 3]]
+    assert len(result["handle_pairs"]) == 4
+
+
+def test_single_observation_is_a_proposal_not_an_exploitation_certificate():
+    result = propose_control_pairs(_samples()[::2])
+    assert result["handle_pairs"][:2] == [[0, 3], [3, 0]]
+    assert all(
+        item["role"] != "conditional_exploitation" for item in result["selections"]
+    )
+    assert not any(item["robustly_noncollinear"] for item in result["ranked_pairs"])
+
+
+def test_near_opposite_known_pair_is_not_exploited_for_positive_sine_score():
+    samples = tuple(
+        item.model_copy(
+            update={
+                "direction": (-float(np.cos(np.pi / 10)), 0, float(np.sin(np.pi / 10)))
+            }
         )
-        assert len(result["handle_pairs"]) == 4
+        if item.handle == 3
+        else item
+        for item in _samples()
+    )
+    result = propose_control_pairs(samples)
+    opposite = next(
+        item for item in result["ranked_pairs"] if item["handles"] == [0, 3]
+    )
+    assert opposite["expected_turn_degrees"] == pytest.approx(162)
+    assert opposite["information_proxy"] == 0
+    assert all(
+        item["role"] == "anchored_unknown_exploration" for item in result["selections"]
+    )
+    assert all(
+        any(handle in (0, 3) for handle in pair) for pair in result["handle_pairs"]
+    )
+    assert {handle for pair in result["handle_pairs"] for handle in pair} == {
+        0,
+        1,
+        2,
+        3,
+    }
+
+
+def test_missing_sample_does_not_remove_potentially_useful_new_direction():
+    samples = tuple(
+        item.model_copy(update={"direction": (-1.0, 0.0, 0.0)})
+        if item.handle == 3
+        else item
+        for item in _samples()
+    ) + (
+        DirectionSample(
+            handle=2,
+            first=30,
+            second=31,
+            direction=(0, 0, 1),
+            sensitivity_radius_degrees=2,
+        ),
+    )
+    result = propose_control_pairs(samples)
+    assert result["handle_pairs"][:2] == [[0, 2], [2, 0]]
+    assert all(
+        1 in pair and any(handle in (0, 3) for handle in pair)
+        for pair in result["handle_pairs"][2:]
+    )
+    assert [item["role"] for item in result["selections"]] == [
+        "provisional_direction_resampling",
+        "provisional_direction_resampling",
+        "anchored_unknown_exploration",
+        "anchored_unknown_exploration",
+    ]
 
 
 def test_repeated_image_intervals_cannot_inflate_support():

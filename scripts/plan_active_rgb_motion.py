@@ -95,7 +95,7 @@ def build_plan(route, experiment, output):
     paths, runtime = inputs(route, experiment), sources()
     policy = ParallaxPolicy()
     config = {
-        "schema": "active-parallax-plan-v1",
+        "schema": "active-parallax-plan-v2",
         "source_acquisition": route.resolve().relative_to(ROOT).as_posix(),
         "source_predictions": experiment.resolve().relative_to(ROOT).as_posix(),
         "policy": policy.model_dump(mode="json"),
@@ -150,7 +150,7 @@ def validate_plan(directory):
     )
     paths, runtime = inputs(route, experiment), sources()
     if (
-        config["schema"] != "active-parallax-plan-v1"
+        config["schema"] != "active-parallax-plan-v2"
         or config["policy"] != ParallaxPolicy().model_dump(mode="json")
         or plan["completed"] is not True
         or plan["failure"] is not None
@@ -178,6 +178,22 @@ def validate_plan(directory):
         raise ValueError(
             "active parallax plan does not reproduce public-only action selection"
         )
+    if (
+        digest(directory / "config.json") != plan["config_sha256"]
+        or json.loads((directory / "plan.json").read_bytes()) != plan
+        or any(
+            digest(path) != config["input_sha256"][name] for name, path in paths.items()
+        )
+        or any(
+            digest(path) != config["source_sha256"][name]
+            for name, path in runtime.items()
+        )
+        or any(
+            digest(directory / "source-snapshot" / name) != value
+            for name, value in config["source_sha256"].items()
+        )
+    ):
+        raise ValueError("active plan provenance changed during public replay")
     return requested
 
 

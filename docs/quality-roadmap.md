@@ -180,3 +180,23 @@ two future frames lie inside a WAIT. This is an explanatory lead, not proven
 unique causality. V7 core releases freeze 92 current sources and pass on both
 platforms. All held-out navigation, scientific integration, long-operation and
 complete release gates stay open; this negative method does not shrink the goal.
+
+The public-only active-view follow-up is in `docs/active-parallax-development.md`.
+V1's fresh session produces zero/eight useful turns, revealing an exploitation
+eligibility defect. V2 separates conditional exploitation from single-sample
+resampling and anchored unknown exploration. Fresh seed-200 acquisition then
+produces six/eight effective turns, but only three/eight correct combined local
+poses and three wrong second-leg estimates; all forty-two public replay/provenance
+checks pass. Acquisition diversity is improved, not geometry reliability or
+navigation. The same V2 policy's second development world yields zero/eight useful
+turns and zero useful poses, despite another complete 42-check replay. Unanchored
+filling omits the only weak direction hypothesis; coverage/revisiting and terrain
+effects must be addressed rather than extrapolating the one-world turning gain.
+A public future-parallax diagnostic fails diversity in the retained
+old wrong case but would lose most correct poses, so it is not a navigation gate.
+Next discriminate competing frozen maps/pose explanations under sufficiently
+diverse images and validate before integration; do not tune to evaluator directions
+or raise the fixed tolerance. V8 core releases freeze 94 current source entries
+on both platforms. Sequential action design must also retest lone provisional
+anchors and retain control failures. All full-project requirements remain open
+where not proved.

@@ -1,9 +1,10 @@
 # ruff: noqa: F401 -- pytest fixture re-export
+# ruff: noqa: F811 -- pytest fixture re-export
 import numpy as np
 import pytest
 
 cv2 = pytest.importorskip("cv2", reason="requires optional geometry extra")
-from test_shadow_motion import CAMERA, motion  # noqa: F401, F811 -- fixture re-export
+from test_shadow_motion import CAMERA, motion
 
 from minecraft_scientist.exploration.active_parallax import (
     homogeneous_direction_samples,
