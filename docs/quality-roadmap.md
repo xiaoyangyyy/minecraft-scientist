@@ -58,6 +58,12 @@ until each required gate has current, inspectable evidence.
 
 ## Evidence discipline
 
+The runtime-camera follow-up in `docs/runtime-camera-timing-development.md`
+identifies a measured sampling mismatch between image camera positions and player
+telemetry. Next align new geometric evaluation to capture-time camera evidence,
+while retaining body scoring and accounting for view bobbing. This changes the
+diagnostic priority, not navigation acceptance or any required outcome below.
+
 - Agent policy inputs contain RGB/opaque public observations and learned action
   programs. Coordinate telemetry and hidden rules remain evaluator-only.
 - Development results are not held-out evaluation. State which failed trajectories

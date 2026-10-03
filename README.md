@@ -815,10 +815,18 @@ training-only rays, with point partitions reserved before bootstrap. Replaying a
 eight trials produces four internally consistent candidates over three intervals.
 One also passes new-control pixel checks, but its incremental midpoint direction
 is wrong by 33.04 degrees; none is promoted for navigation. All 36 initialization
-candidates and both original aborts remain visible. Current full regressions pass
+candidates and both original aborts remain visible. That full regression checkpoint passes
 Windows 858/WSL 860 (two skips each), isolated default-only offline 443/66. See
 `docs/joint-multiview-map-development.md` for the matched-interval observation,
 frozen public-first replay, uncertainty counterexample and remaining broad gates.
+
+Fresh evaluator-only JVM instrumentation now identifies an image/player timing
+mismatch: 66 uniquely matched RGB frames use previous player positions for the
+base camera while telemetry reports current positions (up to 0.462 blocks apart).
+Native-image resize and all public action/frame receipts replay independently.
+This is an observation-model diagnosis, not a navigation fix; view bobbing and
+the original short-step counterexample remain unresolved. See
+`docs/runtime-camera-timing-development.md` for immutable runs and next actions.
 
 The scientific core has a portable offline release verifier:
 

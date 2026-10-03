@@ -143,6 +143,13 @@ three conditions, reliable goal navigation, natural science/map integration,
 at least 100 attempts and recovery checks, live/baseline release revalidation and
 CI consolidation. The broad goal remains active.
 
+Subsequent fresh runtime instrumentation, documented in
+`docs/runtime-camera-timing-development.md`, confirms a base-camera/player-position
+sampling mismatch using uniquely matched native RGB bytes. It does not supply
+missing camera metadata to these historical images, change the 33.042212-degree
+counterexample, or promote any joint map. Capture-time camera-aware evaluation is
+now required before attributing all residual short-motion error to the estimator.
+
 ## Reproduction
 
 Use the dedicated WSL environment from `/mnt/d/minecraft-scientist` and new outputs:

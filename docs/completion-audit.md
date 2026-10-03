@@ -1077,3 +1077,24 @@ Ruff/format pass. See `docs/joint-multiview-map-development.md`. The short-basel
 uncertainty/camera-model counterexample changes the next engineering action, but
 all multi-world, natural science/map integration, long recovery, live/baseline
 release and CI gates remain incomplete. The original broad goal remains active.
+
+## Runtime camera timing follow-up
+
+Two fresh source-bound diagnostic acquisitions retain 66 frames and all 65 fixed
+actions each on the existing development seed. The second additionally stores
+native RGB. Its separate public-first audit independently recomputes every resize,
+matches the whole RGB chain uniquely to consecutive JVM recorder samples and
+passes fourteen byte/provenance/receipt checks. Current telemetry exactly matches
+capture-time player state, but the rendered base camera follows previous player
+position (maximum current-position discrepancy 0.461680409 blocks). All observed
+FOV modifiers are one. This is measured timing evidence, not a navigation gain:
+base camera excludes view-bobbing transforms, yaw/pitch are not proven to share a
+one-frame lag, and no old pose/evaluator is rewritten. See
+`docs/runtime-camera-timing-development.md`. Next use capture-time camera evidence
+and a verified view model for new geometric evaluation. All broad completion
+gates, including held-out worlds, integrated natural science, recovery and release
+consolidation, remain open; the original goal remains active.
+Final camera-diagnostic tests pass 25/25 on Windows and WSL, following a 70-case
+combined camera/joint-map regression on both. Ruff/format and whitespace checks
+pass. All 101 V18 core source hashes remain identical; no production package or
+core-verifier source changes. This does not claim a newly rerun full release suite.
