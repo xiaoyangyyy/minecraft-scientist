@@ -600,3 +600,174 @@ def test_bytes_changed_during_scoring_invalidate_the_evaluation(
     monkeypatch.setattr(auditor, "score_relative_motion", changing)
     result = auditor.audit(route, output)
     assert mutated and not result["valid"] and result["evaluation"] is None
+
+
+@pytest.fixture
+def shadow_capture(adaptive_capture):
+    common, route = adaptive_capture
+    manifest = json.loads((route / "config.json").read_bytes())
+    manifest.update(
+        schema="visibility-rgb-acquisition-v3",
+        second_leg_shadow_policy=common.SecondLegShadowPolicy().model_dump(mode="json"),
+        maximum_frames=manifest["maximum_frames"] + 32,
+        scope="fresh development RGB probe with second-leg maps/search frozen before bounded third-control views; physical diversity unknown, no navigation promotion",
+    )
+    save(route / "config.json", manifest)
+    raw = json.loads((route / "report.json").read_bytes())
+    raw["config_sha256"] = common.canonical.digest(route / "config.json")
+    for trial in raw["trials"]:
+        trial["second_leg_shadow"] = {
+            "terminal": "source_aborted",
+            "anchor_frame": None,
+            "freeze_frame": trial["end_frame"],
+            "end_frame": trial["end_frame"],
+        }
+    save(route / "report.json", raw)
+    return common, route
+
+
+def test_shadow_schema_retains_all_skipped_trials_and_replays_before_private_scoring(
+    shadow_capture, monkeypatch
+):
+    common, route = shadow_capture
+    output = route.parent / "shadow-predictions"
+    result = importlib.import_module("probe_visibility_maps").run(route, output)
+    assert result["completed"] and len(result["results"]) == 54
+    assert all(
+        item["selection"] is None
+        for item in result["results"]
+        if item["pair"]["group"] == "third_shadow"
+    )
+    reading, infer = Path.read_bytes, common.infer
+    completed = []
+
+    def replay(*args, **kwargs):
+        records = infer(*args, **kwargs)
+        completed.extend(records)
+        return records
+
+    def guarded(path):
+        if path.name == "evaluator-audit.json":
+            assert len(completed) == 54
+        return reading(path)
+
+    monkeypatch.setattr(common, "infer", replay)
+    monkeypatch.setattr(Path, "read_bytes", guarded)
+    audit = importlib.import_module("audit_visibility_maps").audit(route, output)
+    assert audit["valid"] and not audit["evaluation"]["navigation_accepted"]
+    assert audit["evaluation"]["groups"]["third_shadow"]["trials"] == 8
+
+
+@pytest.mark.parametrize(
+    "change", ("omit", "invent_freeze", "end_frame", "policy", "budget")
+)
+def test_forged_shadow_metadata_fails_before_private_inputs(
+    shadow_capture, monkeypatch, change
+):
+    common, route = shadow_capture
+    manifest = json.loads((route / "config.json").read_bytes())
+    raw = json.loads((route / "report.json").read_bytes())
+    if change == "omit":
+        raw["trials"][0].pop("second_leg_shadow")
+    elif change == "invent_freeze":
+        raw["trials"][0]["second_leg_shadow"]["freeze"] = {"invented": True}
+    elif change == "end_frame":
+        raw["trials"][0]["second_leg_shadow"]["end_frame"] += 1
+    elif change == "policy":
+        manifest["second_leg_shadow_policy"]["ticks"] = 5
+    elif change == "budget":
+        manifest["maximum_frames"] -= 1
+    save(route / "config.json", manifest)
+    raw["config_sha256"] = common.canonical.digest(route / "config.json")
+    save(route / "report.json", raw)
+    reading = Path.read_bytes
+
+    def public(path):
+        assert path.name != "evaluator-audit.json"
+        return reading(path)
+
+    monkeypatch.setattr(Path, "read_bytes", public)
+    result = importlib.import_module("probe_visibility_maps").run(
+        route, route.parent / "forged-shadow"
+    )
+    assert not result["completed"] and result["failure"] is not None
+
+
+def test_second_leg_inference_uses_frozen_selection_partitions_and_seed(
+    adaptive_capture, monkeypatch
+):
+    from types import SimpleNamespace
+
+    from test_keyframe_motion import _motion, _tracks
+
+    common, route = adaptive_capture
+    attempts = tuple(
+        KeyframeAttempt(
+            end_offset=tick,
+            tracks=_tracks(64, tick + 1),
+            motion=_motion(64, supported=tick == 3),
+        )
+        for tick in (2, 3, 4)
+    )
+    selection = KeyframeSelection(
+        terminal_offset=4, attempts=attempts, selected_offset=3
+    )
+    candidate = selection.selected()
+    seen = []
+
+    def inspect(selected, extended, plan, camera, *, seed, frozen_search, **kwargs):
+        assert selected == candidate and seed == 1007
+        assert plan.anchor_frame == 10 and plan.candidate_end_frame == 13
+        assert plan.action_start_frame == 14 and plan.target_frames == (16, 18)
+        assert extended.track_ids == tuple(range(40))
+        seen.append(selected.model_dump_json())
+        return SimpleNamespace(
+            model_dump=lambda **kwargs: {"fixture": "original second-leg map"}
+        )
+
+    monkeypatch.setattr(common, "inspect_action_switch", inspect)
+    monkeypatch.setattr(
+        common,
+        "infer_keyframe_prefixes",
+        lambda *a, **k: pytest.fail("frozen second-leg map was refitted"),
+    )
+    monkeypatch.setattr(
+        common.canonical, "rgb", lambda path: np.zeros((224, 224, 3), dtype=np.uint8)
+    )
+    search = common.inspect_direction_search(None, np.eye(3), seed=1007).model_dump(
+        mode="json"
+    )
+    data = {
+        "anchor_frame": 10,
+        "freeze": {
+            "selection": selection.model_dump(mode="json"),
+            "seed": 1007,
+            "search": search,
+        },
+        "prefix_tracks": [_tracks(64, 9).model_dump(mode="json")],
+        "retained_ids": [list(range(40))],
+        "plan": common.ActionSwitchPlan(
+            anchor_frame=0,
+            candidate_end_frame=3,
+            available=True,
+            reason="fixture",
+            current_handle=1,
+            next_handle=2,
+            action_start_frame=4,
+            action_end_frame=8,
+            target_frames=(6, 8),
+            requested_frames=(6, 8),
+        ).model_dump(mode="json"),
+    }
+    raw = {"trials": [{"second_leg_shadow": data}]}
+    config = {
+        "seed": 999,
+        "camera_intrinsics": np.eye(3).tolist(),
+        "keyframe": KeyframeMotionConfig().model_dump(mode="json"),
+        "action_switch": common.ActionSwitchConfig().model_dump(mode="json"),
+        "pairs": [{"id": "leg_two-00", "group": "leg_two", "first": 10, "second": 14}],
+    }
+    result = common.infer(route, raw, config)
+    assert seen == [candidate.model_dump_json()]
+    assert result[0]["selection"]["selected_offset"] == 3
+    assert common.expected_offsets(config["pairs"][0], raw) == (2, 3, 4)

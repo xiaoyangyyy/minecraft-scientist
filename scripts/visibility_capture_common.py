@@ -28,13 +28,20 @@ from minecraft_scientist.exploration.keyframe_motion import (
     infer_keyframe_prefixes,
 )
 from minecraft_scientist.exploration.pose_direction_search import (
+    DirectionSearchEvidence,
     inspect_direction_search,
+)
+from minecraft_scientist.exploration.second_leg_shadow import (
+    SecondLegShadowPolicy,
+    acquire_second_leg_shadow,
+    retain_tracks,
 )
 from minecraft_scientist.exploration.temporal_tracks import (
     TemporalTracks,
     track_frame_chain,
 )
 from minecraft_scientist.exploration.visibility_acquisition import (
+    PublicProbeStep,
     VisibilityController,
 )
 from minecraft_scientist.protocols import ActionKind, PrimitiveAction, TransitionRecord
@@ -111,8 +118,14 @@ def validate_capture(route):
     manifest = json.loads((route / "config.json").read_bytes())
     raw = json.loads((route / "report.json").read_bytes())
     runtime, parent = capture_sources(), parent_inputs(route)
+    shadow_policy = (
+        SecondLegShadowPolicy()
+        if manifest["schema"] == "visibility-rgb-acquisition-v3"
+        else None
+    )
     if (
-        manifest["schema"] != "visibility-rgb-acquisition-v2"
+        manifest["schema"]
+        not in ("visibility-rgb-acquisition-v2", "visibility-rgb-acquisition-v3")
         or raw["passed"] is not True
         or raw["failure"] is not None
         or raw["navigation_accepted"] is not False
@@ -148,7 +161,9 @@ def validate_capture(route):
     config = capture.planner.validate_plan(ROOT / manifest["plan_directory"])
     policy = capture.online_policy()
     expected = {
-        "schema": "visibility-rgb-acquisition-v2",
+        "schema": "visibility-rgb-acquisition-v3"
+        if shadow_policy is not None
+        else "visibility-rgb-acquisition-v2",
         "policy": policy.model_dump(mode="json"),
         "online_landmarks": capture.online_settings(),
         "world": {
@@ -174,10 +189,15 @@ def validate_capture(route):
         "source_sha256": manifest["source_sha256"],
         "scope": "fresh visibility-aware RGB probe on development seed; no hidden telemetry in policy, no terrain edits, no pose validation or navigation promotion",
     }
-    if (
-        manifest != expected
-        or not 1 <= raw["frame_count"] <= expected["maximum_frames"] <= 225
-    ):
+    if shadow_policy is not None:
+        expected["second_leg_shadow_policy"] = shadow_policy.model_dump(mode="json")
+        expected["maximum_frames"] += 2 * len(config.handle_pairs) * shadow_policy.ticks
+        expected["scope"] = (
+            "fresh development RGB probe with second-leg maps/search frozen before bounded third-control views; physical diversity unknown, no navigation promotion"
+        )
+    if manifest != expected or not 1 <= raw["frame_count"] <= expected[
+        "maximum_frames"
+    ] <= (257 if shadow_policy is not None else 225):
         raise ValueError(
             "capture differs from publicly replayed plan or fixed policy/budget"
         )
@@ -347,6 +367,39 @@ def validate_capture(route):
             ],
             "prefix_tracks": prefixes,
         }
+        if shadow_policy is not None:
+            freeze_frame = replayed["end_frame"]
+            if replayed["terminal"] == "finished":
+                second_anchor = anchor + decision.endpoint_tick
+
+                def execute_shadow(handle):
+                    interval = consume("move", 1, handle)
+                    return PublicProbeStep(images[interval["end_frame"]], handle, True)
+
+                shadow = acquire_second_leg_shadow(
+                    images[second_anchor : freeze_frame + 1],
+                    execute_shadow,
+                    pair,
+                    calibration["camera_intrinsics"],
+                    seed=shadow_policy.seed(number),
+                    handle_count=sum(
+                        item.affordances == (ActionKind.MOVE,)
+                        for item in events[event_slot - 1].state_after.objects
+                    ),
+                    policy=shadow_policy,
+                )
+                replayed["second_leg_shadow"] = shadow | {
+                    "anchor_frame": second_anchor,
+                    "freeze_frame": freeze_frame,
+                    "end_frame": timeline[event_slot - 1]["end_frame"],
+                }
+            else:
+                replayed["second_leg_shadow"] = {
+                    "terminal": "source_aborted",
+                    "anchor_frame": None,
+                    "freeze_frame": freeze_frame,
+                    "end_frame": freeze_frame,
+                }
         if not _numeric_equal(replayed, trial):
             raise ValueError(
                 "causal prefix tracking, decisions or receipts differ from independent replay"
@@ -377,6 +430,14 @@ def validate_capture(route):
             "all_public_bytes_stable",
         )
     }
+    if shadow_policy is not None:
+        checks.update(
+            {
+                "all_second_leg_prefits_and_search_frozen_before_new_control": True,
+                "all_shadow_receipts_and_protected_support_replayed": True,
+                "all_eight_shadow_outcomes_retained": True,
+            }
+        )
     return config, raw, reconstructed, checks
 
 
@@ -389,12 +450,13 @@ def pairs(raw):
             None,
         )
         split = None if switch is None else first + switch["tick"]
+        settle = trial.get("second_leg_shadow", {}).get("end_frame", end)
         for group, begin, finish in (
             ("compound_moving", first, end),
-            ("compound_settled", first, end + 8),
+            ("compound_settled", first, settle + 8),
             ("leg_one", first, split),
             ("leg_two", split, end),
-            ("settle_control", end + 4, end + 8),
+            ("settle_control", settle + 4, settle + 8),
         ):
             result.append(
                 {
@@ -402,6 +464,17 @@ def pairs(raw):
                     "group": group,
                     "first": begin,
                     "second": finish,
+                }
+            )
+        if "second_leg_shadow" in trial:
+            shadow = trial["second_leg_shadow"]
+            executed = shadow["end_frame"] > end
+            result.append(
+                {
+                    "id": f"third_shadow-{number:02d}",
+                    "group": "third_shadow",
+                    "first": end if executed else None,
+                    "second": shadow["end_frame"] if executed else None,
                 }
             )
     startup = raw["timeline"][:25]
@@ -441,18 +514,31 @@ def configuration(route, acquisition, raw, seed):
     baseline = canonical.inference_config(
         route, acquisition, raw | {"pairs": pairs(raw)}, seed
     )
-    return baseline | {
+    result = baseline | {
         "schema": "adaptive-landmark-frozen-maps-v2",
         "keyframe": KeyframeMotionConfig().model_dump(mode="json"),
         "action_switch": ActionSwitchConfig().model_dump(mode="json"),
         "scope": "all adaptive trial/control prefixes; leg-one maps frozen before second-control pixels; no pose replacement or navigation; single development world, unmatched trajectories",
     }
+    if any("second_leg_shadow" in trial for trial in raw["trials"]):
+        result["schema"] = "adaptive-landmark-shadow-maps-v3"
+        result["second_leg_shadow_policy"] = SecondLegShadowPolicy().model_dump(
+            mode="json"
+        )
+        result["scope"] = (
+            "all adaptive trial/control prefixes plus bounded third-control views; second-leg maps/search frozen before shadow acquisition; different handles do not prove physical diversity; no map replacement or navigation; single development world, unmatched trajectories"
+        )
+    return result
 
 
 def expected_offsets(pair, raw):
     if pair["first"] is None or pair["second"] is None:
         return None
     terminal = pair["second"] - pair["first"]
+    if pair["group"] == "leg_two":
+        shadow = raw["trials"][int(pair["id"].split("-")[-1])].get("second_leg_shadow")
+        if shadow is not None and "freeze" in shadow:
+            return tuple(range(2, terminal + 1))
     if pair["group"] == "leg_one":
         trial = raw["trials"][int(pair["id"].split("-")[-1])]
         if trial["landmark_attempts"]:
@@ -477,11 +563,15 @@ def infer(route, raw, config, *, results=None):
             ]
             # Identity controls use one actual image and infer's own repeat, so
             # their terminal offset is zero, not a synthetic one-tick movement.
-            if (
-                pair["group"] != "leg_one"
-                or not raw["trials"][int(pair["id"].split("-")[-1])][
-                    "landmark_attempts"
-                ]
+            if not (
+                pair["group"] == "leg_one"
+                and raw["trials"][int(pair["id"].split("-")[-1])]["landmark_attempts"]
+            ) and not (
+                pair["group"] == "leg_two"
+                and "freeze"
+                in raw["trials"][int(pair["id"].split("-")[-1])].get(
+                    "second_leg_shadow", {}
+                )
             ):
                 selection = infer_keyframe_prefixes(
                     images[:1] if first == second else images,
@@ -592,6 +682,44 @@ def infer(route, raw, config, *, results=None):
                 config=future_policy,
                 frozen_search=prefit,
             )
+        if pair["group"] == "leg_two":
+            trial = raw["trials"][int(pair["id"].split("-")[-1])]
+            shadow = trial.get("second_leg_shadow", {})
+            if "freeze" in shadow:
+                selection = KeyframeSelection.model_validate(
+                    shadow["freeze"]["selection"]
+                )
+                selected = selection.selected()
+                plan_data = dict(shadow["plan"])
+                anchor = shadow["anchor_frame"]
+                for name in (
+                    "anchor_frame",
+                    "candidate_end_frame",
+                    "action_start_frame",
+                    "action_end_frame",
+                ):
+                    if plan_data[name] is not None:
+                        plan_data[name] += anchor
+                for name in ("target_frames", "requested_frames"):
+                    plan_data[name] = tuple(slot + anchor for slot in plan_data[name])
+                plan = ActionSwitchPlan.model_validate(plan_data)
+                extended = None
+                if plan.available:
+                    extended = retain_tracks(
+                        TemporalTracks.model_validate(shadow["prefix_tracks"][-1]),
+                        set(shadow["retained_ids"][-1]),
+                    )
+                evidence = inspect_action_switch(
+                    selected,
+                    extended,
+                    plan,
+                    camera,
+                    seed=shadow["freeze"]["seed"],
+                    config=SecondLegShadowPolicy().future,
+                    frozen_search=DirectionSearchEvidence.model_validate(
+                        shadow["freeze"]["search"]
+                    ),
+                )
         results.append(
             {
                 "pair": pair,

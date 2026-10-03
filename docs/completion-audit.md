@@ -1030,3 +1030,27 @@ releases pass their thirty-seed/two-repeat/six-check gates with 99 entries.
 `docs/landmark-track-loss-development.md` records scope, failed diagnostic attempts
 and the historical-source boundary. Useful reliable navigation, subsequent
 second-leg validation and all broad completion requirements remain unproven.
+
+### Frozen second-leg different-control validation (2026-10-02)
+
+The optional third-control path freezes the completed second leg's first-supported
+map and its training-only bounded alternatives before any new actions, preserving
+all prefix fits, permanent landmark IDs and protected validation partitions. Fresh
+acquisition completes 203 RGB frames and all eight original trials (six finished,
+two aborted); six eligible shadows add 24 one-tick actions. Independent public-first
+audit passes 29 checks over all 54 records. The sole second-leg candidate has
+38.119170 degrees of direction error and fails both new-control pixel views despite
+sixteen surviving withheld landmarks in four cells. Its shadow is physically
+non-collinear under the registered gate, but that result is evaluator-only.
+All six plausible bounded alternatives also fail. No map survives or is promoted.
+
+Nine selected records overlap into five unique intervals, four correct/one wrong;
+the complete prefix audit also retains a wrong later compound terminal. The changed
+third-control trajectories are not matched to earlier captures. Windows 811/WSL
+813 tests pass (two skips each), isolated default-only offline 443/64; both V17
+thirty-seed/two-repeat/eighteen-artifact releases pass all six checks and their 100
+source hashes match current bytes. See `docs/second-leg-shadow-development.md`.
+This is a verified rejection and stronger validation contract, not reliable visual
+navigation. Joint multi-view estimation/residual diagnosis, fresh generalization,
+natural scientific/map integration, long recovery and full live/baseline/CI release
+requirements remain incomplete. The broad goal remains active.

@@ -800,6 +800,16 @@ simple pyramid/crop changes do not rescue the failing map. No navigation repair
 is claimed. See `docs/landmark-track-loss-development.md` for the evidence and
 next independent-control validation requirement.
 
+Completed-second-leg maps and their competing-direction search can now be frozen
+before four subsequent distinct-handle controls. Fresh seed-201 development
+acquisition preserves 203 RGB frames/all eight trials, and independent public-first
+audit passes 29 checks. The only second-leg candidate has a 38.119-degree direction
+error and fails the new-control pixel tests; it is not promoted. This closes a
+missing validation boundary, not a navigation gain. Current regressions pass
+Windows 811/WSL 813 (two skips each), default-only offline 443/64; see
+`docs/second-leg-shadow-development.md` for original denominators, extra action
+costs, all retained failures and the full remaining scope.
+
 The scientific core has a portable offline release verifier:
 
 ```powershell

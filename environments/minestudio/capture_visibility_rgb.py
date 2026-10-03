@@ -25,6 +25,10 @@ from minecraft_scientist.exploration.online_landmark_probe import (
     calibrate_reference_camera,
     fit_online_landmarks,
 )
+from minecraft_scientist.exploration.second_leg_shadow import (
+    SecondLegShadowPolicy,
+    acquire_second_leg_shadow,
+)
 from minecraft_scientist.exploration.visibility_acquisition import (
     PublicProbeStep,
     VisibilityPolicy,
@@ -65,7 +69,7 @@ def target(world, kind, handle=None):
     return None
 
 
-def collect(world, frames, config, policy, records, trials):
+def collect(world, frames, config, policy, records, trials, *, shadow_policy=None):
     """RGB-only callback boundary; this function cannot read evaluator positions."""
     world.reset(config.seed)
     for scheduled in motion_probe_schedule(config)[:25]:
@@ -158,6 +162,44 @@ def collect(world, frames, config, policy, records, trials):
             )
             if result.failure:
                 raise RuntimeError(f"visibility probe failed: {result.failure}")
+            if shadow_policy is not None:
+                trial = trials[-1]
+                freeze_frame = trial["end_frame"]
+                if result.terminal == "finished":
+                    switch = next(
+                        item
+                        for item in result.decisions
+                        if item.instruction == "switch"
+                    )
+                    second_anchor = anchor + switch.tick
+                    shadow = acquire_second_leg_shadow(
+                        frames[second_anchor : freeze_frame + 1],
+                        execute,
+                        pair,
+                        calibration["camera_intrinsics"],
+                        seed=shadow_policy.seed(number),
+                        handle_count=sum(
+                            item.affordances == (ActionKind.MOVE,)
+                            for item in world.observe().objects
+                        ),
+                        policy=shadow_policy,
+                    )
+                    trial["second_leg_shadow"] = shadow | {
+                        "anchor_frame": second_anchor,
+                        "freeze_frame": freeze_frame,
+                        "end_frame": len(frames) - 1,
+                    }
+                    if shadow["failure"] is not None:
+                        raise RuntimeError(
+                            f"second-leg shadow failed: {shadow['failure']}"
+                        )
+                else:
+                    trial["second_leg_shadow"] = {
+                        "terminal": "source_aborted",
+                        "anchor_frame": None,
+                        "freeze_frame": freeze_frame,
+                        "end_frame": freeze_frame,
+                    }
             # An aborted probe remains a failure category, never accepted evidence.
             record = world.step(PrimitiveAction(kind=ActionKind.WAIT, ticks=8))
             records.append(record)
@@ -169,11 +211,12 @@ def collect(world, frames, config, policy, records, trials):
     return references, calibration
 
 
-def run(plan_directory, output):
+def run(plan_directory, output, *, shadow_second_leg=False):
     if output.exists():
         raise FileExistsError("refusing to overwrite adaptive visibility capture")
     config = planner.validate_plan(plan_directory)  # Public-only prior pixel replay.
     policy = online_policy()
+    shadow_policy = SecondLegShadowPolicy() if shadow_second_leg else None
     from minestudio.simulator import MinecraftSim
     from minestudio.simulator.callbacks.commands import CommandsCallback
     from navigation_probe import PositionAudit, PositionAuditSimulator
@@ -214,10 +257,14 @@ def run(plan_directory, output):
         * (policy.maximum_first_ticks + policy.maximum_second_ticks + 8)
         + 8
     )
-    if maximum_frames > 225:
-        raise ValueError("adaptive capture exceeds registered 225-frame ceiling")
+    if shadow_policy is not None:
+        maximum_frames += 2 * len(config.handle_pairs) * shadow_policy.ticks
+    if maximum_frames > (257 if shadow_policy is not None else 225):
+        raise ValueError("adaptive capture exceeds its registered frame ceiling")
     manifest = {
-        "schema": "visibility-rgb-acquisition-v2",
+        "schema": "visibility-rgb-acquisition-v3"
+        if shadow_policy is not None
+        else "visibility-rgb-acquisition-v2",
         "policy": policy.model_dump(mode="json"),
         "online_landmarks": online_settings(),
         "world": {
@@ -238,6 +285,11 @@ def run(plan_directory, output):
         "source_sha256": {name: digest(path) for name, path in source_paths.items()},
         "scope": "fresh visibility-aware RGB probe on development seed; no hidden telemetry in policy, no terrain edits, no pose validation or navigation promotion",
     }
+    if shadow_policy is not None:
+        manifest["second_leg_shadow_policy"] = shadow_policy.model_dump(mode="json")
+        manifest["scope"] = (
+            "fresh development RGB probe with second-leg maps/search frozen before bounded third-control views; physical diversity unknown, no navigation promotion"
+        )
     output.mkdir(parents=True, exist_ok=False)
     snapshot = output / "source-snapshot"
     snapshot.mkdir()
@@ -283,7 +335,7 @@ def run(plan_directory, output):
     failure, references, calibration = None, [], None
     try:
         references, calibration = collect(
-            world, frames, config, policy, records, trials
+            world, frames, config, policy, records, trials, shadow_policy=shadow_policy
         )
     except Exception as error:  # noqa: BLE001 -- retain acquisition failures
         failure = {"type": type(error).__name__, "message": str(error)}
@@ -380,8 +432,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--plan", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--shadow-second-leg", action="store_true")
     args = parser.parse_args()
-    report = run(args.plan, args.output)
+    report = run(args.plan, args.output, shadow_second_leg=args.shadow_second_leg)
     print(
         json.dumps(
             {

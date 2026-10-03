@@ -106,7 +106,7 @@ Both V16 scientific-core releases pass all six checks for thirty seeds/two
 repeats/eighteen artifacts. Their 99-entry ledgers freeze this tracing change.
 Full regressions at the tracing checkpoint pass **785 tests/two skips on Windows**,
 **787/two on WSL**, and **427/63 optional or platform skips** in an isolated default-
-only offline environment. Both 99-entry core ledgers still match current bytes.
+only offline environment. Both 99-entry core ledgers matched that checkpoint's bytes.
 The subsequent script-only cache-safe loading refinement adds one regression
 case and passes the 45-test targeted suite; the full suites preceded that final
 script refinement. Ruff, formatting, source checks and both package builds pass.
@@ -118,8 +118,11 @@ source. The diagnostic explicitly replays historical tracker bytes; it does not
 rewrite their manifests or relabel them as current-source acquisition evidence.
 The seed-zero MVP result remains unchanged; no new navigation result is claimed.
 
-Next implement independent subsequent different-control validation for the
-second-leg map, then assess joint multi-view refinement/landmark lifecycle where
+Subsequent different-control validation is now implemented and independently
+audited in `docs/second-leg-shadow-development.md`. The fresh 203-frame capture
+rejects its sole second-leg candidate, despite surviving validation landmarks.
+V16 and this diagnostic's manifests are historical after that new source boundary;
+V17 freezes 100 core entries. Assess joint multi-view refinement/landmark lifecycle where
 ambiguous correspondence remains. Do not substitute generic survivor counts,
 wider crops, looser cycle thresholds or abstention for useful navigation. After
 the repair, fresh disjoint worlds/terrains/conditions, natural science/map

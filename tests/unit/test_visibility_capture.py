@@ -130,3 +130,69 @@ def test_probe_failure_retains_trial_and_stops_before_wait_or_retry(
     assert len(records) == 25 and not any(
         action.kind == ActionKind.MOVE for action in world.actions
     )
+
+
+def test_second_leg_shadow_fits_only_completed_leg_before_new_controls(
+    capture, monkeypatch
+):
+    frames, records, trials, seeds = [], [], [], []
+    world = PublicWorld(frames)
+
+    def acquire(initial, execute, pair, **kwargs):
+        for handle in pair:
+            execute(handle)
+            execute(handle)
+        return SimpleNamespace(
+            terminal="finished",
+            failure=None,
+            steps=(),
+            tracks=(),
+            landmark_attempts=(),
+            decisions=(
+                SimpleNamespace(
+                    instruction="switch",
+                    tick=2,
+                    model_dump=lambda **kwargs: {"instruction": "switch", "tick": 2},
+                ),
+                SimpleNamespace(
+                    instruction="finish",
+                    tick=4,
+                    model_dump=lambda **kwargs: {"instruction": "finish", "tick": 4},
+                ),
+            ),
+        )
+
+    def shadow(leg, execute, handles, camera, *, seed, handle_count, policy):
+        assert len(leg) == 3 and handle_count == 4
+        assert all(isinstance(image, np.ndarray) for image in leg)
+        seeds.append(seed)
+        handle = next(index for index in range(handle_count) if index not in handles)
+        for _ in range(policy.ticks):
+            assert execute(handle).compliant
+        return {"terminal": "completed", "failure": None, "handle": handle}
+
+    monkeypatch.setattr(capture, "acquire_visibility_probe", acquire)
+    monkeypatch.setattr(capture, "acquire_second_leg_shadow", shadow)
+    capture.collect(
+        world,
+        frames,
+        CompoundProbeConfig(seed=201),
+        capture.online_policy(),
+        records,
+        trials,
+        shadow_policy=capture.SecondLegShadowPolicy(),
+    )
+    assert len(trials) == 8 and seeds == list(range(1002, 1038, 5))
+    assert all(
+        trial["second_leg_shadow"]["anchor_frame"] == trial["anchor_frame"] + 2
+        for trial in trials
+    )
+    assert all(
+        trial["second_leg_shadow"]["freeze_frame"] == trial["end_frame"]
+        for trial in trials
+    )
+    assert all(
+        trial["second_leg_shadow"]["end_frame"] == trial["end_frame"] + 4
+        for trial in trials
+    )
+    assert len(frames) == 193

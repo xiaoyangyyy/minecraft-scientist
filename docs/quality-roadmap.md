@@ -347,3 +347,19 @@ lifecycle as needed. All broad requirements remain. Both V16 core releases pass
 thirty seeds/two repeats/six checks with 99 source entries; prior V15 visual
 artifacts remain historical after the trace-source boundary. See
 `docs/landmark-track-loss-development.md`; no navigation promotion follows.
+
+The second-leg different-control follow-up now freezes all past fits and the
+training-only competing-map search before new actions. A fresh 203-frame capture
+retains all eight trials, including two original aborts; six completed trials add
+24 one-tick controls. Independent public-first audit passes 29 checks over all 54
+records, but the only second-leg candidate has a 38.119-degree direction error
+and fails both protected new-control pixel views. Six plausible alternatives also
+fail; no map is promoted. Nine selected records overlap into five unique intervals
+(four correct/one wrong), and another later compound prefix is wrong. This changes
+the next action from collecting missing second-leg validation to multi-view
+estimation/residual diagnosis with separate fitting/selection/future observations.
+Do not count this negative development result as held-out navigation success.
+Both V17 releases pass thirty seeds/two repeats/six checks with 100 source entries;
+full regressions pass Windows 811/WSL 813 (two skips each), default offline 443/64.
+See `docs/second-leg-shadow-development.md`. All original generalization,
+science/map integration, long recovery, live/baseline release and CI gates remain.
