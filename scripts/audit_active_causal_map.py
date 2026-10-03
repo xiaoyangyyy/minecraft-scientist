@@ -1,0 +1,295 @@
+"""Replay every live acquisition action before opening private camera evidence."""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+
+import audit_runtime_camera as runtime
+
+from minecraft_scientist.evaluation.relative_motion import score_relative_motion
+from minecraft_scientist.evaluation.rendered_camera import score_rendered_motion
+from minecraft_scientist.exploration.active_causal_map import (
+    ActiveMapPolicy,
+    acquire_causal_map,
+)
+from minecraft_scientist.exploration.online_landmark_probe import (
+    calibrate_reference_camera,
+)
+from minecraft_scientist.exploration.visibility_acquisition import PublicProbeStep
+from minecraft_scientist.protocols import TransitionRecord
+
+THRESHOLDS = {
+    "minimum_translation": 0.15,
+    "maximum_direction_error": 20,
+    "maximum_rotation_error": 5,
+}
+
+
+def registration(directory, config, report, definition):
+    settings = ActiveMapPolicy()
+    baseline = [list(item) for item in definition.SCHEDULE[:48]]
+    registered = {
+        "valid": False,
+        "schedule": baseline,
+        "artifacts": ["active-acquisition.json"],
+        "capture_checks": ["active_policy_completed"],
+    }
+    if not (
+        config["schema"] == "active-causal-camera-projection-v1"
+        and config["schedule"] == baseline
+        and config["active_policy"] == settings.model_dump(mode="json")
+        and type(config["active_seed"]) is int
+        and config["active_seed"] == 2000
+        and config["reference_indices"] == list(definition.REFERENCE_INDICES)
+        and config["trial_intervals"] == []
+        and type(report["frame_count"]) is int
+        and 50
+        <= report["frame_count"]
+        <= 49 + settings.maximum_ticks + settings.window.horizon
+    ):
+        return registered
+    count = report["frame_count"]
+    paths = [
+        directory / name
+        for name in (
+            "config.json",
+            "report.json",
+            "events.jsonl",
+            "active-acquisition.json",
+        )
+    ]
+    paths += [directory / "frames" / f"frame-{slot:05d}.png" for slot in range(count)]
+    frozen = {path: runtime.digest(path) for path in paths}
+    images = [
+        runtime.load_image(directory / "frames" / f"frame-{slot:05d}.png")
+        for slot in range(count)
+    ]
+    if any(image.shape != (448, 448, 3) for image in images):
+        raise ValueError("active replay needs registered public RGB dimensions")
+    events = [
+        TransitionRecord.model_validate_json(line)
+        for line in (directory / "events.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    saved = json.loads((directory / "active-acquisition.json").read_bytes())
+    calibration = calibrate_reference_camera(
+        [images[slot] for slot in definition.REFERENCE_INDICES], (1280, 720)
+    )
+    cursor = 48
+    requested = list(baseline)
+
+    def execute(handle):
+        nonlocal cursor
+        if cursor >= len(events) or cursor + 1 >= len(images):
+            raise ValueError(
+                "saved run ended before the public policy requested an action"
+            )
+        event = events[cursor]
+        requested.append(["move", handle])
+        targets = [
+            obj.object_id
+            for obj in event.state_before.objects
+            if tuple(kind.value for kind in obj.affordances) == ("move",)
+        ]
+        actual = (
+            targets.index(event.executed_action.target_id)
+            if event.executed_action.target_id in targets
+            else -1
+        )
+        compliant = (
+            event.executed_action.kind.value == "move"
+            and event.intervention_compliance is True
+            and event.event.success is True
+            and event.controller_failure is None
+            and event.event.duration == 1
+        )
+        cursor += 1
+        return PublicProbeStep(
+            images[cursor].copy(), actual, compliant, event.executed_action.ticks
+        )
+
+    replayed = {
+        "calibration": calibration,
+        "acquisition": acquire_causal_map(
+            images[48].copy(),
+            execute,
+            calibration["camera_intrinsics"],
+            anchor_frame=48,
+            seed=config["active_seed"],
+            policy=settings,
+        ),
+    }
+    registered.update(
+        valid=(
+            json.dumps(saved, sort_keys=True, allow_nan=False)
+            == json.dumps(replayed, sort_keys=True, allow_nan=False)
+            and cursor == len(events) == count - 1
+            and replayed["acquisition"]["failure"] is None
+            and all(runtime.digest(path) == value for path, value in frozen.items())
+        ),
+        schedule=requested,
+    )
+    return registered
+
+
+def audit(directory, engine):
+    report = json.loads((directory / "report.json").read_bytes())
+    count = report["frame_count"]
+    if type(count) is not int or not 50 <= count <= 61:
+        raise ValueError("active capture frame count exceeds registration")
+    # Freeze public inputs across the nested camera audit, not after it. Private
+    # ledger names may be inspected here, but their bytes remain unopened.
+    paths = [
+        directory / name
+        for name in (
+            "config.json",
+            "report.json",
+            "events.jsonl",
+            "active-acquisition.json",
+            "camera-audit.jar",
+        )
+    ]
+    paths += [
+        directory / folder / f"frame-{slot:05d}.png"
+        for folder in ("frames", "evaluator-native")
+        for slot in range(count)
+    ]
+    paths += [
+        path for path in (directory / "source-snapshot").rglob("*") if path.is_file()
+    ]
+    paths += list((runtime.ROOT / "src/minecraft_scientist").rglob("*.py"))
+    paths += [engine, Path(__file__), Path(runtime.__file__)]
+    frozen = {path: runtime.digest(path) for path in paths}
+    # runtime.audit cannot read any private bytes until registration's complete
+    # chronological public replay, image resizing and action receipt checks pass.
+    physical = runtime.audit(directory, engine, registration=registration)
+    if not physical["valid"]:
+        return {"valid": False, "camera_audit": physical, "navigation_accepted": False}
+    if not all(runtime.digest(path) == value for path, value in frozen.items()):
+        return {
+            "valid": False,
+            "camera_audit": physical,
+            "evaluation": None,
+            "failure": {
+                "type": "ValueError",
+                "message": "public bytes changed across camera audit",
+            },
+            "navigation_accepted": False,
+        }
+    extra = directory / "active-acquisition.json"
+    config = json.loads((directory / "config.json").read_bytes())
+    private = [
+        directory / name
+        for name in ("evaluator-positions.json", "evaluator-camera.jsonl")
+    ]
+    frozen.update({path: runtime.digest(path) for path in private})
+    if any(frozen[path] != report["artifact_sha256"][path.name] for path in private):
+        return {
+            "valid": False,
+            "camera_audit": physical,
+            "evaluation": None,
+            "failure": {
+                "type": "ValueError",
+                "message": "private bytes changed after camera audit",
+            },
+            "navigation_accepted": False,
+        }
+    active = json.loads(extra.read_bytes())["acquisition"]
+    positions = json.loads((directory / "evaluator-positions.json").read_bytes())[
+        "positions"
+    ]
+    cameras = physical["rendered_cameras"]
+    window = active["snapshot"]
+    decision = active["controller_decision"]
+    evaluation = None
+    if (
+        window is not None
+        and decision is not None
+        and decision["instruction"] != "collect"
+    ):
+        first = active["anchor_frame"] + window["past"]["frame_count"] - 1
+        last = decision["absolute_frame"]
+        predicted = (
+            {
+                "supported": True,
+                "relative_rotation": decision["relative_rotation"],
+                "unit_translation": decision["unit_translation"],
+            }
+            if decision["instruction"] == "refresh"
+            else {"supported": False}
+        )
+        evaluation = {
+            "interval": [first, last],
+            "rendered": score_rendered_motion(
+                predicted, cameras[first], cameras[last], **THRESHOLDS
+            ),
+            "body": score_relative_motion(
+                predicted, positions[first], positions[last], **THRESHOLDS
+            ),
+        }
+    checks = {
+        "capture_and_public_policy_independently_replayed": physical["valid"],
+        "artifacts_still_match_capture_ledger": all(
+            frozen[directory / name] == value
+            for name, value in report["artifact_sha256"].items()
+        ),
+        "bytes_stable_through_scoring": all(
+            runtime.digest(path) == value for path, value in frozen.items()
+        ),
+    }
+    # Invalid late mutation discards every physical score, not just a green flag.
+    valid = all(checks.values())
+    return {
+        "valid": valid,
+        "checks": checks,
+        "camera_audit": physical,
+        "policy_terminal": active["terminal"],
+        "fit_count": active["fit_count"],
+        "acquisition_attempts": len(active["acquisition_attempts"]),
+        "executed_acquisition_actions": len(active["steps"]),
+        "evaluation": evaluation if valid else None,
+        "navigation_accepted": False,
+        "scope": config["scope"],
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("route", type=Path)
+    parser.add_argument("--engine-jar", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+    snapshot = args.output.with_suffix(".source.py")
+    if args.output.exists() or snapshot.exists():
+        raise FileExistsError("refusing to overwrite active acquisition audit")
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    snapshot.write_bytes(Path(__file__).read_bytes())
+    try:
+        result = audit(args.route, args.engine_jar)
+    except (KeyError, ValueError, OSError, TypeError) as error:
+        result = {
+            "valid": False,
+            "failure": {"type": type(error).__name__, "message": str(error)},
+            "navigation_accepted": False,
+        }
+    result["audit_snapshot_sha256"] = runtime.digest(snapshot)
+    args.output.write_text(
+        json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    print(
+        json.dumps(
+            {
+                key: result.get(key)
+                for key in ("valid", "policy_terminal", "failure", "evaluation")
+            }
+        )
+    )
+    if not result["valid"]:
+        raise SystemExit(1)
+
+
+if __name__ == "__main__":
+    main()

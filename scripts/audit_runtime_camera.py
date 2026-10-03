@@ -173,7 +173,7 @@ def timing_metrics(aligned, positions):
     }
 
 
-def public_data(directory, engine):
+def public_data(directory, engine, *, registration=None):
     """Validate RGB and action receipts without opening any private pose file."""
     config = json.loads((directory / "config.json").read_bytes())
     report = json.loads((directory / "report.json").read_bytes())
@@ -208,7 +208,25 @@ def public_data(directory, engine):
     )
     module = importlib.util.module_from_spec(definition)
     definition.loader.exec_module(module)
-    expected_schedule = [list(action) for action in module.SCHEDULE]
+    extra_artifacts = set()
+    if registration is None:
+        expected_schedule = [list(action) for action in module.SCHEDULE]
+        registered_schedule = config["schema"] == "runtime-camera-projection-v2" and (
+            config["schedule"] == expected_schedule
+            and config["reference_indices"] == list(module.REFERENCE_INDICES)
+            and config["trial_intervals"]
+            == [list(item) for item in module.TRIAL_INTERVALS]
+        )
+    else:
+        # An explicit source-bound caller must independently replay a dynamic
+        # public policy. Default fixed-capture validation is never relaxed.
+        registered = registration(directory, config, report, module)
+        expected_schedule = registered["schedule"]
+        registered_schedule = registered["valid"] is True
+        extra_artifacts = set(registered["artifacts"])
+        expected_checks |= set(registered["capture_checks"])
+    if not 1 <= len(expected_schedule) <= 200:
+        raise ValueError("runtime registration exceeded bounded action count")
     count = len(expected_schedule) + 1
     checks = {
         "complete_capture": report["completed"] is True
@@ -218,10 +236,7 @@ def public_data(directory, engine):
         and set(report["checks"]) == expected_checks
         and all(value is True for value in report["checks"].values()),
         "config_identity": digest(directory / "config.json") == report["config_sha256"],
-        "registered_schedule": config["schema"] == "runtime-camera-projection-v2"
-        and config["schedule"] == expected_schedule
-        and config["reference_indices"] == list(module.REFERENCE_INDICES)
-        and config["trial_intervals"] == [list(item) for item in module.TRIAL_INTERVALS]
+        "registered_schedule": registered_schedule
         and config["render_size"] == [1280, 720]
         and config["observation_size"] == [448, 448],
         "complete_source_snapshots": {
@@ -309,15 +324,19 @@ def public_data(directory, engine):
         == public_hashes[index + 1]
         for index, event in enumerate(events)
     )
-    expected_files = {
-        "events.jsonl",
-        "evaluator-positions.json",
-        "evaluator-camera.jsonl",
-    } | {
-        f"{folder}/{name}"
-        for folder in ("frames", "evaluator-native")
-        for name in names
-    }
+    expected_files = (
+        extra_artifacts
+        | {
+            "events.jsonl",
+            "evaluator-positions.json",
+            "evaluator-camera.jsonl",
+        }
+        | {
+            f"{folder}/{name}"
+            for folder in ("frames", "evaluator-native")
+            for name in names
+        }
+    )
     checks["complete_artifact_ledger"] = (
         set(report["artifact_sha256"]) == expected_files
     )
@@ -379,8 +398,12 @@ def public_data(directory, engine):
     }
 
 
-def audit(directory, engine):
-    public = public_data(directory, engine)
+def audit(directory, engine, *, registration=None):
+    public = (
+        public_data(directory, engine)
+        if registration is None
+        else public_data(directory, engine, registration=registration)
+    )
     if not public["valid"]:
         return {"valid": False, "checks": public["checks"], "timing": None}
     checks, config, report = public["checks"], public["config"], public["report"]

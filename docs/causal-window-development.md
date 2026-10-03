@@ -5,6 +5,11 @@ fresh replay is still negative: all four horizons yield no accepted estimate.
 This is not useful goal navigation, an online game-policy run, or completion.
 Rejecting real movement is an accuracy failure, not a successful stationary test.
 
+This records the preceding 100-package-file/V20 source checkpoint. The later
+`docs/active-causal-acquisition-development.md` adds first-eligible live dispatch;
+its fresh motion result remains negative. Preserve these earlier source snapshots
+rather than treating them as current-source evidence.
+
 ## Public controller contract
 
 `exploration/causal_map_window.py` contains the reusable `CausalMapWindow`:

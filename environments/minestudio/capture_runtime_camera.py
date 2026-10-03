@@ -90,6 +90,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seed", type=int, default=201)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--active-causal",
+        action="store_true",
+        help="dispatch public-only first-eligible map acquisition after calibration",
+    )
     args = parser.parse_args()
     if args.seed < 0:
         parser.error("seed must be nonnegative")
@@ -171,6 +176,17 @@ def main():
         "sdk_runtime_sha256": runtime_before,
         "scope": "fresh full world-render projection diagnostic; all matrix telemetry evaluator-only; preregistered distinct-control trials; no navigation promotion",
     }
+    if args.active_causal:
+        from minecraft_scientist.exploration.active_causal_map import ActiveMapPolicy
+
+        config.update(
+            schema="active-causal-camera-projection-v1",
+            schedule=SCHEDULE[:48],
+            trial_intervals=[],
+            active_policy=ActiveMapPolicy().model_dump(mode="json"),
+            active_seed=2000,
+            scope="live public-only first-eligible acquisition and distinct two-tick validation; one development trajectory; no navigation promotion",
+        )
     write_json(directory / "config.json", config)
     config_hash = digest(directory / "config.json")
     audit, images, native_images, native_hashes, records = (
@@ -219,13 +235,14 @@ def main():
         simulator_factory=factory,
     )
     error = None
+    active = None
     launches = []
     try:
         with isolated_agent_launch(
             MinecraftInstance, jar, directory / "evaluator-camera.jsonl"
         ) as launches:
             world.reset(args.seed)
-            for kind, index in SCHEDULE:
+            for kind, index in config["schedule"]:
                 target = None
                 if kind == "move":
                     target = [
@@ -248,6 +265,67 @@ def main():
                         )
                     )
                 )
+            if args.active_causal:
+                from minecraft_scientist.exploration.active_causal_map import (
+                    acquire_causal_map,
+                )
+                from minecraft_scientist.exploration.online_landmark_probe import (
+                    calibrate_reference_camera,
+                )
+                from minecraft_scientist.exploration.visibility_acquisition import (
+                    PublicProbeStep,
+                )
+
+                calibration = calibrate_reference_camera(
+                    [images[slot] for slot in REFERENCE_INDICES], (1280, 720)
+                )
+
+                def execute(handle):
+                    targets = [
+                        obj.object_id
+                        for obj in world.observe().objects
+                        if obj.affordances == (ActionKind.MOVE,)
+                    ]
+                    record = world.step(
+                        PrimitiveAction(
+                            kind=ActionKind.MOVE, target_id=targets[handle], ticks=1
+                        )
+                    )
+                    records.append(record)
+                    actual = (
+                        targets.index(record.executed_action.target_id)
+                        if record.executed_action.target_id in targets
+                        else -1
+                    )
+                    compliant = (
+                        record.executed_action.kind is ActionKind.MOVE
+                        and record.intervention_compliance is True
+                        and record.event.success is True
+                        and record.controller_failure is None
+                        and record.event.duration == 1
+                    )
+                    return PublicProbeStep(
+                        images[-1].copy(),
+                        actual,
+                        compliant,
+                        record.executed_action.ticks,
+                    )
+
+                active = {
+                    "calibration": calibration,
+                    "acquisition": acquire_causal_map(
+                        images[-1].copy(),
+                        execute,
+                        calibration["camera_intrinsics"],
+                        anchor_frame=48,
+                        seed=config["active_seed"],
+                        policy=config["active_policy"],
+                    ),
+                }
+                if active["acquisition"]["failure"] is not None:
+                    raise RuntimeError(
+                        "active causal acquisition failed; partial evidence retained"
+                    )
     except Exception as failure:  # noqa: BLE001 -- preserve real launch/capture failures
         error = {"type": type(failure).__name__, "message": str(failure)}
     finally:
@@ -268,12 +346,14 @@ def main():
     )
     checks = {
         "one_fresh_instrumented_launch": len(launches) == 1,
-        "complete_frames_actions_positions": len(records) == len(SCHEDULE)
+        "complete_frames_actions_positions": (
+            args.active_causal or len(records) == len(SCHEDULE)
+        )
         and len(images)
         == len(native_images)
         == len(native_hashes)
         == len(audit.positions)
-        == len(SCHEDULE) + 1,
+        == len(records) + 1,
         "sdk_runtime_unchanged": runtime_ledger(runtime_dir) == runtime_before,
         "engine_agent_unchanged": digest(ENGINE) == config["engine_sha256"]
         and digest(jar) == config["agent_sha256"],
@@ -283,6 +363,15 @@ def main():
         ),
         "config_unchanged": digest(directory / "config.json") == config_hash,
     }
+    if args.active_causal:
+        checks["active_policy_completed"] = (
+            active is not None
+            and active["acquisition"]["failure"] is None
+            and active["acquisition"]["terminal"]
+            in ("validated", "rejected", "exhausted", "support_aborted")
+            and len(records) == 48 + len(active["acquisition"]["steps"])
+        )
+        write_json(directory / "active-acquisition.json", active)
     report = {
         "completed": error is None and all(checks.values()),
         "failure": error,
@@ -299,6 +388,7 @@ def main():
             ]
             + sorted(frame_dir.glob("*.png"))
             + sorted(native_dir.glob("*.png"))
+            + ([directory / "active-acquisition.json"] if args.active_causal else [])
             if path.exists()
         },
     }

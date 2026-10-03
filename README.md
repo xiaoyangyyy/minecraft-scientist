@@ -11,6 +11,13 @@ Fabric mod supplies resettable hidden rules, and the Python boundary replaces it
 block, and entity names with seeded opaque IDs before an agent can observe them.
 Live execution still requires the user's explicit Minecraft EULA acceptance.
 
+Latest visual-development result: first-eligible map acquisition now dispatches
+controls live from public RGB, but the fresh motion test still rejects all maps
+(0/1 useful estimates). Scientific-core validation remains separate from incomplete
+visual goal navigation. See
+[`docs/active-causal-acquisition-development.md`](docs/active-causal-acquisition-development.md)
+for the full attempt ledger, independent audit and remaining gates.
+
 ## Quick start
 
     uv sync

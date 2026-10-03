@@ -576,6 +576,133 @@ def test_causal_window_denominator_forgery_cannot_reach_truth(
     assert not result["valid"] and result["evaluation"] is None
 
 
+@pytest.fixture
+def active_capture(diagnostic, scripts, monkeypatch):
+    runtime, route, engine = diagnostic
+    _, definition = scripts
+    active = importlib.import_module("audit_active_causal_map")
+    calibration = {
+        "camera_intrinsics": [[180.0, 0, 224], [0, 320.0, 224], [0, 0, 1]],
+        "scope": "unit-only public calibration mock",
+    }
+    monkeypatch.setattr(active, "calibrate_reference_camera", lambda *args: calibration)
+    config = json.loads((route / "config.json").read_bytes())
+    config.update(
+        schema="active-causal-camera-projection-v1",
+        schedule=[list(item) for item in definition.SCHEDULE[:48]],
+        trial_intervals=[],
+        active_seed=2000,
+        active_policy=active.ActiveMapPolicy().model_dump(mode="json"),
+    )
+    save(route / "config.json", config)
+    lines = (route / "events.jsonl").read_text(encoding="utf-8").splitlines()
+    (route / "events.jsonl").write_text("\n".join(lines[:49]) + "\n", encoding="utf-8")
+    for folder in ("frames", "evaluator-native"):
+        for path in (route / folder).glob("*.png"):
+            if int(path.stem.split("-")[-1]) >= 50:
+                path.unlink()  # test-owned temporary fixture only
+    private = json.loads((route / "evaluator-positions.json").read_bytes())
+    save(
+        route / "evaluator-positions.json",
+        {key: value[:50] for key, value in private.items()},
+    )
+    rows = (route / "evaluator-camera.jsonl").read_text(encoding="utf-8").splitlines()
+    (route / "evaluator-camera.jsonl").write_text(
+        "\n".join(rows[:52]) + "\n", encoding="utf-8"
+    )
+
+    def execute(handle):
+        assert handle == 0
+        return active.PublicProbeStep(
+            runtime.load_image(route / "frames/frame-00049.png"), 0, True
+        )
+
+    acquired = active.acquire_causal_map(
+        runtime.load_image(route / "frames/frame-00048.png"),
+        execute,
+        calibration["camera_intrinsics"],
+        anchor_frame=48,
+    )
+    assert (
+        acquired["terminal"] == "support_aborted"
+    )  # blank public fixture, not real runtime proof
+    save(
+        route / "active-acquisition.json",
+        {"calibration": calibration, "acquisition": acquired},
+    )
+    report = json.loads((route / "report.json").read_bytes())
+    report.update(frame_count=50, config_sha256=runtime.digest(route / "config.json"))
+    report["checks"]["active_policy_completed"] = True
+    report["artifact_sha256"] = {
+        name: runtime.digest(route / name)
+        for name in report["artifact_sha256"]
+        if (route / name).exists()
+    }
+    report["artifact_sha256"]["active-acquisition.json"] = runtime.digest(
+        route / "active-acquisition.json"
+    )
+    save(route / "report.json", report)
+    return active, route, engine
+
+
+def test_active_policy_replays_every_request_without_reading_truth(
+    active_capture, monkeypatch
+):
+    active, route, engine = active_capture
+    private_guard(monkeypatch)
+    public = active.runtime.public_data(route, engine, registration=active.registration)
+    assert public["valid"] and public["count"] == 50
+    # A dynamic run cannot sneak through the original fixed registration.
+    assert not active.runtime.public_data(route, engine)["valid"]
+
+
+def test_active_camera_audit_retains_aborted_trajectory_without_accuracy_claim(
+    active_capture,
+):
+    active, route, engine = active_capture
+    result = active.audit(route, engine)
+    assert result["valid"] and all(result["checks"].values())
+    assert result["policy_terminal"] == "support_aborted"
+    assert result["executed_acquisition_actions"] == 1 and result["fit_count"] == 0
+    assert result["evaluation"] is None and not result["navigation_accepted"]
+
+
+def test_forged_active_gate_cannot_reach_private_evaluator(active_capture, monkeypatch):
+    active, route, engine = active_capture
+    extra = json.loads((route / "active-acquisition.json").read_bytes())
+    extra["acquisition"]["terminal"] = "validated"
+    save(route / "active-acquisition.json", extra)
+    report = json.loads((route / "report.json").read_bytes())
+    report["artifact_sha256"]["active-acquisition.json"] = active.runtime.digest(
+        route / "active-acquisition.json"
+    )
+    save(route / "report.json", report)
+    private_guard(monkeypatch)
+    result = active.audit(route, engine)
+    assert not result["valid"]
+    assert not result["camera_audit"]["checks"]["registered_schedule"]
+
+
+@pytest.mark.parametrize(
+    "name", ["active-acquisition.json", "evaluator-positions.json", "report.json"]
+)
+def test_active_bytes_changed_after_nested_audit_discard_scores(
+    active_capture, monkeypatch, name
+):
+    active, route, engine = active_capture
+    original = active.runtime.audit
+
+    def mutate(*args, **kwargs):
+        result = original(*args, **kwargs)
+        path = route / name
+        path.write_text(path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+        return result
+
+    monkeypatch.setattr(active.runtime, "audit", mutate)
+    result = active.audit(route, engine)
+    assert not result["valid"] and result["evaluation"] is None
+
+
 def test_mutation_during_analysis_invalidates_audit(diagnostic, monkeypatch):
     script, route, engine = diagnostic
     analyze = script.timing_metrics

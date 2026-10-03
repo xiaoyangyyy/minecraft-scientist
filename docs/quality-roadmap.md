@@ -76,6 +76,14 @@ motion; rolling refresh alone does not acquire sufficient geometry. Next add
 public-only adaptive acquisition and live bounded dispatch, preserving every
 attempt and all original gates. The offline causal replay is not an online run.
 
+`docs/active-causal-acquisition-development.md` now verifies first-eligible live
+dispatch and complete public-only action replay. Its fresh 35-fit trajectory still
+rejects every new-view map test (0/1 supported movements). Live dispatch itself does
+not solve acquisition conditioning: next request complementary controls from past
+public geometry/visibility rather than a fixed six-tick first leg, and investigate
+past-only landmark conditioning without changing gates or dropping failed maps.
+All full-scope requirements above remain unchanged.
+
 - Agent policy inputs contain RGB/opaque public observations and learned action
   programs. Coordinate telemetry and hidden rules remain evaluator-only.
 - Development results are not held-out evaluation. State which failed trajectories

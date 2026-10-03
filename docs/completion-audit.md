@@ -4,6 +4,11 @@ This audit compares the current repository with the original self-evolving symbo
 Minecraft system, not merely with the smaller offline MVP. A green unit test is not
 treated as proof of live Minecraft behavior.
 
+The latest checkpoint is `docs/active-causal-acquisition-development.md`: real
+public-only first-eligible acquisition dispatch is independently replayed, but its
+fresh movement estimate remains unsupported (0/1). Reliable visual goal navigation
+and the full-project completion gates remain open.
+
 The current full-project execution gates are in `docs/quality-roadmap.md`.
 Subsequent RGB-geometry development and its rejected tracking results are recorded
 in `docs/visual-geometry-development.md`. Reference-scale normalization preserves
@@ -1141,7 +1146,7 @@ is zero of four, not successful stationary rejection. The matched-image referenc
 has one locally accurate map but no full future support. Both audits pass thirteen
 integrity checks, not navigation acceptance. See `docs/causal-window-development.md`.
 
-Current V20 core releases pass thirty seeds/two repeats/eighteen exact artifacts
+At the preceding checkpoint, V20 core releases pass thirty seeds/two repeats/eighteen exact artifacts
 on both platforms, freezing 103 source entries including 100 package files. Full
 regressions pass Windows 951/2 skips and WSL 953/2 skips; both focused suites
 pass 86 cases. The MVP CLI and builds pass. The next algorithm action is
@@ -1149,4 +1154,24 @@ well-conditioned adaptive acquisition and live action-dispatch integration, not
 loosening error/support gates. All original full-project requirements remain open.
 
 Isolated default-only WSL passes 495 cases/70 skips without optional vision or
-training packages. All 103 current source hashes match both V20 release ledgers.
+training packages. All 103 source hashes matched both V20 ledgers at that checkpoint;
+these are historical after the active-acquisition module was added.
+
+## First-eligible live acquisition checkpoint
+
+`exploration/active_causal_map.py` now requests real one-tick actions from public
+RGB and latches the first supported past-map prefix before distinct-control
+validation. All attempts and failed controls are retained; original geometry and
+consensus gates remain unchanged. `runs/active-causal-live-seed201-v1` completes
+60 frames/59 actions with seven capture checks. Its independent policy/camera
+audit passes three outer plus eighteen nested checks, but no movement is supported
+(0/1): every future map fails. This is development on seed 201, not generalization
+or goal navigation. See `docs/active-causal-acquisition-development.md`.
+
+Current V21 releases pass thirty seeds/two repeats/eighteen exact artifacts on
+both platforms, with all 104 hashes matching current code (101 package files).
+Full regressions pass Windows 983/two skips and WSL 985/two skips; targeted Windows
+passes 89, WSL package/controller 45, isolated default-only WSL 521/70 skips.
+MVP/build/changed-file Ruff pass. Global lint debt and hosted CI remain separately
+unverified/unresolved. Next improve public-only acquisition conditioning; all
+original full-project outcomes remain required and the goal remains active.
