@@ -20,6 +20,11 @@ from controlled_motion_common import digest
 from PIL import Image
 
 from minecraft_scientist.exploration.motion_probe_schedule import motion_probe_schedule
+from minecraft_scientist.exploration.multiview_motion import MultiViewMotionConfig
+from minecraft_scientist.exploration.online_landmark_probe import (
+    calibrate_reference_camera,
+    fit_online_landmarks,
+)
 from minecraft_scientist.exploration.visibility_acquisition import (
     PublicProbeStep,
     VisibilityPolicy,
@@ -27,6 +32,20 @@ from minecraft_scientist.exploration.visibility_acquisition import (
 )
 from minecraft_scientist.minecraft import MineStudioConfig, MineStudioVisualAdapter
 from minecraft_scientist.protocols import ActionKind, PrimitiveAction
+
+
+def online_policy():
+    return VisibilityPolicy(landmark_protection="first_supported_map_v1")
+
+
+def online_settings():
+    return {
+        "schema": "causal-landmark-fit-v1",
+        "seed_base": 0,
+        "seed_stride": 5,
+        "seed_offset": 2,
+        "multiview": MultiViewMotionConfig().model_dump(mode="json"),
+    }
 
 
 def target(world, kind, handle=None):
@@ -68,9 +87,19 @@ def collect(world, frames, config, policy, records, trials):
         for index, action in enumerate(motion_probe_schedule(config)[:25])
         if action.phase == "reference_settle"
     ]
+    calibration = calibrate_reference_camera(
+        [frames[slot] for slot in references], config.render_size
+    )
     for repetition in range(2):
         for pair in config.handle_pairs:
             anchor = len(frames) - 1
+            number = len(trials)
+            settings = online_settings()
+            landmark_seed = (
+                settings["seed_base"]
+                + number * settings["seed_stride"]
+                + settings["seed_offset"]
+            )
 
             def execute(handle):
                 object_id = target(world, "move", handle)
@@ -90,7 +119,21 @@ def collect(world, frames, config, policy, records, trials):
                     bool(record.intervention_compliance and record.event.success),
                 )
 
-            result = acquire_visibility_probe(frames[-1], execute, pair, policy=policy)
+            def observe_landmarks(tracked, retained, *, seed=landmark_seed):
+                return fit_online_landmarks(
+                    tracked,
+                    retained,
+                    calibration["camera_intrinsics"],
+                    seed=seed,
+                )
+
+            result = acquire_visibility_probe(
+                frames[-1],
+                execute,
+                pair,
+                policy=policy,
+                landmark_observer=observe_landmarks,
+            )
             trials.append(
                 {
                     "repetition": repetition,
@@ -99,6 +142,11 @@ def collect(world, frames, config, policy, records, trials):
                     "end_frame": len(frames) - 1,
                     "terminal": result.terminal,
                     "failure": result.failure,
+                    "landmark_seed": landmark_seed,
+                    "landmark_attempts": [
+                        item.model_dump(mode="json")
+                        for item in result.landmark_attempts
+                    ],
                     "steps": list(result.steps),
                     "decisions": [
                         item.model_dump(mode="json") for item in result.decisions
@@ -118,14 +166,14 @@ def collect(world, frames, config, policy, records, trials):
     records.append(world.step(PrimitiveAction(kind=ActionKind.WAIT, ticks=8)))
     if not records[-1].intervention_compliance or not records[-1].event.success:
         raise RuntimeError("final WAIT control failed")
-    return references
+    return references, calibration
 
 
 def run(plan_directory, output):
     if output.exists():
         raise FileExistsError("refusing to overwrite adaptive visibility capture")
     config = planner.validate_plan(plan_directory)  # Public-only prior pixel replay.
-    policy = VisibilityPolicy()
+    policy = online_policy()
     from minestudio.simulator import MinecraftSim
     from minestudio.simulator.callbacks.commands import CommandsCallback
     from navigation_probe import PositionAudit, PositionAuditSimulator
@@ -169,8 +217,9 @@ def run(plan_directory, output):
     if maximum_frames > 225:
         raise ValueError("adaptive capture exceeds registered 225-frame ceiling")
     manifest = {
-        "schema": "visibility-rgb-acquisition-v1",
+        "schema": "visibility-rgb-acquisition-v2",
         "policy": policy.model_dump(mode="json"),
+        "online_landmarks": online_settings(),
         "world": {
             "seed": config.seed,
             "observation_size": config.observation_size,
@@ -231,9 +280,11 @@ def run(plan_directory, output):
         ),
         simulator_factory=factory,
     )
-    failure, references = None, []
+    failure, references, calibration = None, [], None
     try:
-        references = collect(world, frames, config, policy, records, trials)
+        references, calibration = collect(
+            world, frames, config, policy, records, trials
+        )
     except Exception as error:  # noqa: BLE001 -- retain acquisition failures
         failure = {"type": type(error).__name__, "message": str(error)}
     finally:
@@ -311,6 +362,7 @@ def run(plan_directory, output):
         "frame_sha256": frame_hashes,
         "rgb_sha256": rgb_hashes,
         "reference_indices": references,
+        "landmark_calibration": calibration,
         "timeline": timeline,
         "trials": trials,
         "navigation_accepted": False,

@@ -22,7 +22,9 @@ from minecraft_scientist.exploration.action_switch_motion import (
     inspect_action_switch,
 )
 from minecraft_scientist.exploration.keyframe_motion import (
+    KeyframeAttempt,
     KeyframeMotionConfig,
+    KeyframeSelection,
     infer_keyframe_prefixes,
 )
 from minecraft_scientist.exploration.pose_direction_search import (
@@ -34,7 +36,6 @@ from minecraft_scientist.exploration.temporal_tracks import (
 )
 from minecraft_scientist.exploration.visibility_acquisition import (
     VisibilityController,
-    VisibilityPolicy,
 )
 from minecraft_scientist.protocols import ActionKind, PrimitiveAction, TransitionRecord
 
@@ -111,7 +112,7 @@ def validate_capture(route):
     raw = json.loads((route / "report.json").read_bytes())
     runtime, parent = capture_sources(), parent_inputs(route)
     if (
-        manifest["schema"] != "visibility-rgb-acquisition-v1"
+        manifest["schema"] != "visibility-rgb-acquisition-v2"
         or raw["passed"] is not True
         or raw["failure"] is not None
         or raw["navigation_accepted"] is not False
@@ -145,10 +146,11 @@ def validate_capture(route):
         for path in list(inputs(route).values()) + list(runtime.values())
     }
     config = capture.planner.validate_plan(ROOT / manifest["plan_directory"])
-    policy = VisibilityPolicy()
+    policy = capture.online_policy()
     expected = {
-        "schema": "visibility-rgb-acquisition-v1",
+        "schema": "visibility-rgb-acquisition-v2",
         "policy": policy.model_dump(mode="json"),
+        "online_landmarks": capture.online_settings(),
         "world": {
             "seed": config.seed,
             "observation_size": config.observation_size,
@@ -274,12 +276,25 @@ def validate_capture(route):
         )
     if len(raw["trials"]) != 2 * len(config.handle_pairs):
         raise ValueError("adaptive acquisition cannot drop failed or aborted trials")
+    calibration = capture.calibrate_reference_camera(
+        [images[slot] for slot in references], config.render_size
+    )
+    if not _numeric_equal(calibration, raw["landmark_calibration"]):
+        raise ValueError(
+            "online camera must use only the completed public startup views"
+        )
     reconstructed = []
     for number, trial in enumerate(raw["trials"]):
         pair = config.handle_pairs[number % len(config.handle_pairs)]
         controller = VisibilityController(pair, policy=policy)
         anchor = timeline[event_slot]["start_frame"]
-        prefixes, steps = [], []
+        prefixes, steps, attempts = [], [], []
+        settings = capture.online_settings()
+        landmark_seed = (
+            settings["seed_base"]
+            + number * settings["seed_stride"]
+            + settings["seed_offset"]
+        )
         for _ in range(policy.maximum_first_ticks + policy.maximum_second_ticks):
             handle = controller.next_handle
             interval = consume("move", 1, handle)
@@ -294,7 +309,24 @@ def validate_capture(route):
             tracked = track_frame_chain(
                 images[anchor : interval["end_frame"] + 1], config=policy.temporal
             )
-            decision = controller.observe(tracked)
+            landmark = None
+            if (
+                controller.endpoint_tick is None
+                and not controller.has_landmark
+                and tracked.frame_count - 1 >= policy.minimum_leg_ticks
+            ):
+                attempt = capture.fit_online_landmarks(
+                    tracked,
+                    None
+                    if not controller.decisions
+                    else controller.decisions[-1].retained_ids,
+                    calibration["camera_intrinsics"],
+                    seed=landmark_seed,
+                )
+                attempts.append(attempt.model_dump(mode="json"))
+                if attempt.motion.supported:
+                    landmark = attempt
+            decision = controller.observe(tracked, landmark=landmark)
             prefixes.append(tracked.model_dump(mode="json"))
             if decision.instruction in ("finish", "abort"):
                 break
@@ -307,6 +339,8 @@ def validate_capture(route):
             "end_frame": interval["end_frame"],
             "terminal": "finished" if decision.instruction == "finish" else "aborted",
             "failure": None,
+            "landmark_seed": landmark_seed,
+            "landmark_attempts": attempts,
             "steps": steps,
             "decisions": [
                 item.model_dump(mode="json") for item in controller.decisions
@@ -408,11 +442,23 @@ def configuration(route, acquisition, raw, seed):
         route, acquisition, raw | {"pairs": pairs(raw)}, seed
     )
     return baseline | {
-        "schema": "adaptive-visibility-frozen-maps-v1",
+        "schema": "adaptive-landmark-frozen-maps-v2",
         "keyframe": KeyframeMotionConfig().model_dump(mode="json"),
         "action_switch": ActionSwitchConfig().model_dump(mode="json"),
         "scope": "all adaptive trial/control prefixes; leg-one maps frozen before second-control pixels; no pose replacement or navigation; single development world, unmatched trajectories",
     }
+
+
+def expected_offsets(pair, raw):
+    if pair["first"] is None or pair["second"] is None:
+        return None
+    terminal = pair["second"] - pair["first"]
+    if pair["group"] == "leg_one":
+        trial = raw["trials"][int(pair["id"].split("-")[-1])]
+        if trial["landmark_attempts"]:
+            offsets = tuple(item["end_offset"] for item in trial["landmark_attempts"])
+            return offsets + ((terminal,) if offsets[-1] < terminal else ())
+    return KeyframeMotionConfig().offsets(terminal)
 
 
 def infer(route, raw, config, *, results=None):
@@ -431,14 +477,55 @@ def infer(route, raw, config, *, results=None):
             ]
             # Identity controls use one actual image and infer's own repeat, so
             # their terminal offset is zero, not a synthetic one-tick movement.
-            selection = infer_keyframe_prefixes(
-                images[:1] if first == second else images,
-                camera,
-                config=keyframe,
-                seed=config["seed"] + index,
-            )
+            if (
+                pair["group"] != "leg_one"
+                or not raw["trials"][int(pair["id"].split("-")[-1])][
+                    "landmark_attempts"
+                ]
+            ):
+                selection = infer_keyframe_prefixes(
+                    images[:1] if first == second else images,
+                    camera,
+                    config=keyframe,
+                    seed=config["seed"] + index,
+                )
         if pair["group"] == "leg_one":
             trial = raw["trials"][int(pair["id"].split("-")[-1])]
+            # The experimental map was fitted causally online, with permanently
+            # retained IDs. Do not replace it with a retrospective full-chain fit.
+            if first is not None and second is not None and trial["landmark_attempts"]:
+                online = [
+                    KeyframeAttempt.model_validate(item)
+                    for item in trial["landmark_attempts"]
+                ]
+                terminal = (
+                    pair["second"] - pair["first"]
+                    if pair["second"] is not None
+                    else online[-1].end_offset
+                )
+                if online[-1].end_offset < terminal:
+                    final = next(
+                        item for item in trial["decisions"] if item["tick"] == terminal
+                    )
+                    current = TemporalTracks.model_validate(
+                        trial["prefix_tracks"][terminal - 1]
+                    )
+                    online.append(
+                        capture.fit_online_landmarks(
+                            current,
+                            final["retained_ids"],
+                            camera,
+                            seed=trial["landmark_seed"],
+                        )
+                    )
+                supported = [
+                    item.end_offset for item in online if item.motion.supported
+                ]
+                selection = KeyframeSelection(
+                    terminal_offset=terminal,
+                    attempts=tuple(online),
+                    selected_offset=supported[0] if supported else None,
+                )
             selected = None if selection is None else selection.selected()
             last = trial["decisions"][-1]
             available = selected is not None and trial["terminal"] == "finished"
@@ -464,7 +551,7 @@ def infer(route, raw, config, *, results=None):
             prefit = inspect_direction_search(
                 selected,
                 camera,
-                seed=config["seed"] + index,
+                seed=trial["landmark_seed"],
                 config=future_policy.search,
             )
             extended = None
@@ -501,7 +588,7 @@ def infer(route, raw, config, *, results=None):
                 extended,
                 plan,
                 camera,
-                seed=config["seed"] + index,
+                seed=trial["landmark_seed"],
                 config=future_policy,
                 frozen_search=prefit,
             )
@@ -516,4 +603,8 @@ def infer(route, raw, config, *, results=None):
                 else evidence.model_dump(mode="json"),
             }
         )
+        if selection is not None and tuple(
+            item.end_offset for item in selection.attempts
+        ) != expected_offsets(pair, raw):
+            raise ValueError("missing causal online or chronological diagnostic prefix")
     return results

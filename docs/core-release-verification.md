@@ -60,8 +60,8 @@ exits nonzero, not a smaller passing seed subset.
 
 ## Current results (2026-10-02)
 
-`runs/core-release-seeds0-29-windows-v14/report.json` on Windows and
-`runs/core-release-seeds0-29-wsl-v14/report.json` on WSL each pass all six release
+`runs/core-release-seeds0-29-windows-v15/report.json` on Windows and
+`runs/core-release-seeds0-29-wsl-v15/report.json` on WSL each pass all six release
 checks for all thirty seeds. Each platform runs sixty complete benchmarks and
 reproduces eighteen artifacts per seed, including the transfer traces and
 experience database. All four learned-law accuracies, revised-law recovery and
@@ -81,7 +81,8 @@ the optional bounded competing-map diagnostic and weak-anchor resampling. V10
 adds original-map replay and the optional direction-constrained map search. V11
 adds optional frozen-map action-switch validation. V12 adds a causal visibility
 controller; V13 repairs its anchor-denominator definition, and V14 separates
-second-phase new loss from original-anchor loss. All 98
+second-phase new loss from original-anchor loss. V15 adds online fitting and
+protection of the first supported map's immutable landmark partitions. All 99
 current frozen source hashes match. Core behavior
 is unchanged by those optional modules.
 These earlier runs are historical checks, not the current source-frozen release.
@@ -104,8 +105,8 @@ downloads are separate from the algorithm's offline/no-model runtime contract.
 The subsequent decorator-source locator correction affects experiment scripts,
 not the then-96-entry package/core ledger. V10 is historical after adding the
 action-switch module. V11 matches the prior 97-entry checkpoint; V13 freezes the
-prior 98-entry core after anchor-denominator refinement. V14 freezes the current
-phase-relative controller. Visual
+prior 98-entry core after anchor-denominator refinement. V14 freezes the historical
+phase-relative controller; V15 freezes the current online-landmark module. Visual
 inference/plan/diagnostic manifests have a separate historical
 boundary after that correction, detailed in `docs/source-ledger-development.md`.
 The scientific-core verifier does not substitute for their source checks.
@@ -118,8 +119,14 @@ adaptive capture and independent map auditing complete, but two direction errors
 remain; see `docs/phase-visibility-development.md`. These results are not reliable
 navigation or completion of the broad project requirements.
 
+The current online-landmark V15 checkpoint passes **749/two skips on Windows**,
+**751/two on WSL**, and **427/61 in the isolated default-only offline installation**.
+Both 99-entry core ledgers were rechecked against current bytes, with no mismatch.
+The optional acquisition change does not establish reliable navigation; see
+`docs/online-landmark-acquisition-development.md` for fresh real-world evidence.
+
 The current seed-zero MVP report at
-`runs/phase-visibility-regression-mvp-seed0/benchmark.json` remains byte-identical
+`runs/online-landmark-regression-mvp-seed0/benchmark.json` remains byte-identical
 to the earlier regression: SHA-256
 `B95AF2E5C152B9F06EDC63004EA87FB183C37E6A5A13BFF53F21A39A4F48AEB8`.
 It retains 47 experiments, accuracy/task success 1.0, detection delay one, eight

@@ -111,8 +111,13 @@ IDs at tick two. By the first-leg switch at tick three these populations are onl
 0/0 at tick seven. Generic retention therefore does not protect the actual map.
 
 Using the same existing one-step extrapolation, central ROI and 12-reference-pixel
-margin at tick two, **48/48 map landmarks** are projected near/outside the safe
+margin at tick two, **16/48 map landmarks** are projected near/outside the safe
 region; the generic population's projected-edge fraction is only **0.117845**.
+Correction (2026-10-02): the earlier hand calculation incorrectly used 224-pixel
+bounds for actual 448-by-448 images. Recalculation with the actual dimensions and
+scaled margin gives 16/48 (one third), still above the unchanged 0.25 warning
+threshold. The controller already used actual image dimensions; this corrects
+the report, not the algorithm or any historical raw artifact.
 The map exists before the next action and supplies a causal public warning that
 the generic controller misses. This derives from frozen public tracks/IDs, not
 private direction labels or retrospectively selected replacement landmarks.
@@ -139,3 +144,7 @@ Five additional held-out worlds/multiple terrains/three conditions, integrated
 natural scientific experiments/maps, at least 100 exploration/recovery attempts,
 live release/baseline comparisons and consolidated CI/release verification remain
 required. No full-project gate is removed or reduced by this development result.
+
+This is the historical V14 checkpoint. The subsequent V15 online fitted-landmark
+protection and fresh independent evidence are documented in
+`online-landmark-acquisition-development.md`; neither checkpoint proves navigation.

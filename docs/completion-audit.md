@@ -979,7 +979,7 @@ incomplete, not proof of unique map or reliable navigation.
 
 Public landmark replay shows why another correct first-leg map becomes
 unobservable: its 36 fitting/12 withheld points at tick two fall to 7/1 by tick
-three despite 222 generic survivors. All 48 map points had projected-edge risk
+three despite 222 generic survivors. Sixteen of 48 map points had projected-edge risk
 at tick two, while the generic risk was only 0.117845. Next protect actually fitted
 map identities online and validate second-leg maps after further controls, without
 resurrection, hidden-label policy or relaxed geometry. See
@@ -991,3 +991,28 @@ releases pass six checks and all 98 current source hashes. Seed-zero MVP bytes
 remain identical. None completes the still-required held-out navigation, natural
 science/map integration, long recovery or consolidated live release/baseline/CI
 requirements. Overall completion remains unproven.
+
+Correction to the preceding diagnosis (2026-10-02): the earlier report's 48/48
+used 224-pixel bounds for actual 448-pixel images. The corrected 16/48 fraction
+still exceeds the existing warning threshold. This is a report correction, not
+a controller fix or modification of historical raw evidence.
+
+### Online fitted-landmark protection (2026-10-02)
+
+The controller now freezes the first supported map using only already observed
+public prefixes and protects its original fitting/withheld IDs. Replacement and
+resurrection are forbidden. A fresh 180-frame capture includes all eight trials:
+seven finish and one aborts after protected support collapses despite 226 generic
+survivors. Independent public-first replay passes all 26 checks over 46 records/
+128 prefixes. Ten selected records correspond to five unique intervals, all
+within the unchanged error gates; overlapping groups are not independent trials.
+Only one/eight second-leg trials supports a map, with direction error 19.966090
+degrees, and no subsequent different-control validation. One first-leg diagnostic
+survives but has antiparallel shadow motion and an incomplete alternative family.
+Navigation remains unaccepted. This is not matched-path accuracy improvement.
+
+Full regressions pass Windows 749/WSL 751 (two skips each), default-only offline
+427/61, and both V15 thirty-seed/two-repeat core releases pass six checks with 99
+frozen source entries. The seed-zero MVP artifact is unchanged. Source boundaries,
+costs and unresolved requirements are recorded in
+`docs/online-landmark-acquisition-development.md`. The broad goal remains active.

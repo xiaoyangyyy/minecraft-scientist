@@ -786,6 +786,14 @@ fitted/withheld map landmarks despite generic track survival. See
 `docs/phase-visibility-development.md` for all denominators, costs, original-ID
 loss traces and unchanged full-project requirements.
 
+Online fitted-landmark protection now freezes public-prefix maps and safely
+aborts on loss of their original fitting/withheld support. A fresh development
+capture has five unique selected local intervals within the error gates, but
+second-leg support remains only one/eight, with no subsequent different-control
+validation. This is not reliable navigation or held-out generalization. See
+`docs/online-landmark-acquisition-development.md` for the independent audit,
+current regressions and all remaining full-project requirements.
+
 The scientific core has a portable offline release verifier:
 
 ```powershell

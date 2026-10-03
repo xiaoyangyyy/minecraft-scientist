@@ -15,7 +15,6 @@ from controlled_motion_common import digest
 
 from minecraft_scientist.evaluation.relative_motion import score_relative_motion
 from minecraft_scientist.exploration.keyframe_motion import (
-    KeyframeMotionConfig,
     KeyframeSelection,
 )
 
@@ -165,7 +164,7 @@ def audit(route, experiment):
                 selection = KeyframeSelection.model_validate(saved)
                 if tuple(
                     item.end_offset for item in selection.attempts
-                ) != KeyframeMotionConfig().offsets(pair["second"] - pair["first"]):
+                ) != common.expected_offsets(pair, raw):
                     raise ValueError(
                         "missing chronological prefix or changed first-supported latch"
                     )

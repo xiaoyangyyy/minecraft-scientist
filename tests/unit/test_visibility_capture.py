@@ -16,7 +16,15 @@ from minecraft_scientist.protocols import ActionKind
 def capture(monkeypatch):
     root = Path(__file__).resolve().parents[2]
     monkeypatch.syspath_prepend(str(root / "environments" / "minestudio"))
-    return importlib.import_module("capture_visibility_rgb")
+    module = importlib.import_module("capture_visibility_rgb")
+    monkeypatch.setattr(
+        module,
+        "calibrate_reference_camera",
+        lambda images, size: {
+            "camera_intrinsics": [[180, 0, 112], [0, 180, 112], [0, 0, 1]],
+        },
+    )
+    return module
 
 
 class PublicWorld:
@@ -62,8 +70,10 @@ def test_acquisition_orchestration_exposes_only_rgb_and_receipts(capture, monkey
     frames, records, trials, receipts = [], [], [], []
     world = PublicWorld(frames)
 
-    def acquire(initial, execute, pair, *, policy):
+    def acquire(initial, execute, pair, *, policy, landmark_observer):
         assert isinstance(initial, np.ndarray)
+        assert policy.landmark_protection == "first_supported_map_v1"
+        assert callable(landmark_observer)
         for handle in pair:
             receipt = execute(handle)
             assert (
@@ -73,16 +83,23 @@ def test_acquisition_orchestration_exposes_only_rgb_and_receipts(capture, monkey
             )
             receipts.append(receipt)
         return SimpleNamespace(
-            terminal="finished", failure=None, steps=(), decisions=(), tracks=()
+            terminal="finished",
+            failure=None,
+            steps=(),
+            decisions=(),
+            tracks=(),
+            landmark_attempts=(),
         )
 
     monkeypatch.setattr(capture, "acquire_visibility_probe", acquire)
     config = CompoundProbeConfig(seed=201)
-    references = capture.collect(
-        world, frames, config, VisibilityPolicy(), records, trials
+    references, calibration = capture.collect(
+        world, frames, config, capture.online_policy(), records, trials
     )
     assert world.seed == 201 and len(trials) == 8 and len(receipts) == 16
     assert len(references) == 12 and references[-1] == 56
+    assert calibration["camera_intrinsics"][0][0] == 180
+    assert [trial["landmark_seed"] for trial in trials] == list(range(2, 38, 5))
     moves = [action for action in world.actions if action.kind == ActionKind.MOVE]
     assert len(moves) == 16 and all(action.ticks == 1 for action in moves)
     assert len(frames) == sum(item.event.duration for item in records) + 1
@@ -102,6 +119,7 @@ def test_probe_failure_retains_trial_and_stops_before_wait_or_retry(
             steps=(),
             decisions=(),
             tracks=(),
+            landmark_attempts=(),
         ),
     )
     with pytest.raises(RuntimeError, match="visibility probe failed"):

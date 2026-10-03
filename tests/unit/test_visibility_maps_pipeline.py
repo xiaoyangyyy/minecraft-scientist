@@ -17,7 +17,6 @@ from minecraft_scientist.exploration.keyframe_motion import (
 )
 from minecraft_scientist.exploration.visibility_acquisition import (
     VisibilityController,
-    VisibilityPolicy,
 )
 from minecraft_scientist.protocols import (
     ActionKind,
@@ -42,7 +41,11 @@ def adaptive_capture(tmp_path, monkeypatch):
     common = importlib.import_module("visibility_capture_common")
     monkeypatch.setattr(common, "ROOT", tmp_path)
     config = CompoundProbeConfig(seed=201, observation_size=224)
-    policy = VisibilityPolicy()
+    policy = common.capture.online_policy()
+    camera = {"camera_intrinsics": [[180, 0, 112], [0, 180, 112], [0, 0, 1]]}
+    monkeypatch.setattr(
+        common.capture, "calibrate_reference_camera", lambda images, size: camera
+    )
     route, plan = tmp_path / "runs/capture", tmp_path / "runs/plan"
     parent = {"plan_config": plan / "config.json", "plan_result": plan / "plan.json"}
     for path in parent.values():
@@ -61,8 +64,9 @@ def adaptive_capture(tmp_path, monkeypatch):
         target.write_bytes(path.read_bytes())
     (route / "source-snapshot/sdk-entry.py").write_bytes(b"fixture SDK provenance\n")
     manifest = {
-        "schema": "visibility-rgb-acquisition-v1",
+        "schema": "visibility-rgb-acquisition-v2",
         "policy": policy.model_dump(mode="json"),
+        "online_landmarks": common.capture.online_settings(),
         "world": {
             "seed": 201,
             "observation_size": 224,
@@ -152,7 +156,7 @@ def adaptive_capture(tmp_path, monkeypatch):
     for repetition in range(2):
         for pair in config.handle_pairs:
             anchor = cursor
-            controller = VisibilityController(pair)
+            controller = VisibilityController(pair, policy=policy)
             tracked = _tracks(0, 2)
             decision = controller.observe(tracked)
             action("move", 1, pair[0])
@@ -164,6 +168,8 @@ def adaptive_capture(tmp_path, monkeypatch):
                     "end_frame": cursor,
                     "terminal": "aborted",
                     "failure": None,
+                    "landmark_seed": 5 * len(trials) + 2,
+                    "landmark_attempts": [],
                     "steps": [
                         {
                             "requested_handle": pair[0],
@@ -198,6 +204,7 @@ def adaptive_capture(tmp_path, monkeypatch):
         },
         "rgb_sha256": [rgb_hash] * (cursor + 1),
         "reference_indices": references,
+        "landmark_calibration": camera,
         "timeline": timeline,
         "trials": trials,
         "navigation_accepted": False,
@@ -312,6 +319,9 @@ def test_all_public_controls_and_maps_replay_before_private_read(
         "failed_control",
         "drop_frame",
         "snapshot",
+        "landmark_seed",
+        "landmark_calibration",
+        "missing_landmark_attempts",
     ],
 )
 def test_raw_acquisition_tampering_rejects_before_private_read(
@@ -335,6 +345,12 @@ def test_raw_acquisition_tampering_rejects_before_private_read(
         )
     elif change == "drop_frame":
         (route / "frames/frame-00003.png").unlink()
+    elif change == "landmark_seed":
+        raw["trials"][0]["landmark_seed"] += 1
+    elif change == "landmark_calibration":
+        raw["landmark_calibration"]["camera_intrinsics"][0][0] += 1
+    elif change == "missing_landmark_attempts":
+        del raw["trials"][0]["landmark_attempts"]
     else:
         (route / "source-snapshot/visibility_acquisition.py").write_bytes(b"forged\n")
     save(route / "report.json", raw)
@@ -472,6 +488,8 @@ def test_pre_switch_search_is_frozen_before_future_pixels_and_lost_ids_stay_lost
                 "end_frame": 6,
                 "handles": [0, 1],
                 "terminal": "finished",
+                "landmark_seed": 2,
+                "landmark_attempts": [],
                 "decisions": [
                     {"holdout_ticks": [5, 6], "retained_ids": list(range(50))}
                 ],
@@ -481,6 +499,83 @@ def test_pre_switch_search_is_frozen_before_future_pixels_and_lost_ids_stay_lost
     result = common.infer(route, raw, config)
     assert result[0]["selection"]["selected_offset"] == 2
     assert seen == list(range(5)) + list(range(7))
+
+
+def test_online_frozen_candidate_is_not_retrospectively_refitted(
+    adaptive_capture, monkeypatch
+):
+    from types import SimpleNamespace
+
+    from test_keyframe_motion import _motion, _tracks
+
+    common, route = adaptive_capture
+    seen, frozen = [], []
+    first = KeyframeAttempt(
+        end_offset=2, tracks=_tracks(64, 3), motion=_motion(64, supported=False)
+    )
+    selected = KeyframeAttempt(
+        end_offset=3, tracks=_tracks(64, 4), motion=_motion(64, supported=True)
+    )
+
+    def rgb(path):
+        slot = int(path.stem.split("-")[-1])
+        if slot > 3:
+            assert frozen
+        seen.append(slot)
+        return np.full((224, 224, 3), slot, dtype=np.uint8)
+
+    def search(candidate, camera, *, seed, **kwargs):
+        assert candidate == selected and seed == 17 and max(seen) == 3
+        frozen.append(candidate.model_dump_json())
+        return SimpleNamespace(reference_matches_original_checks=True)
+
+    def inspect(candidate, extended, plan, camera, *, seed, **kwargs):
+        assert candidate == selected and seed == 17
+        assert plan.target_frames == (4, 5) and extended.track_ids == tuple(range(50))
+        return SimpleNamespace(
+            model_dump=lambda **kwargs: {"fixture": "original online map"}
+        )
+
+    monkeypatch.setattr(common.canonical, "rgb", rgb)
+    monkeypatch.setattr(
+        common,
+        "infer_keyframe_prefixes",
+        lambda *a, **k: pytest.fail("online map replaced by retrospective fit"),
+    )
+    monkeypatch.setattr(common, "inspect_direction_search", search)
+    monkeypatch.setattr(common, "inspect_action_switch", inspect)
+    monkeypatch.setattr(
+        common, "track_frame_chain", lambda frames, **kwargs: _tracks(64, len(frames))
+    )
+    config = {
+        "seed": 90,
+        "camera_intrinsics": np.eye(3).tolist(),
+        "keyframe": KeyframeMotionConfig().model_dump(mode="json"),
+        "action_switch": common.ActionSwitchConfig().model_dump(mode="json"),
+        "pairs": [{"id": "leg_one-00", "group": "leg_one", "first": 0, "second": 3}],
+    }
+    raw = {
+        "trials": [
+            {
+                "anchor_frame": 0,
+                "end_frame": 5,
+                "handles": [0, 1],
+                "terminal": "finished",
+                "landmark_seed": 17,
+                "landmark_attempts": [
+                    first.model_dump(mode="json"),
+                    selected.model_dump(mode="json"),
+                ],
+                "decisions": [
+                    {"holdout_ticks": [4, 5], "retained_ids": list(range(50))}
+                ],
+            }
+        ]
+    }
+    result = common.infer(route, raw, config)
+    assert result[0]["selection"]["selected_offset"] == 3
+    assert seen == list(range(4)) + list(range(6))
+    assert common.expected_offsets(config["pairs"][0], raw) == (2, 3)
 
 
 @pytest.mark.parametrize("target", ["public", "private"])

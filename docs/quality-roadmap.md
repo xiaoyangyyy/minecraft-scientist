@@ -308,7 +308,7 @@ all second legs reach four ticks. Independent replay passes 26 checks over all
 diagnostic, with antiparallel shadow motion and an incomplete no-witness family,
 not unique/non-collinear validation. All fourteen stationary controls reject.
 The public map-ID trace identifies the next concrete action: at tick two one
-candidate has 48/48 projected-at-risk landmarks, while generic edge risk is only
+candidate has 16/48 projected-at-risk landmarks, while generic edge risk is only
 0.117845; by tick three its fitting/withheld support collapses to 7/1. Integrate
 online candidate-specific landmark protection and second-leg subsequent-control
 validation, then independent fresh accuracy/generalization/integration/recovery.
@@ -316,3 +316,22 @@ Do not relax the 20-degree gate or promote generic point retention as navigation
 Full regressions pass 725/727 on Windows/WSL (two skips each), default-only offline
 408/60, and both V14 thirty-seed releases (98 source entries). Complete evidence
 is in `docs/phase-visibility-development.md`; the full objective remains active.
+
+The 48/48 figure previously reported above was a hand-calculation error using
+224-pixel bounds for 448-pixel RGB. The corrected 16/48 still exceeds the existing
+0.25 warning threshold; controller code and historical raw artifacts are unchanged.
+
+Online protection now freezes the first supported map from current public RGB
+prefixes and aborts when its original fitting/withheld support disappears, even
+if generic tracks survive. A fresh 180-frame development capture preserves all
+eight trials (seven finished/one aborted), and independent replay passes all 26
+checks over 46 records/128 prefixes. Ten selected records represent five unique
+intervals, all within the existing error gate; second-leg coverage is only one
+of eight and its direction error is 19.966090 degrees against a 20-degree limit.
+No matched-path improvement, unique map, held-out success or reliable navigation
+is established. Further different-control validation and track-loss diagnosis
+remain next, followed by all original generalization/integration/recovery gates.
+Full regressions pass Windows 749/WSL 751 (two skips each), default-only offline
+427/61; both V15 core releases pass six checks across thirty seeds/two repeats
+and freeze 99 source entries. Complete evidence and limits are in
+`docs/online-landmark-acquisition-development.md`.

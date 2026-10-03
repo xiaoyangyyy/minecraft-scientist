@@ -7,6 +7,7 @@ probability or a physical direction estimate. No failed identity is replenished.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from typing import Literal
 
@@ -20,6 +21,8 @@ from pydantic import (
     model_validator,
 )
 
+from .keyframe_motion import KeyframeAttempt
+from .multiview_motion import MultiViewMotionConfig
 from .temporal_tracks import TemporalTrackConfig, TemporalTracks, track_frame_chain
 from .visual_geometry import _cells, _frame
 
@@ -28,6 +31,7 @@ class VisibilityPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     retention_reference: Literal["phase_start_v2"] = "phase_start_v2"
+    landmark_protection: Literal["none", "first_supported_map_v1"] = "none"
     minimum_leg_ticks: int = Field(default=2, ge=2, le=8, strict=True)
     maximum_first_ticks: int = Field(default=6, ge=2, le=12, strict=True)
     maximum_second_ticks: int = Field(default=4, ge=2, le=12, strict=True)
@@ -51,6 +55,37 @@ class VisibilityPolicy(BaseModel):
         return self
 
 
+class LandmarkVisibility(BaseModel):
+    """Frozen map partitions, never new points or a navigation acceptance claim."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    fit_tick: int = Field(ge=2, strict=True)
+    candidate_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    initial_training_count: int = Field(ge=12, strict=True)
+    initial_validation_count: int = Field(ge=8, strict=True)
+    training_ids: tuple[StrictInt, ...]
+    validation_ids: tuple[StrictInt, ...]
+    projected_edge_fraction: FiniteFloat = Field(ge=0, le=1)
+    validation_cells: int = Field(ge=0, le=16, strict=True)
+
+    @model_validator(mode="after")
+    def _partitions(self):
+        for ids, original_count in (
+            (self.training_ids, self.initial_training_count),
+            (self.validation_ids, self.initial_validation_count),
+        ):
+            if (
+                tuple(sorted(set(ids))) != ids
+                or any(item < 0 for item in ids)
+                or len(ids) > original_count
+            ):
+                raise ValueError("map visibility must preserve original partition IDs")
+        if set(self.training_ids) & set(self.validation_ids):
+            raise ValueError("fitting and withheld map IDs cannot overlap")
+        return self
+
+
 class VisibilityDecision(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -66,6 +101,7 @@ class VisibilityDecision(BaseModel):
     phase_retention_fraction: FiniteFloat = Field(ge=0, le=1)
     projected_edge_fraction: FiniteFloat = Field(ge=0, le=1)
     occupied_cells: int = Field(ge=0, le=16, strict=True)
+    landmarks: LandmarkVisibility | None = None
     endpoint_tick: int | None = Field(default=None, ge=2, strict=True)
     holdout_ticks: tuple[StrictInt, ...] = ()
 
@@ -122,6 +158,15 @@ class VisibilityDecision(BaseModel):
             raise ValueError(
                 "only completed acquisition exposes two distinct future views"
             )
+        if self.landmarks is not None and (
+            self.landmarks.fit_tick > self.tick
+            or not set(self.landmarks.training_ids + self.landmarks.validation_ids)
+            <= set(self.retained_ids)
+            or self.landmarks.initial_training_count
+            + self.landmarks.initial_validation_count
+            > self.initial_track_count
+        ):
+            raise ValueError("map visibility must align with this causal anchor")
         return self
 
 
@@ -144,20 +189,31 @@ class VisibilityController:
         ):
             raise ValueError("probe requires two distinct opaque public handle indices")
         self.handles = tuple(handles)
-        self.policy = policy or VisibilityPolicy()
+        self.policy = VisibilityPolicy.model_validate(
+            policy.model_dump()
+            if isinstance(policy, VisibilityPolicy)
+            else policy or {}
+        )
         self.next_handle = self.handles[0]
         self.endpoint_tick = None
         self._previous = None
         self._retained = None
         self._initial_count = 0
         self._phase_count = None
+        self._landmark = None
         self._decisions = []
 
     @property
     def decisions(self):
         return tuple(self._decisions)
 
-    def observe(self, tracks: TemporalTracks) -> VisibilityDecision:
+    @property
+    def has_landmark(self):
+        return self._landmark is not None
+
+    def observe(
+        self, tracks: TemporalTracks, *, landmark: KeyframeAttempt | None = None
+    ) -> VisibilityDecision:
         if self.next_handle is None:
             raise ValueError("terminal probes cannot consume more pixels")
         tracks = TemporalTracks.model_validate(
@@ -221,6 +277,65 @@ class VisibilityController:
         cells = _cells(current_pixels, height, width) if ids else 0
         tick = tracks.frame_count - 1
         phase = "first" if self.endpoint_tick is None else "second"
+        frozen = self._landmark
+        if landmark is not None:
+            landmark = KeyframeAttempt.model_validate(landmark.model_dump())
+            if (
+                self.policy.landmark_protection != "first_supported_map_v1"
+                or frozen is not None
+                or phase != "first"
+                or landmark.end_offset != tick
+                or not landmark.motion.supported
+                or landmark.tracks.image_shape != tracks.image_shape
+                or landmark.tracks.seed_count != tracks.seed_count
+                or not set(landmark.tracks.track_ids) <= retained
+                or not set(
+                    landmark.motion.training_track_ids
+                    + landmark.motion.validation_track_ids
+                )
+                <= set(landmark.tracks.track_ids)
+                or len(landmark.motion.training_track_ids) < 12
+                or len(landmark.motion.validation_track_ids) < 8
+                or len(landmark.motion.training_track_ids)
+                + len(landmark.motion.validation_track_ids)
+                < 32
+            ):
+                raise ValueError("only a first supported causal map may be frozen once")
+            candidate_indices = [
+                tracks.track_ids.index(identity)
+                for identity in landmark.tracks.track_ids
+            ]
+            if not np.allclose(
+                landmark.tracks.pixels,
+                pixels[:, candidate_indices],
+                rtol=0,
+                atol=self.policy.prefix_pixel_tolerance,
+            ):
+                raise ValueError("frozen map must use identical causal prefix pixels")
+            frozen = landmark
+        visibility = None
+        if frozen is not None:
+            fitting = tuple(sorted(set(frozen.motion.training_track_ids) & retained))
+            withheld = tuple(sorted(set(frozen.motion.validation_track_ids) & retained))
+            order = {identity: index for index, identity in enumerate(ids)}
+            map_indices = [order[identity] for identity in fitting + withheld]
+            valid_indices = [order[identity] for identity in withheld]
+            visibility = LandmarkVisibility(
+                fit_tick=frozen.end_offset,
+                candidate_sha256=hashlib.sha256(
+                    frozen.model_dump_json().encode("utf-8")
+                ).hexdigest(),
+                initial_training_count=len(frozen.motion.training_track_ids),
+                initial_validation_count=len(frozen.motion.validation_track_ids),
+                training_ids=fitting,
+                validation_ids=withheld,
+                projected_edge_fraction=float(endangered[map_indices].mean())
+                if map_indices
+                else 1.0,
+                validation_cells=_cells(current_pixels[valid_indices], height, width)
+                if valid_indices
+                else 0,
+            )
         # A switch changes only the loss denominator, never the identities or
         # absolute support requirement. Reusing global loss in the second leg
         # would immediately retrigger a threshold already crossed in the first.
@@ -229,10 +344,24 @@ class VisibilityController:
         risk = (
             phase_retention <= self.policy.retention_trigger
             or edge_fraction >= self.policy.projected_edge_trigger
+            or (
+                visibility is not None
+                and visibility.projected_edge_fraction
+                >= self.policy.projected_edge_trigger
+            )
         )
         insufficient = (
             len(ids) < self.policy.minimum_tracks or cells < self.policy.minimum_cells
         )
+        if visibility is not None:
+            settings = MultiViewMotionConfig()
+            insufficient |= (
+                len(visibility.training_ids) < settings.minimum_training_inliers
+                or len(visibility.validation_ids) < settings.minimum_validation_tracks
+                or len(visibility.training_ids) + len(visibility.validation_ids)
+                < settings.minimum_tracks
+                or visibility.validation_cells < settings.minimum_validation_cells
+            )
         endpoint = self.endpoint_tick
         handle, instruction, reason = (
             self.next_handle,
@@ -277,6 +406,7 @@ class VisibilityController:
             phase_retention_fraction=phase_retention,
             projected_edge_fraction=edge_fraction,
             occupied_cells=cells,
+            landmarks=visibility,
             endpoint_tick=endpoint,
             holdout_ticks=(endpoint + 1, tick) if instruction == "finish" else (),
         )
@@ -287,6 +417,7 @@ class VisibilityController:
             initial_count,
         )
         self.endpoint_tick, self.next_handle = endpoint, handle
+        self._landmark = frozen
         if instruction == "switch":
             self._phase_count = len(ids)
         self._decisions.append(decision)
@@ -311,9 +442,12 @@ class VisibilityProbeRun:
     decisions: tuple[VisibilityDecision, ...]
     terminal: Literal["finished", "aborted", "control_failed", "tracking_failed"]
     failure: dict | None
+    landmark_attempts: tuple[KeyframeAttempt, ...] = ()
 
 
-def acquire_visibility_probe(initial_frame, execute, handles, *, policy=None):
+def acquire_visibility_probe(
+    initial_frame, execute, handles, *, policy=None, landmark_observer=None
+):
     """Execute causal requests against an RGB-only callback, preserving failures.
 
     The callback executes exactly the requested opaque handle for one tick and
@@ -322,6 +456,13 @@ def acquire_visibility_probe(initial_frame, execute, handles, *, policy=None):
     No retry, alternate identity, pose substitution or unbounded loop is allowed.
     """
     controller = VisibilityController(handles, policy=policy)
+    if (
+        landmark_observer is not None
+        and controller.policy.landmark_protection == "none"
+    ):
+        raise ValueError(
+            "online landmark observer requires an explicit protection policy"
+        )
 
     def public_copy(frame):
         copied = _frame(frame).copy()
@@ -329,6 +470,7 @@ def acquire_visibility_probe(initial_frame, execute, handles, *, policy=None):
         return copied
 
     frames, steps, prefixes = [public_copy(initial_frame)], [], []
+    attempts = []
     failure, terminal = None, "tracking_failed"
     for _ in range(
         controller.policy.maximum_first_ticks + controller.policy.maximum_second_ticks
@@ -371,7 +513,28 @@ def acquire_visibility_probe(initial_frame, execute, handles, *, policy=None):
             break
         try:
             tracked = track_frame_chain(frames, config=controller.policy.temporal)
-            decision = controller.observe(tracked)
+            landmark = None
+            if (
+                landmark_observer is not None
+                and controller.endpoint_tick is None
+                and not controller.has_landmark
+                and len(frames) - 1 >= controller.policy.minimum_leg_ticks
+            ):
+                attempt = landmark_observer(
+                    tracked,
+                    None
+                    if not controller.decisions
+                    else controller.decisions[-1].retained_ids,
+                )
+                if not isinstance(attempt, KeyframeAttempt):
+                    raise TypeError(
+                        "map observer must return a public keyframe attempt"
+                    )
+                attempt = KeyframeAttempt.model_validate(attempt.model_dump())
+                attempts.append(attempt)
+                if attempt.motion.supported:
+                    landmark = attempt
+            decision = controller.observe(tracked, landmark=landmark)
             prefixes.append(tracked)
         except Exception as error:  # noqa: BLE001 -- preserve partial prefix failure
             failure = {"type": type(error).__name__, "message": str(error)}
@@ -391,4 +554,5 @@ def acquire_visibility_probe(initial_frame, execute, handles, *, policy=None):
         controller.decisions,
         terminal,
         failure,
+        tuple(attempts),
     )
