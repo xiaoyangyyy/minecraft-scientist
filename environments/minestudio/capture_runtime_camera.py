@@ -98,6 +98,7 @@ def main():
     parser.add_argument("--acquisition-strategy", choices=("past_support", "fixed_cap"))
     parser.add_argument("--settled-controls", action="store_true")
     parser.add_argument("--recover-map", action="store_true")
+    parser.add_argument("--maintain-map", action="store_true")
     args = parser.parse_args()
     if args.seed < 0:
         parser.error("seed must be nonnegative")
@@ -109,6 +110,8 @@ def main():
         parser.error("settled controls require active past-support acquisition")
     if args.recover_map and not args.settled_controls:
         parser.error("map recovery requires --settled-controls")
+    if args.maintain_map and not args.recover_map:
+        parser.error("rolling maintenance requires --recover-map")
     directory = args.output.resolve()
     directory.mkdir(parents=True, exist_ok=False)
     build = directory / "agent-build"
@@ -220,6 +223,18 @@ def main():
                 config["scope"] = (
                     "bounded public-image WAIT recovery and independent local map epoch; no gauge stitching, private landing selection or goal arrival claim"
                 )
+                if args.maintain_map:
+                    from minecraft_scientist.exploration.rolling_map_control import (
+                        RollingMapPolicy,
+                    )
+
+                    config["maintenance_policy"] = RollingMapPolicy().model_dump(
+                        mode="json"
+                    )
+                    config["schema"] = "maintenance-causal-camera-projection-v1"
+                    config["scope"] = (
+                        "bounded public rolling map epochs and least-used opaque controls; no metric/global gauge, goal arrival or held-out generalization claim"
+                    )
     write_json(directory / "config.json", config)
     config_hash = digest(directory / "config.json")
     audit, images, native_images, native_hashes, records = (
@@ -427,6 +442,28 @@ def main():
                             raise RuntimeError(
                                 "map recovery failed; partial public evidence retained"
                             )
+                        if args.maintain_map:
+                            from minecraft_scientist.exploration.rolling_map_control import (
+                                maintain_public_maps,
+                            )
+
+                            recovered = active["recovery"]
+                            epoch_frames = (
+                                images[recovered["new_anchor_frame"] :]
+                                if recovered["acquisition"]
+                                else []
+                            )
+                            active["maintenance"] = maintain_public_maps(
+                                recovered,
+                                epoch_frames,
+                                execute_control,
+                                calibration["camera_intrinsics"],
+                                policy=config["maintenance_policy"],
+                            )
+                            if active["maintenance"]["failure"] is not None:
+                                raise RuntimeError(
+                                    "rolling map maintenance failed; partial evidence retained"
+                                )
     except Exception as failure:  # noqa: BLE001 -- preserve real launch/capture failures
         error = {"type": type(failure).__name__, "message": str(failure)}
     finally:
@@ -481,6 +518,7 @@ def main():
             + len(active["acquisition"]["steps"])
             + len(active.get("settled", {}).get("steps", []))
             + recovery_actions
+            + len(active.get("maintenance", {}).get("steps", []))
         )
         if args.settled_controls:
             checks["settled_policy_completed"] = (
@@ -502,6 +540,20 @@ def main():
                     "map_unavailable",
                     "continuation_aborted",
                     "wait_exhausted",
+                )
+            )
+        if args.maintain_map:
+            checks["maintenance_policy_completed"] = (
+                active is not None
+                and "maintenance" in active
+                and active["maintenance"]["failure"] is None
+                and active["maintenance"]["terminal"]
+                in (
+                    "completed",
+                    "not_started",
+                    "map_unavailable",
+                    "budget_exhausted",
+                    "insufficient_history",
                 )
             )
         write_json(directory / "active-acquisition.json", active)

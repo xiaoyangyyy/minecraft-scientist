@@ -27,6 +27,10 @@ from minecraft_scientist.exploration.map_recovery import (
 from minecraft_scientist.exploration.online_landmark_probe import (
     calibrate_reference_camera,
 )
+from minecraft_scientist.exploration.rolling_map_control import (
+    RollingMapPolicy,
+    maintain_public_maps,
+)
 from minecraft_scientist.exploration.settled_map_control import (
     PublicControlStep,
     SettledControlPolicy,
@@ -47,14 +51,24 @@ def _settled_registration(config):
     return config.get("schema") in (
         "settled-causal-camera-projection-v1",
         "recovery-causal-camera-projection-v1",
+        "maintenance-causal-camera-projection-v1",
     )
 
 
 def _recovery_registration(config):
-    return config.get("schema") == "recovery-causal-camera-projection-v1"
+    return config.get("schema") in (
+        "recovery-causal-camera-projection-v1",
+        "maintenance-causal-camera-projection-v1",
+    )
+
+
+def _maintenance_registration(config):
+    return config.get("schema") == "maintenance-causal-camera-projection-v1"
 
 
 def _frame_limit(config):
+    if _maintenance_registration(config):
+        return 201
     if _recovery_registration(config):
         return 193
     return 105 if _settled_registration(config) else 61
@@ -74,6 +88,8 @@ def registration(directory, config, report, definition):
     continuation = SettledControlPolicy()
     recovering = _recovery_registration(config)
     recovery_policy = MapRecoveryPolicy()
+    maintaining = _maintenance_registration(config)
+    maintenance_policy = RollingMapPolicy()
     baseline = [list(item) for item in definition.SCHEDULE[:48]]
     registered = {
         "valid": False,
@@ -85,6 +101,14 @@ def registration(directory, config, report, definition):
         registered["capture_checks"].append("settled_policy_completed")
     if recovering:
         registered["capture_checks"].append("recovery_policy_completed")
+    if maintaining:
+        registered["capture_checks"].append("maintenance_policy_completed")
+    if (
+        maintaining
+        and json.dumps(config.get("maintenance_policy"), sort_keys=True)
+        != json.dumps(maintenance_policy.model_dump(mode="json"), sort_keys=True)
+    ) or (not maintaining and "maintenance_policy" in config):
+        return registered
     if (
         recovering
         and json.dumps(config.get("recovery_policy"), sort_keys=True)
@@ -103,6 +127,7 @@ def registration(directory, config, report, definition):
             "active-causal-camera-projection-v2",
             "settled-causal-camera-projection-v1",
             "recovery-causal-camera-projection-v1",
+            "maintenance-causal-camera-projection-v1",
         )
         and (settled or "settled_policy" not in config)
         and config["schedule"] == baseline
@@ -240,6 +265,20 @@ def registration(directory, config, report, definition):
                 execute_control,
                 policy=recovery_policy,
             )
+            if maintaining:
+                recovered = replayed["recovery"]
+                epoch_frames = (
+                    images[recovered["new_anchor_frame"] : cursor + 1]
+                    if recovered["acquisition"]
+                    else []
+                )
+                replayed["maintenance"] = maintain_public_maps(
+                    recovered,
+                    epoch_frames,
+                    execute_control,
+                    calibration["camera_intrinsics"],
+                    policy=maintenance_policy,
+                )
     registered.update(
         valid=(
             json.dumps(saved, sort_keys=True, allow_nan=False)
@@ -248,6 +287,7 @@ def registration(directory, config, report, definition):
             and replayed["acquisition"]["failure"] is None
             and (not settled or replayed["settled"]["failure"] is None)
             and (not recovering or replayed["recovery"]["failure"] is None)
+            and (not maintaining or replayed["maintenance"]["failure"] is None)
             and all(runtime.digest(path) == value for path, value in frozen.items())
         ),
         schedule=requested,
@@ -356,12 +396,23 @@ def audit(directory, engine):
     # chronological public replay, image resizing and action receipt checks pass.
     physical = runtime.audit(directory, engine, registration=registration)
     if not physical["valid"]:
-        return {"valid": False, "camera_audit": physical, "navigation_accepted": False}
+        return {
+            "valid": False,
+            "camera_audit": physical,
+            "evaluation": None,
+            "settled_evaluation": None,
+            "recovery_evaluation": None,
+            "maintenance_evaluation": None,
+            "navigation_accepted": False,
+        }
     if not all(runtime.digest(path) == value for path, value in frozen.items()):
         return {
             "valid": False,
             "camera_audit": physical,
             "evaluation": None,
+            "settled_evaluation": None,
+            "recovery_evaluation": None,
+            "maintenance_evaluation": None,
             "failure": {
                 "type": "ValueError",
                 "message": "public bytes changed across camera audit",
@@ -380,6 +431,9 @@ def audit(directory, engine):
             "valid": False,
             "camera_audit": physical,
             "evaluation": None,
+            "settled_evaluation": None,
+            "recovery_evaluation": None,
+            "maintenance_evaluation": None,
             "failure": {
                 "type": "ValueError",
                 "message": "private bytes changed after camera audit",
@@ -433,6 +487,42 @@ def audit(directory, engine):
             "global_gauge_aligned": False,
             "navigation_accepted": False,
         }
+    maintenance_evaluation = None
+    if _maintenance_registration(config):
+        maintenance = public_run["maintenance"]
+        epochs = []
+        for epoch in maintenance["epochs"]:
+            fitted = epoch["frozen"]
+            epochs.append(
+                {
+                    "number": epoch["number"],
+                    "parent_sha256": epoch["parent_sha256"],
+                    "terminal": epoch["terminal"],
+                    "fit_attempts": len(epoch["attempts"]),
+                    "fitted_candidates": sum(
+                        len(item["snapshot"]["maps"]) for item in epoch["attempts"]
+                    ),
+                    "validation_handle": epoch["validation_handle"],
+                    "evaluation": _score_acquisition(
+                        {
+                            "snapshot": fitted["snapshot"],
+                            "anchor_frame": fitted["anchor_frame"],
+                            "controller_decision": epoch["decision"],
+                        },
+                        positions,
+                        cameras,
+                    )
+                    if fitted
+                    else None,
+                }
+            )
+        maintenance_evaluation = {
+            "terminal": maintenance["terminal"],
+            "executed_actions": len(maintenance["steps"]),
+            "epochs": epochs,
+            "global_gauge_aligned": False,
+            "navigation_accepted": False,
+        }
     checks = {
         "capture_and_public_policy_independently_replayed": physical["valid"],
         "artifacts_still_match_capture_ledger": all(
@@ -458,6 +548,7 @@ def audit(directory, engine):
         "evaluation": evaluation if valid else None,
         "settled_evaluation": settled_evaluation if valid else None,
         "recovery_evaluation": recovery_evaluation if valid else None,
+        "maintenance_evaluation": maintenance_evaluation if valid else None,
         "navigation_accepted": False,
         "scope": config["scope"],
     }
@@ -497,6 +588,7 @@ def main():
                     "evaluation",
                     "settled_evaluation",
                     "recovery_evaluation",
+                    "maintenance_evaluation",
                 )
             }
         )

@@ -11,13 +11,13 @@ Fabric mod supplies resettable hidden rules, and the Python boundary replaces it
 block, and entity names with seeded opaque IDs before an agent can observe them.
 Live execution still requires the user's explicit Minecraft EULA acceptance.
 
-Latest visual-development result: public image stability now triggers bounded
-recovery and a separately versioned local map. Two fresh development sessions
-independently confirm stationary recovery intervals, but one reacquisition fails
-and the other loses support during later movement. A correct stationary-motion
-abstention is retained separately from a moving unsupported counterexample.
+Latest visual-development result: bounded public rolling-map maintenance now
+recovers two consecutive supported rendered-camera motion intervals after a map
+failure, with independent direction errors about 2.60/1.11 degrees. Current-player
+directions are wrong on both intervals, and another development world exhausts
+every new map fit. All failures and unstitched local gauges remain explicit.
 This is not reliable goal navigation. See
-[`docs/public-map-recovery-development.md`](docs/public-map-recovery-development.md)
+[`docs/rolling-map-maintenance-development.md`](docs/rolling-map-maintenance-development.md)
 for all outcomes, camera/body scores, costs and outstanding full-project gates.
 
 ## Quick start

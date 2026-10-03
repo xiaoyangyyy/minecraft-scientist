@@ -108,7 +108,12 @@ def recover_public_map(parent, last_frame, execute, *, policy=None):
     if type(old["seed"]) is not int or not 0 <= old["seed"] < 2**31 - 517:
         raise ValueError("recovery requires a bounded parent seed")
     count = stopped.get("evidence_frames", old["evidence_frames"])
-    if type(count) is not int or count < 1 or type(old["anchor_frame"]) is not int:
+    if (
+        type(count) is not int
+        or not 1 <= count <= 64
+        or type(old["anchor_frame"]) is not int
+        or old["anchor_frame"] < 0
+    ):
         raise ValueError("recovery needs a public image endpoint")
     anchor = old["anchor_frame"] + count - 1
     if stopped["terminal"] != "not_started" and (

@@ -1257,3 +1257,41 @@ bytes/build/changed-file lint pass. Next address public stall/observability-awar
 control selection and explicit map maintenance before actual arrival; no original
 generalization, natural science/map integration, longer recovery, comparison or
 consolidated-release gate is replaced or closed. The full goal remains active.
+
+## Rolling public-map maintenance checkpoint
+
+The package now replaces stopped local maps from recent consumed public images,
+retains all failed fits in separate detector namespaces, chooses less-used opaque
+controls, and freezes each map before independently consuming its two future
+actions. The outer epoch journal records immutable parent hashes; gauges are
+explicitly unstitched. Capture/auditor registration replays the entire chronology
+before private reads and rejects forged lineage, relaxed geometry/budgets, old
+schema disguise and invented motion. Invalid audit paths expose null scores.
+
+Three fresh sessions (seed 201 once, seed 202 twice; clear/noon) pass ten capture
+and three/eighteen outer/nested audit checks. Both seed-202 sessions recover two
+consecutive rendered-camera motion intervals: direction errors 2.595411/1.106379
+and 2.943707/1.126835 degrees. All four registered current-player directions are
+wrong (about 33.6–37.4 degrees), and seed 201 exhausts all 49 new candidates despite
+actual additional movement. These are development sessions with shared scene/
+history, not independent held-out generalization, globally aligned navigation or
+arrival. Original unsupported-motion and stationary correct-abstention controls
+remain. See `docs/rolling-map-maintenance-development.md` for every cost/score.
+
+Both V25 core releases pass thirty seeds/two repeats/eighteen exact artifacts and
+six checks, freezing 107 entries (104 package sources). All current/snapshot core
+hashes match. Three live runs preserve all 111 snapshots, match 109 current project
+entries and their saved active auditors, and match all 178/216/216 artifact hashes.
+Full regressions pass Windows 1075/two skips and WSL 1077/two; isolated default-only
+WSL passes 593/70 skips. Focused tests pass 47. The initially failed focused schema
+tests and WSL temporary-directory failure are retained alongside corrected full
+runs. MVP bytes/build/changed-file checks pass; the wheel includes all 104 sources.
+
+Next establish publicly validated gauge correspondence, observable alternative
+controls and explicit camera/control endpoints, then independently verified actual
+arrival. The original five additional disjoint worlds/multiple terrains/three
+conditions with adequate uncertainty, natural scientific-map integration, at
+least 100 frontier/experiment attempts with restarts/failures/recovery, current
+baseline/symbol/planner comparisons and consolidated release gates remain open.
+Neither the repeated local camera success nor green unit tests proves excellence
+or overall completion. The full goal stays active, not complete or blocked.

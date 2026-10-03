@@ -1092,6 +1092,90 @@ def test_forged_recovery_protocol_cannot_reach_private_evaluator(
     assert not result["camera_audit"]["checks"]["registered_schedule"]
 
 
+@pytest.fixture
+def maintenance_capture(recovery_capture):
+    active, route, engine = recovery_capture
+    config = json.loads((route / "config.json").read_bytes())
+    config.update(
+        schema="maintenance-causal-camera-projection-v1",
+        maintenance_policy=active.RollingMapPolicy().model_dump(mode="json"),
+    )
+    save(route / "config.json", config)
+    extra = json.loads((route / "active-acquisition.json").read_bytes())
+    extra["maintenance"] = active.maintain_public_maps(
+        extra["recovery"],
+        [],
+        lambda *args: pytest.fail(
+            "exhausted recovery cannot dispatch rolling controls"
+        ),
+        extra["calibration"]["camera_intrinsics"],
+    )
+    save(route / "active-acquisition.json", extra)
+    report = json.loads((route / "report.json").read_bytes())
+    report["config_sha256"] = active.runtime.digest(route / "config.json")
+    report["artifact_sha256"]["active-acquisition.json"] = active.runtime.digest(
+        route / "active-acquisition.json"
+    )
+    report["checks"]["maintenance_policy_completed"] = True
+    save(route / "report.json", report)
+    return active, route, engine
+
+
+def test_maintenance_registration_replays_before_truth_without_inventing_motion(
+    maintenance_capture, monkeypatch
+):
+    active, route, engine = maintenance_capture
+    with monkeypatch.context() as guards:
+        private_guard(guards)
+        public = active.runtime.public_data(
+            route, engine, registration=active.registration
+        )
+        assert public["valid"] and public["count"] == 82
+    result = active.audit(route, engine)
+    assert result["valid"] and result["evaluation"] is None
+    assert result["maintenance_evaluation"] == {
+        "terminal": "not_started",
+        "executed_actions": 0,
+        "epochs": [],
+        "global_gauge_aligned": False,
+        "navigation_accepted": False,
+    }
+    assert not result["navigation_accepted"]
+
+
+@pytest.mark.parametrize("case", ["parent", "geometry", "budget", "schema", "motion"])
+def test_forged_maintenance_protocol_is_rejected_before_private_reads(
+    maintenance_capture, monkeypatch, case
+):
+    active, route, engine = maintenance_capture
+    config = json.loads((route / "config.json").read_bytes())
+    extra = json.loads((route / "active-acquisition.json").read_bytes())
+    if case == "parent":
+        extra["maintenance"]["parent_sha256"] = "0" * 64
+    elif case == "geometry":
+        config["maintenance_policy"]["window"]["maximum_direction_disagreement"] = 20
+    elif case == "budget":
+        config["maintenance_policy"]["maximum_total_actions"] = 201
+    elif case == "schema":
+        config["schema"] = "recovery-causal-camera-projection-v1"
+    else:
+        extra["maintenance"]["terminal"] = "completed"
+        extra["maintenance"]["navigation_accepted"] = True
+    save(route / "config.json", config)
+    save(route / "active-acquisition.json", extra)
+    report = json.loads((route / "report.json").read_bytes())
+    report["config_sha256"] = active.runtime.digest(route / "config.json")
+    report["artifact_sha256"]["active-acquisition.json"] = active.runtime.digest(
+        route / "active-acquisition.json"
+    )
+    save(route / "report.json", report)
+    private_guard(monkeypatch)
+    result = active.audit(route, engine)
+    assert not result["valid"]
+    assert not result["camera_audit"]["checks"]["registered_schedule"]
+    assert result["maintenance_evaluation"] is None
+
+
 def test_mutation_during_analysis_invalidates_audit(diagnostic, monkeypatch):
     script, route, engine = diagnostic
     analyze = script.timing_metrics

@@ -58,7 +58,16 @@ until each required gate has current, inspectable evidence.
 
 ## Evidence discipline
 
-The current `docs/public-map-recovery-development.md` checkpoint adds bounded
+The current `docs/rolling-map-maintenance-development.md` checkpoint retains
+failed fits and the moving unsupported parent, replaces local maps using only
+consumed public history, and validates two consecutive rendered-camera motion
+intervals in one development world. Both registered current-player directions
+are wrong; another world exhausts all new fits. Next address observable excitation,
+explicit gauge registration and public goal control with independent actual arrival.
+These correlated local windows do not establish held-out generalization or close
+any original full-project requirement above.
+
+The preceding `docs/public-map-recovery-development.md` checkpoint adds bounded
 public optical-flow stability recovery and explicit fresh local-map epochs. Both
 development sessions select truly stationary intervals; one new map fails and the
 other correctly abstains on a stationary control but loses ray consistency during

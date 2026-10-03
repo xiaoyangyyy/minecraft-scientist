@@ -119,7 +119,17 @@ def test_failed_wait_cannot_enter_recovery_evidence(recovery_session, case):
     json.dumps(result, allow_nan=False)
 
 
-@pytest.mark.parametrize("case", ["seed", "camera", "failed_parent", "endpoint"])
+@pytest.mark.parametrize(
+    "case",
+    [
+        "seed",
+        "camera",
+        "failed_parent",
+        "endpoint",
+        "negative_anchor",
+        "oversized_count",
+    ],
+)
 def test_bad_parent_refuses_before_recovery_dispatch(recovery_session, case):
     parent, image, execute, requests = recovery_session
     if case == "seed":
@@ -128,6 +138,10 @@ def test_bad_parent_refuses_before_recovery_dispatch(recovery_session, case):
         parent["calibration"]["camera_intrinsics"] = [[0] * 3] * 3
     elif case == "failed_parent":
         parent["settled"]["failure"] = {"type": "injected"}
+    elif case == "negative_anchor":
+        parent["acquisition"]["anchor_frame"] = -1
+    elif case == "oversized_count":
+        parent["acquisition"]["evidence_frames"] = 65
     else:
         parent["settled"].update(
             terminal="support_aborted",

@@ -60,8 +60,8 @@ exits nonzero, not a smaller passing seed subset.
 
 ## Current results (2026-10-03)
 
-`runs/core-release-seeds0-29-windows-v24/report.json` on Windows and
-`runs/core-release-seeds0-29-wsl-v24/report.json` on WSL each pass all six release
+`runs/core-release-seeds0-29-windows-v25/report.json` on Windows and
+`runs/core-release-seeds0-29-wsl-v25/report.json` on WSL each pass all six release
 checks for all thirty seeds. Each platform runs sixty complete benchmarks and
 reproduces eighteen artifacts per seed, including the transfer traces and
 experience database. All four learned-law accuracies, revised-law recovery and
@@ -92,13 +92,26 @@ chronological causal map windows, V21 dispatches first-eligible acquisition live
 V22 adds past-support switching, and V23 adds public frozen-map MOVE/WAIT settling.
 V23 freezes the preceding 105 entries including 102 package files. V24 adds
 public-image stability recovery and explicit fresh local-map epochs, freezing
-106 entries including 103 package files. Core behavior is unchanged by these
+106 entries including 103 package files. V25 adds bounded rolling maintenance,
+explicit epoch journals and alternative opaque controls, freezing 107 entries
+including 104 package files. Both V25 current/source-snapshot ledgers are rechecked
+with zero mismatches. Core behavior is unchanged by these
 optional modules; visual results remain separately scoped in
-`docs/public-map-recovery-development.md`.
+`docs/rolling-map-maintenance-development.md`.
 These earlier runs are historical checks, not the current source-frozen release.
 Neither local multi-seed verification
 proves remote CI execution, fresh live-server gates, learned-planner release
 comparisons, broad visual generalization or integrated long-horizon exploration.
+
+The V25 full frozen regressions pass **1075 tests/two skips on Windows** and
+**1077/two on WSL**, `runs/rolling-map-full-windows-v1.xml` and
+`runs/rolling-map-full-wsl-v2.xml`. The isolated default-only WSL installation
+passes **593/70 optional or platform skips**; the focused rolling/recovery/auditor
+Windows profile passes 47 cases. Original MVP bytes, builds and changed-file
+lint/format/whitespace checks pass. A failed initial WSL suite is retained, not
+counted as a release pass: its temporary root disappeared during concurrent pytest
+jobs. The unchanged rerun uses a verified-unused dedicated `--basetemp` and passes
+the complete suite. See the rolling-map document for failure and identity details.
 
 The historical adaptive-map audit checkpoint regression passes **718 tests/two
 skips on Windows**, **720/two on WSL**, and **401/60 optional or platform skips**
@@ -160,7 +173,7 @@ see `docs/joint-multiview-map-development.md`. Ruff/format checks and both build
 pass. Earlier V17 evidence remains historical after adding the new optional module.
 
 The current seed-zero MVP report at
-`runs/map-recovery-regression-mvp-seed0/benchmark.json` remains byte-identical
+`runs/rolling-map-regression-mvp-seed0/benchmark.json` remains byte-identical
 to the earlier regression: SHA-256
 `B95AF2E5C152B9F06EDC63004EA87FB183C37E6A5A13BFF53F21A39A4F48AEB8`.
 It retains 47 experiments, accuracy/task success 1.0, detection delay one, eight
