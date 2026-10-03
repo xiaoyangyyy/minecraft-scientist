@@ -190,11 +190,16 @@ def policy():
     }
 
 
-def run(route, engine, output):
+def run(route, engine, output, *, infer_fn=None, policy_fn=None, sources_fn=None):
+    infer_fn, policy_fn, sources_fn = (
+        infer_fn or infer,
+        policy_fn or policy,
+        sources_fn or sources,
+    )
     if output.exists():
         raise FileExistsError("refusing to overwrite rendered-motion experiment")
-    paths, code = inputs(route), sources()
-    config = policy() | {
+    paths, code = inputs(route), sources_fn()
+    config = policy_fn() | {
         "input_sha256": {name: runtime.digest(path) for name, path in paths.items()},
         "source_sha256": {name: runtime.digest(path) for name, path in code.items()},
         "engine_sha256": runtime.digest(engine),
@@ -215,7 +220,7 @@ def run(route, engine, output):
         "config_sha256": runtime.digest(output / "config.json"),
     }
     try:
-        result["prediction"] = infer(route, engine)
+        result["prediction"] = infer_fn(route, engine)
         result["completed"] = True
     except Exception as error:  # noqa: BLE001 -- retain rejected development runs
         result["failure"] = {"type": type(error).__name__, "message": str(error)}
@@ -284,17 +289,40 @@ def evaluate_future(pose, future, first, end, score):
     return records
 
 
-def audit(route, engine, experiment):
+def registered_trials(predicted):
+    return [item["trial"] for item in predicted["trials"]] == [0, 1] and all(
+        [item["map"]["bootstrap_slot"] for item in trial["candidates"]]
+        == list(range(2, 11))
+        for trial in predicted["trials"]
+    )
+
+
+def audit(
+    route,
+    engine,
+    experiment,
+    *,
+    infer_fn=None,
+    policy_fn=None,
+    sources_fn=None,
+    denominator_fn=None,
+):
+    infer_fn, policy_fn, sources_fn = (
+        infer_fn or infer,
+        policy_fn or policy,
+        sources_fn or sources,
+    )
+    denominator_fn = denominator_fn or registered_trials
     config = json.loads((experiment / "config.json").read_bytes())
     result = json.loads((experiment / "report.json").read_bytes())
-    paths, code = inputs(route), sources()
+    paths, code = inputs(route), sources_fn()
     checks = {
         "complete_public_prediction": result["completed"] is True
         and result["failure"] is None
         and result["input_sources_unchanged"] is True
         and result["navigation_accepted"] is False,
         "registered_policy": all(
-            config.get(name) == value for name, value in policy().items()
+            config.get(name) == value for name, value in policy_fn().items()
         ),
         "config_identity": result["config_sha256"]
         == runtime.digest(experiment / "config.json"),
@@ -326,14 +354,10 @@ def audit(route, engine, experiment):
     if all(checks.values()):
         # Exact same-runtime numerical/structural replay, including every failure.
         checks["entire_public_inference_replayed"] = json.dumps(
-            infer(route, engine), sort_keys=True, allow_nan=False
+            infer_fn(route, engine), sort_keys=True, allow_nan=False
         ) == json.dumps(result["prediction"], sort_keys=True, allow_nan=False)
-        checks["all_registered_trials_and_candidates_retained"] = [
-            item["trial"] for item in result["prediction"]["trials"]
-        ] == [0, 1] and all(
-            [item["map"]["bootstrap_slot"] for item in trial["candidates"]]
-            == list(range(2, 11))
-            for trial in result["prediction"]["trials"]
+        checks["all_registered_trials_and_candidates_retained"] = denominator_fn(
+            result["prediction"]
         )
         checks["public_bytes_stable_before_private_access"] = all(
             runtime.digest(path) == value for path, value in frozen.items()
@@ -396,7 +420,21 @@ def audit(route, engine, experiment):
                     "future_motion": future_scores,
                 }
             )
-        evaluation.append({"trial": trial["trial"], "candidates": records})
+        evaluated = {"trial": trial["trial"], "candidates": records}
+        if "controller_decision" in trial:
+            decision = trial["controller_decision"]
+            evaluated["controller_gate"] = decision["instruction"]
+            evaluated["controller_motion"] = score(
+                {
+                    "rotation": decision["relative_rotation"],
+                    "translation": decision["unit_translation"],
+                }
+                if decision["unit_translation"] is not None
+                else None,
+                end,
+                decision["absolute_frame"],
+            )
+        evaluation.append(evaluated)
     checks["all_bytes_stable_through_scoring"] = all(
         runtime.digest(path) == value for path, value in frozen.items()
     )
@@ -408,7 +446,7 @@ def audit(route, engine, experiment):
         "camera_audit": physical,
         "private_sha256": {name: frozen[route / name] for name in private_names},
         "navigation_accepted": False,
-        "scope": SCOPE,
+        "scope": config["scope"],
     }
 
 

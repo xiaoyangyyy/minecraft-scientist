@@ -1,5 +1,9 @@
 # Rendered-camera motion evaluation: development checkpoint
 
+This preserves the V19/99-package-source checkpoint. A later current-prefix
+controller and refreshed-map replay are documented in `causal-window-development.md`;
+they change the current source boundary but do not retroactively change these runs.
+
 This follow-up measures the complete world-render pinhole projection, separates
 image-camera motion from simultaneous body motion, and fixes an actual public
 pixel-coordinate inconsistency. It does **not** establish reliable navigation,

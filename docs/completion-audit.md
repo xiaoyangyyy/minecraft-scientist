@@ -1128,3 +1128,25 @@ CLI and builds pass. Scoped changed-file Ruff passes, but the wider read-only li
 check exposes 21 issues in 16 untouched files plus 34 formatting candidates;
 global cleanup remains an explicit engineering requirement. All reports and the
 first WSL source-mutation test failure are preserved rather than hidden.
+
+## Causal prefix validation and explicit local refresh
+
+`exploration/causal_map_window.py` now fits a bounded public past, validates only
+the actual current horizon, preserves original track loss and requires explicit
+parent-linked refresh. All eligible passing initializations must agree; no private
+winner or agreeing subgroup is selected, and metric/global gauge remains unknown.
+A fresh 106-frame acquisition and chronological replay retain four windows and
+36 candidates. Every horizon is rejected despite real translation: motion coverage
+is zero of four, not successful stationary rejection. The matched-image reference
+has one locally accurate map but no full future support. Both audits pass thirteen
+integrity checks, not navigation acceptance. See `docs/causal-window-development.md`.
+
+Current V20 core releases pass thirty seeds/two repeats/eighteen exact artifacts
+on both platforms, freezing 103 source entries including 100 package files. Full
+regressions pass Windows 951/2 skips and WSL 953/2 skips; both focused suites
+pass 86 cases. The MVP CLI and builds pass. The next algorithm action is
+well-conditioned adaptive acquisition and live action-dispatch integration, not
+loosening error/support gates. All original full-project requirements remain open.
+
+Isolated default-only WSL passes 495 cases/70 skips without optional vision or
+training packages. All 103 current source hashes match both V20 release ledgers.

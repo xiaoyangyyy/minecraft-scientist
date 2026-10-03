@@ -503,6 +503,79 @@ def test_rejected_future_pose_diagnostics_never_become_policy_acceptance(
         ] == [0, 0, -1]
 
 
+@pytest.fixture
+def causal_probe(rendered_probe, monkeypatch):
+    common, route, engine, _ = rendered_probe
+    probe = importlib.import_module("probe_causal_windows")
+    trace = []
+    track = common.track_frame_chain
+
+    def traced(images, **kwargs):
+        trace.append((int(images[0][224, 224, 0]), int(images[-1][224, 224, 0])))
+        return track(images, **kwargs)
+
+    monkeypatch.setattr(probe, "track_frame_chain", traced)
+    monkeypatch.setattr(
+        probe, "calibrate_reference_camera", common.calibrate_reference_camera
+    )
+    return probe, route, engine, trace
+
+
+def test_causal_replay_refreshes_before_later_input_and_never_reads_private(
+    causal_probe, monkeypatch
+):
+    probe, route, engine, trace = causal_probe
+    private_guard(monkeypatch)
+    predicted = probe.infer(route, engine)
+    assert probe.registered(predicted)
+    assert sum(len(item["candidates"]) for item in predicted["trials"]) == 36
+    assert [
+        item["controller_decision"]["absolute_frame"] for item in predicted["trials"]
+    ] == [60, 62, 91, 93]
+    assert trace.index((50, 60)) < trace.index((50, 61)) < trace.index((50, 62))
+    assert trace.index((81, 91)) < trace.index((81, 92)) < trace.index((81, 93))
+    for first, second in ((0, 1), (2, 3)):
+        assert (
+            predicted["trials"][second]["snapshot"]["parent_sha256"]
+            == predicted["trials"][first]["snapshot_sha256"]
+        )
+    assert all(
+        item["controller_decision"]["instruction"] == "reject"
+        for item in predicted["trials"]
+    )
+
+
+def test_causal_audit_retains_rejected_windows_with_separate_physical_scores(
+    causal_probe, tmp_path
+):
+    probe, route, engine, _ = causal_probe
+    experiment = tmp_path / "causal"
+    assert probe.run(route, engine, experiment)["completed"]
+    result = probe.audit(route, engine, experiment)
+    assert result["valid"] and len(result["evaluation"]) == 4
+    assert all(
+        item["controller_gate"] == "reject"
+        and not item["controller_motion"]["rendered"]["supported"]
+        for item in result["evaluation"]
+    )
+    assert result["scope"] == probe.SCOPE
+    assert not result["navigation_accepted"]
+
+
+def test_causal_window_denominator_forgery_cannot_reach_truth(
+    causal_probe, tmp_path, monkeypatch
+):
+    probe, route, engine, _ = causal_probe
+    experiment = tmp_path / "causal"
+    probe.run(route, engine, experiment)
+    report = json.loads((experiment / "report.json").read_bytes())
+    report["prediction"]["trials"].pop()
+    save(experiment / "report.json", report)
+    private_guard(monkeypatch)
+    result = probe.audit(route, engine, experiment)
+    assert not result["valid"] and result["evaluation"] is None
+
+
 def test_mutation_during_analysis_invalidates_audit(diagnostic, monkeypatch):
     script, route, engine = diagnostic
     analyze = script.timing_metrics

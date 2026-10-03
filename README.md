@@ -835,6 +835,13 @@ past movement accurately, but none passes all future pixel tests; no navigation
 promotion is claimed. See `docs/rendered-camera-motion-development.md` for exact
 denominators, rejected-pose diagnostics, current source boundaries and reproduction.
 
+A reusable causal short-window API now prevents later track survival from
+changing an earlier gate and requires an explicit immutable-parent map refresh.
+Its fresh development replay retains all four windows/36 candidates, but all four
+horizons are rejected despite real movement. No navigation improvement is claimed.
+See `docs/causal-window-development.md` for the matched-image reference, precise
+costs, public-first physical audit and remaining live-controller requirement.
+
 The scientific core has a portable offline release verifier:
 
 ```powershell

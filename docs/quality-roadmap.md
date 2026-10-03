@@ -70,6 +70,12 @@ half-pixel convention repair. None of 18 registered candidates passes all future
 pixel tests. Next investigate short-horizon rolling maps and original-landmark
 support/uncertainty; do not accept gate-rejected diagnostics as navigation success.
 
+`docs/causal-window-development.md` implements actual-prefix validation and
+immutable-parent refresh. Its fresh replay rejects all four horizons despite real
+motion; rolling refresh alone does not acquire sufficient geometry. Next add
+public-only adaptive acquisition and live bounded dispatch, preserving every
+attempt and all original gates. The offline causal replay is not an online run.
+
 - Agent policy inputs contain RGB/opaque public observations and learned action
   programs. Coordinate telemetry and hidden rules remain evaluator-only.
 - Development results are not held-out evaluation. State which failed trajectories
