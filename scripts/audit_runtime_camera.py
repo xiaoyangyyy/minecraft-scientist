@@ -173,7 +173,8 @@ def timing_metrics(aligned, positions):
     }
 
 
-def audit(directory, engine):
+def public_data(directory, engine):
+    """Validate RGB and action receipts without opening any private pose file."""
     config = json.loads((directory / "config.json").read_bytes())
     report = json.loads((directory / "report.json").read_bytes())
     # Source-snapshot-only external SDK checks do not pretend to verify a different
@@ -217,8 +218,10 @@ def audit(directory, engine):
         and set(report["checks"]) == expected_checks
         and all(value is True for value in report["checks"].values()),
         "config_identity": digest(directory / "config.json") == report["config_sha256"],
-        "registered_schedule": config["schema"] == "runtime-camera-timing-v1"
+        "registered_schedule": config["schema"] == "runtime-camera-projection-v2"
         and config["schedule"] == expected_schedule
+        and config["reference_indices"] == list(module.REFERENCE_INDICES)
+        and config["trial_intervals"] == [list(item) for item in module.TRIAL_INTERVALS]
         and config["render_size"] == [1280, 720]
         and config["observation_size"] == [448, 448],
         "complete_source_snapshots": {
@@ -320,11 +323,16 @@ def audit(directory, engine):
     )
     if not all(checks.values()):
         return {"valid": False, "checks": checks, "timing": None}
-    paths = [directory / name for name in expected_files]
+    private_names = {"evaluator-positions.json", "evaluator-camera.jsonl"}
+    paths = [directory / name for name in expected_files - private_names]
     frozen = {path: digest(path) for path in paths}
-    checks["artifact_bytes_verified"] = {
+    checks["public_artifact_bytes_verified"] = {
         path.relative_to(directory).as_posix(): value for path, value in frozen.items()
-    } == report["artifact_sha256"]
+    } == {
+        name: value
+        for name, value in report["artifact_sha256"].items()
+        if name not in private_names
+    }
     if not all(checks.values()):
         return {"valid": False, "checks": checks, "timing": None}
     frozen.update(
@@ -345,20 +353,6 @@ def audit(directory, engine):
             ]
         }
     )
-    # First private JSON read, after all public observations and receipts pass.
-    private = json.loads((directory / "evaluator-positions.json").read_bytes())
-    rows = [
-        json.loads(line)
-        for line in (directory / "evaluator-camera.jsonl")
-        .read_text(encoding="utf-8")
-        .splitlines()
-    ]
-    if rows[0] != {"kind": "instrumented", "hooks": 1} or any(
-        row["kind"] != "capture" for row in rows[1:]
-    ):
-        raise ValueError("instrumentation missing or contains an error")
-    if not len(private["positions"]) == len(private["native_rgb_sha256"]) == count:
-        raise ValueError("incomplete private sequence")
     import cv2
 
     native_hashes = []
@@ -370,9 +364,68 @@ def audit(directory, engine):
         ):
             raise ValueError("SDK resize cannot be independently reproduced")
         native_hashes.append(hashlib.sha256(native[::-1].tobytes()).hexdigest())
+    checks["all_public_native_resize_replayed"] = True
+    checks["public_bytes_stable"] = all(
+        digest(path) == value for path, value in frozen.items()
+    )
+    return {
+        "valid": all(checks.values()),
+        "checks": checks,
+        "config": config,
+        "report": report,
+        "frozen": frozen,
+        "native_hashes": native_hashes,
+        "count": count,
+    }
+
+
+def audit(directory, engine):
+    public = public_data(directory, engine)
+    if not public["valid"]:
+        return {"valid": False, "checks": public["checks"], "timing": None}
+    checks, config, report = public["checks"], public["config"], public["report"]
+    frozen, count, native_hashes = (
+        public["frozen"],
+        public["count"],
+        public["native_hashes"],
+    )
+    # First private bytes read, after all public observations and receipts pass.
+    private_names = ("evaluator-positions.json", "evaluator-camera.jsonl")
+    private_hashes = {name: digest(directory / name) for name in private_names}
+    checks["private_artifact_bytes_verified"] = all(
+        report["artifact_sha256"][name] == value
+        for name, value in private_hashes.items()
+    )
+    if not all(checks.values()):
+        return {"valid": False, "checks": checks, "timing": None}
+    frozen.update({directory / name: value for name, value in private_hashes.items()})
+    private = json.loads((directory / "evaluator-positions.json").read_bytes())
+    rows = [
+        json.loads(line)
+        for line in (directory / "evaluator-camera.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    headers = [row for row in rows if row["kind"] == "instrumented"]
+    if (
+        len(headers) != 2
+        or {json.dumps(row, sort_keys=True) for row in headers}
+        != {
+            json.dumps(
+                {"kind": "instrumented", "target": target, "hooks": 1}, sort_keys=True
+            )
+            for target in ("recorder", "world_renderer")
+        }
+        or any(row["kind"] not in ("capture", "instrumented") for row in rows)
+    ):
+        raise ValueError("instrumentation missing or contains an error")
+    if not len(private["positions"]) == len(private["native_rgb_sha256"]) == count:
+        raise ValueError("incomplete private sequence")
     if native_hashes != private["native_rgb_sha256"]:
         raise ValueError("native bytes disagree with evaluator ledger")
-    start, aligned = match_snapshots(rows[1:], native_hashes)
+    start, aligned = match_snapshots(
+        [row for row in rows if row["kind"] == "capture"], native_hashes
+    )
     if any(
         sample["camera_valid"] is not True
         or sample["third_person"] is not False
@@ -381,10 +434,70 @@ def audit(directory, engine):
     ):
         raise ValueError("camera is invalid or not first person")
     timing = timing_metrics(aligned, private["positions"])
+    from minecraft_scientist.evaluation.relative_motion import camera_rotation
+    from minecraft_scientist.evaluation.rendered_camera import decompose_rendered_camera
+
+    rendered = [
+        decompose_rendered_camera(
+            sample["render"], observation_size=tuple(config["observation_size"])
+        )
+        for sample in aligned
+    ]
+    if any(
+        second.render_sequence != first.render_sequence + 1
+        for first, second in pairwise(rendered)
+    ) or any(
+        not np.allclose(
+            sample["render"]["base_position"],
+            [sample["camera_base"][key] for key in CAMERA_KEYS[:3]],
+            rtol=0,
+            atol=1e-7,
+        )
+        or sample["render"]["partial_ticks"] != sample["partial_ticks"]
+        for sample in aligned
+    ):
+        raise ValueError(
+            "render matrices do not bind consecutive captured camera bases"
+        )
+    rotation_offsets = []
+    for camera, sample in zip(rendered, aligned, strict=True):
+        base = sample["camera_base"]
+        expected = camera_rotation(base["yaw"], base["pitch"])
+        rotation_offsets.append(
+            float(
+                np.degrees(
+                    np.arccos(
+                        np.clip(
+                            (np.trace(np.array(camera.rotation) @ expected.T) - 1) / 2,
+                            -1,
+                            1,
+                        )
+                    )
+                )
+            )
+        )
+    intrinsic = np.array([camera.camera for camera in rendered])
+    projection_metrics = {
+        "maximum_center_offset_blocks": max(
+            float(np.linalg.norm(camera.camera_center_offset)) for camera in rendered
+        ),
+        "maximum_base_rotation_offset_degrees": max(rotation_offsets),
+        "maximum_reconstruction_error": max(
+            camera.reconstruction_error for camera in rendered
+        ),
+        "fx_range": [float(intrinsic[:, 0, 0].min()), float(intrinsic[:, 0, 0].max())],
+        "fy_range": [float(intrinsic[:, 1, 1].min()), float(intrinsic[:, 1, 1].max())],
+        "maximum_absolute_skew_pixels": float(np.abs(intrinsic[:, 0, 1]).max()),
+        "principal_point_range": [
+            [float(intrinsic[:, axis, 2].min()), float(intrinsic[:, axis, 2].max())]
+            for axis in (0, 1)
+        ],
+    }
     checks["native_pixels_resize_and_unique_contiguous_camera_match"] = True
     checks["reported_telemetry_matches_capture_player"] = (
         timing["max_telemetry_vs_capture_player_component_error"] < 1e-5
     )
+    checks["complete_render_matrix_decomposition_and_alignment"] = True
     checks["all_bytes_stable_through_analysis"] = all(
         digest(path) == value for path, value in frozen.items()
     )
@@ -392,6 +505,8 @@ def audit(directory, engine):
         "valid": all(checks.values()),
         "checks": checks,
         "timing": timing,
+        "projection_metrics": projection_metrics,
+        "rendered_cameras": [camera.model_dump(mode="json") for camera in rendered],
         "matching_capture_start": start,
         "navigation_accepted": False,
         "scope": config["scope"],

@@ -67,6 +67,20 @@ def sample(index):
         "player": player,
         "previous_player": previous,
         "camera_base": previous | {"ypos": 11.62, "yaw": 30.0},
+        "render": {
+            "sequence": index + 1,
+            "partial_ticks": 0.0,
+            "model_view": np.diag((-1, 1, -1, 1)).tolist(),
+            "projection": [
+                [0.8, 0, 0, 0],
+                [0, 1.4, 0, 0],
+                [0, 0, -1.001, -0.1],
+                [0, 0, -1, 0],
+            ],
+            "base_position": [previous["xpos"], 11.62, 0],
+            "shader_pack_loaded": False,
+            "shadow_pass": False,
+        },
     }
 
 
@@ -103,9 +117,11 @@ def diagnostic(scripts, tmp_path):
     for name in ("sdk-entry.py", "sdk-launcher.py"):
         (route / "source-snapshot" / name).write_bytes(b"test-only SDK snapshot")
     config = {
-        "schema": "runtime-camera-timing-v1",
+        "schema": "runtime-camera-projection-v2",
         "seed": 201,
         "schedule": capture.SCHEDULE,
+        "reference_indices": capture.REFERENCE_INDICES,
+        "trial_intervals": capture.TRIAL_INTERVALS,
         "render_size": [1280, 720],
         "observation_size": [448, 448],
         "engine_sha256": script.digest(engine),
@@ -185,7 +201,12 @@ def diagnostic(scripts, tmp_path):
     )
     (route / "evaluator-camera.jsonl").write_text(
         "\n".join(
-            json.dumps(row) for row in [{"kind": "instrumented", "hooks": 1}] + captures
+            json.dumps(row)
+            for row in [
+                {"kind": "instrumented", "target": "recorder", "hooks": 1},
+                {"kind": "instrumented", "target": "world_renderer", "hooks": 1},
+            ]
+            + captures
         )
         + "\n",
         encoding="utf-8",
@@ -288,9 +309,198 @@ def test_full_independent_audit_reproduces_pixels_and_matches_camera(diagnostic)
     result = script.audit(route, engine)
     assert result["valid"] and all(result["checks"].values())
     assert result["matching_capture_start"] == 0
-    assert result["timing"]["samples"] == 66
+    assert result["timing"]["samples"] == 106
     assert result["timing"]["max_telemetry_vs_capture_player_component_error"] == 0
     assert not result["navigation_accepted"]
+
+
+def private_guard(monkeypatch):
+    read, text = Path.read_bytes, Path.read_text
+
+    def guard(path):
+        if path.name in ("evaluator-camera.jsonl", "evaluator-positions.json"):
+            raise AssertionError("public inference opened private bytes")
+        return read(path)
+
+    def guard_text(path, *args, **kwargs):
+        if path.name in ("evaluator-camera.jsonl", "evaluator-positions.json"):
+            raise AssertionError("public inference opened private text")
+        return text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_bytes", guard)
+    monkeypatch.setattr(Path, "read_text", guard_text)
+
+
+def test_public_camera_validation_never_reads_private_bytes(diagnostic, monkeypatch):
+    script, route, engine = diagnostic
+    private_guard(monkeypatch)
+    public = script.public_data(route, engine)
+    assert public["valid"] and public["count"] == 106
+    assert all(
+        path.name not in ("evaluator-camera.jsonl", "evaluator-positions.json")
+        for path in public["frozen"]
+    )
+
+
+@pytest.fixture
+def rendered_probe(diagnostic, monkeypatch):
+    from minecraft_scientist.exploration.temporal_tracks import TemporalTracks
+
+    _, route, engine = diagnostic
+    probe = importlib.import_module("probe_rendered_motion")
+    trace = []
+    monkeypatch.setattr(
+        probe,
+        "calibrate_reference_camera",
+        lambda images, size: {
+            "camera_intrinsics": [[180, 0, 224], [0, 320, 224], [0, 0, 1]]
+        },
+    )
+
+    def track(images, **kwargs):
+        trace.append(("track", len(images)))
+        return TemporalTracks(
+            image_shape=(448, 448),
+            frame_count=len(images),
+            seed_count=0,
+            surviving_counts=(0,) * len(images),
+            track_ids=(),
+            pixels=((),) * len(images),
+            minimum_patch_correlations=(),
+            chain_cycle_errors=(),
+        )
+
+    fit = probe.fit_joint_map
+
+    def logged_fit(*args, **kwargs):
+        trace.append(("fit", kwargs["bootstrap_slot"]))
+        return fit(*args, **kwargs)
+
+    monkeypatch.setattr(probe, "track_frame_chain", track)
+    monkeypatch.setattr(probe, "fit_joint_map", logged_fit)
+    return probe, route, engine, trace
+
+
+def test_all_maps_frozen_before_future_and_no_private_inputs(
+    rendered_probe, monkeypatch
+):
+    probe, route, engine, trace = rendered_probe
+    private_guard(monkeypatch)
+    result = probe.infer(route, engine)
+    assert len(result["trials"]) == 2
+    assert sum(kind == "fit" for kind, _ in trace) == 18
+    first_future = next(
+        index
+        for index, (kind, count) in enumerate(trace)
+        if kind == "track" and count > 11
+    )
+    assert all(kind != "fit" for kind, _ in trace[first_future:])
+    for trial in result["trials"]:
+        assert [item["map"]["bootstrap_slot"] for item in trial["candidates"]] == list(
+            range(2, 11)
+        )
+        assert all(not item["map"]["supported"] for item in trial["candidates"])
+    assert not result["navigation_accepted"]
+
+
+def test_rendered_audit_replays_public_fit_before_any_private_access(
+    rendered_probe, tmp_path, monkeypatch
+):
+    probe, route, engine, trace = rendered_probe
+    experiment = tmp_path / "prediction"
+    assert probe.run(route, engine, experiment)["completed"]
+    trace.clear()
+    actual_audit = probe.runtime.audit
+
+    def audited(*args):
+        assert sum(kind == "fit" for kind, _ in trace) == 18
+        return actual_audit(*args)
+
+    monkeypatch.setattr(probe.runtime, "audit", audited)
+    result = probe.audit(route, engine, experiment)
+    assert result["valid"] and all(result["checks"].values())
+    assert sum(len(item["candidates"]) for item in result["evaluation"]) == 18
+    assert all(
+        candidate["past_motion"]["rendered"]["status"] == "unsupported_motion"
+        for trial in result["evaluation"]
+        for candidate in trial["candidates"]
+    )
+
+
+def test_forged_prediction_cannot_reach_renderer_truth(
+    rendered_probe, tmp_path, monkeypatch
+):
+    probe, route, engine, _ = rendered_probe
+    experiment = tmp_path / "prediction"
+    probe.run(route, engine, experiment)
+    result = json.loads((experiment / "report.json").read_bytes())
+    result["prediction"]["trials"][0]["candidates"].pop()
+    save(experiment / "report.json", result)
+    private_guard(monkeypatch)
+    result = probe.audit(route, engine, experiment)
+    assert not result["valid"] and result["evaluation"] is None
+    assert not result["checks"]["entire_public_inference_replayed"]
+
+
+@pytest.mark.parametrize("name", ["evaluator-positions.json", "evaluator-camera.jsonl"])
+def test_private_mutation_between_alignment_and_scoring_is_rejected(
+    rendered_probe, tmp_path, monkeypatch, name
+):
+    probe, route, engine, _ = rendered_probe
+    experiment = tmp_path / "prediction"
+    probe.run(route, engine, experiment)
+    original = probe.runtime.audit
+
+    def mutate(*args):
+        result = original(*args)
+        path = route / name
+        if name == "evaluator-positions.json":
+            positions = json.loads(path.read_bytes())
+            positions["positions"][0]["xpos"] += 0.01
+            save(path, positions)
+        else:
+            path.write_text(path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+        return result
+
+    monkeypatch.setattr(probe.runtime, "audit", mutate)
+    result = probe.audit(route, engine, experiment)
+    assert not result["valid"] and result["evaluation"] is None
+    assert not result["checks"]["all_bytes_stable_through_scoring"]
+
+
+@pytest.mark.parametrize("accepted", [True, False])
+@pytest.mark.parametrize("available", [True, False])
+def test_rejected_future_pose_diagnostics_never_become_policy_acceptance(
+    scripts, accepted, available
+):
+    probe = importlib.import_module("probe_rendered_motion")
+    past = {"rotation": np.eye(3).tolist(), "translation": [0, 0, -1]}
+    later = (
+        {"rotation": np.eye(3).tolist(), "translation": [0, 0, -2]}
+        if available
+        else None
+    )
+    future = {
+        "frame_checks": [{"supported": accepted, "frame_slot": 12}],
+        "poses": [later],
+    }
+
+    def score(pose, first, second):
+        return {
+            "supported": pose is not None,
+            "pose": pose,
+            "interval": [first, second],
+        }
+
+    record = probe.evaluate_future(past, future, 48, 58, score)[0]
+    assert record["from_anchor"]["supported"] == (accepted and available)
+    assert record["diagnostic_pose_from_anchor"]["supported"] == available
+    assert not record["diagnostic_is_policy_acceptance"]
+    assert record["diagnostic_pose_from_frozen_endpoint"]["interval"] == [58, 60]
+    if available:
+        assert record["diagnostic_pose_from_frozen_endpoint"]["pose"][
+            "translation"
+        ] == [0, 0, -1]
 
 
 def test_mutation_during_analysis_invalidates_audit(diagnostic, monkeypatch):

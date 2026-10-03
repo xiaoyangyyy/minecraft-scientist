@@ -25,6 +25,33 @@ def test_aspect_preserving_resize_keeps_equal_native_focal_axes():
     assert camera[0, 2] == 159.5 and camera[1, 2] == 89.5
 
 
+@pytest.mark.parametrize("target", [(224, 224), (448, 448), (320, 180)])
+def test_edge_and_grid_coordinates_produce_identical_rays(target):
+    grid = CameraResizeSpec(render_size=(1280, 720), observation_size=target).camera(
+        180
+    )
+    edge = CameraResizeSpec(
+        render_size=(1280, 720),
+        observation_size=target,
+        principal_point="pixel_edge_center",
+    ).camera(180)
+    np.testing.assert_allclose(edge[:2, 2], np.array(target) / 2)
+    points = np.array(((60.0, 70.0, 1), (100.0, 120.0, 1)))
+    shifted = points.copy()
+    shifted[:, :2] += 0.5
+    np.testing.assert_allclose(
+        points @ np.linalg.inv(grid).T, shifted @ np.linalg.inv(edge).T, atol=1e-12
+    )
+
+
+def test_edge_origin_full_frame_resize_is_pure_scale():
+    camera = np.array(((260.0, 0, 320), (0, 260.0, 180), (0, 0, 1)))
+    resized = resize_intrinsics(
+        camera, (640, 360), (448, 448), principal_point="pixel_edge_center"
+    )
+    np.testing.assert_allclose(resized, np.diag((448 / 640, 448 / 360, 1)) @ camera)
+
+
 def test_raw_resolution_doubling_preserves_normalized_image_rays():
     small = CameraResizeSpec(
         render_size=(640, 360), observation_size=(224, 224)

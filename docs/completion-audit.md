@@ -1098,3 +1098,33 @@ Final camera-diagnostic tests pass 25/25 on Windows and WSL, following a 70-case
 combined camera/joint-map regression on both. Ruff/format and whitespace checks
 pass. All 101 V18 core source hashes remain identical; no production package or
 core-verifier source changes. This does not claim a newly rerun full release suite.
+
+## Full rendered-camera motion follow-up
+
+The later source-frozen projection captures preserve 106 frames/all 105 actions
+each; the current capture is `runtime-camera-projection-seed201-v3`. The evaluator
+includes bobbing effects in model-view/projection matrices, verifies decomposition
+and binds the complete RGB chain. Public calibration/tracking receive no matrices
+or private file bytes, and now share the explicit image-edge pixel convention.
+Both trials' maps freeze before any future tracking; all 18 bootstraps remain.
+`rendered-motion-seed201-v4/audit.json` passes thirteen public-first inference replay
+checks and its nested camera audit passes eighteen integrity checks.
+
+Three past maps have rendered direction errors 1.00–2.42 degrees. Nevertheless,
+zero candidates pass all future pixel checks. Rejected future fitted poses remain
+separate unpromoted diagnostics, with rendered and body scores both retained. This
+is a better-defined evaluation and a real coordinate bug fix, not reliable goal
+navigation. The old 33.042212-degree result is not rewritten. V19 scientific-core
+releases pass thirty seeds/two repeats/eighteen identical artifacts and all six
+checks on both platforms, freezing 102 entries including 99 package sources.
+See `docs/rendered-camera-motion-development.md`. All broad completion gates
+remain open, and the original goal remains active.
+
+Frozen full regression passes Windows 927/2 skips and WSL 929/2 skips. A final
+script-only private-byte freeze and two mutation tests then pass the full affected
+123-case suite on both platforms; no additional full rerun is claimed after that
+guard. Default-only WSL passes 477/69 skips without Torch/Pillow/OpenCV. The MVP
+CLI and builds pass. Scoped changed-file Ruff passes, but the wider read-only lint
+check exposes 21 issues in 16 untouched files plus 34 formatting candidates;
+global cleanup remains an explicit engineering requirement. All reports and the
+first WSL source-mutation test failure are preserved rather than hidden.

@@ -1,5 +1,10 @@
 # Runtime image/camera timing diagnosis
 
+This is the preserved 66-frame timing-only checkpoint, not the current capture
+schema or package release. The later full-matrix measurement, public coordinate
+fix, 106-frame acquisitions and separate camera/body evaluation are documented in
+`rendered-camera-motion-development.md`. Historical source snapshots remain intact.
+
 The joint-map short-motion counterexample is still unresolved. This follow-up
 identifies a real observation/evaluation mismatch in fresh runtime measurements;
 it does **not** retrospectively replace player telemetry, certify old poses,
@@ -7,7 +12,8 @@ improve navigation coverage, or establish the cause of the 33.042212-degree erro
 
 ## Independent runtime measurement
 
-`environments/minestudio/capture_runtime_camera.py` preregisters 65 one-tick
+At this frozen checkpoint, `environments/minestudio/capture_runtime_camera.py`
+preregisters 65 one-tick
 WAIT/MOVE/LOOK actions at natural seed-201 spawn. No terrain is edited and no
 learned map is promoted. It compiles a JDK8-only Java instrumentation agent into
 the new run directory. The agent instruments only the in-process recorder's
@@ -101,7 +107,7 @@ Focused tests cover sequence ambiguity/gaps/counter types, separate pose compone
 invalid renderer fields, full pixel/receipt replay, source/policy/public-log/ledger
 forgery before private JSON access, mutation through analysis, JVM environment/class
 restoration on failure, single-launch bounds and immutable audit outputs.
-No production package or core-verifier source is changed by this follow-up; the
+At this timing-only checkpoint, no production package or core-verifier source is changed; the
 V18 core source boundary and existing benchmark artifacts remain unchanged.
 All 101 V18 source hashes were rechecked on both platform ledgers with zero
 mismatches. Windows and WSL each pass the final 25-case runtime-camera suite

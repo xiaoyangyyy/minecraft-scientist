@@ -22,7 +22,9 @@ class CameraResizeSpec(BaseModel):
     observation_size: tuple[Dimension, Dimension]
     transform: Literal["full_frame_resize"] = "full_frame_resize"
     native_pixel_geometry: Literal["square_pixels"] = "square_pixels"
-    principal_point: Literal["pixel_grid_center"] = "pixel_grid_center"
+    principal_point: Literal["pixel_grid_center", "pixel_edge_center"] = (
+        "pixel_grid_center"
+    )
 
     def camera(self, horizontal_focal_pixels: float) -> np.ndarray:
         focal = FocalCalibration(
@@ -38,7 +40,14 @@ class CameraResizeSpec(BaseModel):
                 (0, 0, 1),
             )
         )
-        return resize_intrinsics(native, self.render_size, self.observation_size)
+        if self.principal_point == "pixel_edge_center":
+            native[:2, 2] += 0.5
+        return resize_intrinsics(
+            native,
+            self.render_size,
+            self.observation_size,
+            principal_point=self.principal_point,
+        )
 
 
 class FocalCalibration(BaseModel):
@@ -48,10 +57,24 @@ class FocalCalibration(BaseModel):
 
 
 def resize_intrinsics(
-    camera: np.ndarray, source_size: tuple[int, int], target_size: tuple[int, int]
+    camera: np.ndarray,
+    source_size: tuple[int, int],
+    target_size: tuple[int, int],
+    *,
+    principal_point: Literal[
+        "pixel_grid_center", "pixel_edge_center"
+    ] = "pixel_grid_center",
 ) -> np.ndarray:
-    """Apply full-frame pixel-center resizing independently along both axes."""
-    spec = CameraResizeSpec(render_size=source_size, observation_size=target_size)
+    """Resize rays in the declared grid-index or image-edge coordinate system.
+
+    OpenCV integer-center coordinates require half-pixel translation; edge-origin
+    coordinates (OpenCV + 0.5) require only scale. Never mix the two conventions.
+    """
+    spec = CameraResizeSpec(
+        render_size=source_size,
+        observation_size=target_size,
+        principal_point=principal_point,
+    )
     camera = np.asarray(camera, dtype=float)
     if (
         camera.shape != (3, 3)
@@ -64,5 +87,10 @@ def resize_intrinsics(
     ):
         raise ValueError("resize requires finite zero-skew pinhole intrinsics")
     sx, sy = np.asarray(spec.observation_size) / np.asarray(spec.render_size)
-    transform = np.array(((sx, 0, (sx - 1) / 2), (0, sy, (sy - 1) / 2), (0, 0, 1)))
+    shift_x, shift_y = (
+        ((sx - 1) / 2, (sy - 1) / 2)
+        if spec.principal_point == "pixel_grid_center"
+        else (0, 0)
+    )
+    transform = np.array(((sx, 0, shift_x), (0, sy, shift_y), (0, 0, 1)))
     return transform @ camera

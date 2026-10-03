@@ -828,6 +828,13 @@ This is an observation-model diagnosis, not a navigation fix; view bobbing and
 the original short-step counterexample remain unresolved. See
 `docs/runtime-camera-timing-development.md` for immutable runs and next actions.
 
+The newer full-render-matrix audit separates image-camera and body motion and
+fixes the public track/intrinsic half-pixel convention. It retains all 18 map
+initializations on two registered development trajectories. Three maps explain
+past movement accurately, but none passes all future pixel tests; no navigation
+promotion is claimed. See `docs/rendered-camera-motion-development.md` for exact
+denominators, rejected-pose diagnostics, current source boundaries and reproduction.
+
 The scientific core has a portable offline release verifier:
 
 ```powershell

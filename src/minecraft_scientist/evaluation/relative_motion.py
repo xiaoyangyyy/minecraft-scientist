@@ -71,6 +71,24 @@ def score_relative_motion(
     maximum_direction_error: float = 20,
     maximum_rotation_error: float = 5,
 ) -> dict:
+    return score_motion_truth(
+        prediction,
+        relative_motion_truth(first, second),
+        minimum_translation=minimum_translation,
+        maximum_direction_error=maximum_direction_error,
+        maximum_rotation_error=maximum_rotation_error,
+    )
+
+
+def score_motion_truth(
+    prediction: Mapping,
+    truth: Mapping,
+    *,
+    minimum_translation: float = 0.15,
+    maximum_direction_error: float = 20,
+    maximum_rotation_error: float = 5,
+) -> dict:
+    """Common evaluator for validated body or rendered-camera motion truth."""
     if (
         not all(
             math.isfinite(value)
@@ -85,7 +103,27 @@ def score_relative_motion(
         or not 0 < maximum_rotation_error < 180
     ):
         raise ValueError("relative-motion evaluation thresholds are invalid")
-    truth = relative_motion_truth(first, second)
+    truth_rotation = np.asarray(truth["relative_rotation"], dtype=float)
+    truth_translation = np.asarray(truth["unit_translation"], dtype=float)
+    if (
+        isinstance(truth["distance"], bool)
+        or not math.isfinite(truth["distance"])
+        or truth["distance"] < 0
+        or truth_rotation.shape != (3, 3)
+        or not np.isfinite(truth_rotation).all()
+        or not np.allclose(truth_rotation.T @ truth_rotation, np.eye(3), atol=1e-5)
+        or not np.isclose(np.linalg.det(truth_rotation), 1, atol=1e-5)
+        or (
+            truth["distance"] > 1e-9
+            and (
+                truth_translation.shape != (3,)
+                or not np.isfinite(truth_translation).all()
+                or not np.isclose(np.linalg.norm(truth_translation), 1, atol=1e-5)
+            )
+        )
+        or (truth["distance"] <= 1e-9 and truth["unit_translation"] is not None)
+    ):
+        raise ValueError("relative-motion truth must be finite, proper and normalized")
     translated = truth["distance"] >= minimum_translation
     supported = bool(prediction["supported"])
     result = {
@@ -117,11 +155,7 @@ def score_relative_motion(
         )
     rotation_error = math.degrees(
         math.acos(
-            float(
-                np.clip(
-                    (np.trace(rotation @ truth["relative_rotation"].T) - 1) / 2, -1, 1
-                )
-            )
+            float(np.clip((np.trace(rotation @ truth_rotation.T) - 1) / 2, -1, 1))
         )
     )
     result["rotation_error_degrees"] = rotation_error
@@ -129,7 +163,7 @@ def score_relative_motion(
         result.update(correct=False, status="false_translation")
         return result
     direction_error = math.degrees(
-        math.acos(float(np.clip(translation @ truth["unit_translation"], -1, 1)))
+        math.acos(float(np.clip(translation @ truth_translation, -1, 1)))
     )
     correct = (
         direction_error <= maximum_direction_error

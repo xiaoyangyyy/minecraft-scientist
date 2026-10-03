@@ -33,7 +33,12 @@ def calibrate_reference_camera(images, render_size):
     focal, count, mad = _calibrate_focal(features, width, geometry, cv2)
     if focal is None:
         raise ValueError("public RGB focal calibration rejected")
-    resize = CameraResizeSpec(render_size=render_size, observation_size=(width, height))
+    # Both startup feature points and TemporalTracks are OpenCV coordinates +0.5.
+    resize = CameraResizeSpec(
+        render_size=render_size,
+        observation_size=(width, height),
+        principal_point="pixel_edge_center",
+    )
     return {
         "camera_resize": resize.model_dump(mode="json"),
         "camera_intrinsics": resize.camera(focal).tolist(),

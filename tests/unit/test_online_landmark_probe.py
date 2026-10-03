@@ -1,4 +1,5 @@
 import hashlib
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -34,6 +35,35 @@ def tracks(tick, ids=tuple(range(400))):
         minimum_patch_correlations=(1,) * len(ids),
         chain_cycle_errors=(0,) * len(ids),
     )
+
+
+def test_public_calibration_uses_temporal_track_edge_coordinates(monkeypatch):
+    captured = []
+    monkeypatch.setattr(
+        online, "_opencv", lambda: SimpleNamespace(__version__="test-only")
+    )
+    monkeypatch.setattr(
+        online,
+        "_features",
+        lambda image, config, cv2: (
+            np.array(((20.0, 30.0), (40.0, 50.0))),
+            np.ones((2, 32), dtype=np.uint8),
+        ),
+    )
+
+    def calibrate(features, width, config, cv2):
+        captured.extend(features)
+        return 90.0, 24, 0.01
+
+    monkeypatch.setattr(online, "_calibrate_focal", calibrate)
+    result = online.calibrate_reference_camera(
+        [np.zeros((224, 224, 3), dtype=np.uint8)] * 12, (640, 360)
+    )
+    np.testing.assert_allclose(captured[0][0], ((20.5, 30.5), (40.5, 50.5)))
+    np.testing.assert_allclose(
+        result["camera_intrinsics"], ((90, 0, 112), (0, 160, 112), (0, 0, 1))
+    )
+    assert result["camera_resize"]["principal_point"] == "pixel_edge_center"
 
 
 def candidate(tick=2, *, current=None, supported=True):

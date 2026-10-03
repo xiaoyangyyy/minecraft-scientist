@@ -18,6 +18,8 @@ import jdk.internal.org.objectweb.asm.Opcodes;
 public final class CameraAudit {
     private static BufferedWriter output;
     private static int sequence;
+    private static int renderSequence;
+    private static String lastRender = "null";
 
     public static void premain(String path, Instrumentation instrumentation) throws Exception {
         output = Files.newBufferedWriter(Paths.get(path), StandardCharsets.UTF_8,
@@ -25,7 +27,9 @@ public final class CameraAudit {
         instrumentation.addTransformer(new ClassFileTransformer() {
             public byte[] transform(ClassLoader loader, String name, Class<?> type,
                     ProtectionDomain domain, byte[] bytes) {
-                if (!name.equals("com/minerl/multiagent/recorder/PlayRecorder")) return null;
+                final boolean recorder = name.equals("com/minerl/multiagent/recorder/PlayRecorder");
+                final boolean world = name.equals("net/minecraft/client/renderer/WorldRenderer");
+                if (!recorder && !world) return null;
                 ClassReader reader = new ClassReader(bytes);
                 ClassWriter writer = new ClassWriter(reader, ClassWriter.COMPUTE_MAXS);
                 final int[] hooks = {0};
@@ -34,7 +38,22 @@ public final class CameraAudit {
                             String signature, String[] exceptions) {
                         MethodVisitor original = super.visitMethod(access, method, descriptor,
                                 signature, exceptions);
-                        if (!method.equals("resolveImageRequests") || !descriptor.equals("()V"))
+                        if (world && method.equals("updateCameraAndRender") && descriptor.equals(
+                                "(Lcom/mojang/blaze3d/matrix/MatrixStack;FJZLnet/minecraft/client/renderer/ActiveRenderInfo;Lnet/minecraft/client/renderer/GameRenderer;Lnet/minecraft/client/renderer/LightTexture;Lnet/minecraft/util/math/vector/Matrix4f;)V")) {
+                            hooks[0]++;
+                            return new MethodVisitor(Opcodes.ASM5, original) {
+                                public void visitCode() {
+                                    super.visitCode();
+                                    super.visitVarInsn(Opcodes.ALOAD, 1);
+                                    super.visitVarInsn(Opcodes.ALOAD, 6);
+                                    super.visitVarInsn(Opcodes.ALOAD, 9);
+                                    super.visitVarInsn(Opcodes.FLOAD, 2);
+                                    super.visitMethodInsn(Opcodes.INVOKESTATIC, "CameraAudit", "render",
+                                            "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;F)V", false);
+                                }
+                            };
+                        }
+                        if (!recorder || !method.equals("resolveImageRequests") || !descriptor.equals("()V"))
                             return original;
                         hooks[0]++;
                         return new MethodVisitor(Opcodes.ASM5, original) {
@@ -50,7 +69,8 @@ public final class CameraAudit {
                     }
                 }, 0);
                 if (hooks[0] != 1) throw new IllegalStateException("unexpected recorder hook count");
-                line("{\"kind\":\"instrumented\",\"hooks\":1}");
+                line("{\"kind\":\"instrumented\",\"target\":\""
+                        + (recorder ? "recorder" : "world_renderer") + "\",\"hooks\":1}");
                 return writer.toByteArray();
             }
         });
@@ -99,6 +119,39 @@ public final class CameraAudit {
                 + ",\"pitch\":" + field(value, previous ? "prevRotationPitch" : "rotationPitch") + "}";
     }
 
+    private static String matrix(Object value) throws Exception {
+        StringBuilder text = new StringBuilder("[");
+        for (int row = 0; row < 4; row++) {
+            if (row > 0) text.append(',');
+            text.append('[');
+            for (int col = 0; col < 4; col++) {
+                if (col > 0) text.append(',');
+                text.append(field(value, "m" + row + col));
+            }
+            text.append(']');
+        }
+        return text.append(']').toString();
+    }
+
+    public static void render(Object stack, Object camera, Object projection, float partial) {
+        try {
+            if (renderSequence >= 10000) throw new IllegalStateException("render audit budget exceeded");
+            Object position = call(camera, "getProjectedView");
+            Class<?> shaders = Class.forName("net.optifine.shaders.Shaders", false,
+                    camera.getClass().getClassLoader());
+            lastRender = "{\"sequence\":" + ++renderSequence + ",\"partial_ticks\":" + partial
+                    + ",\"model_view\":" + matrix(call(call(stack, "getLast"), "getMatrix"))
+                    + ",\"projection\":" + matrix(projection)
+                    + ",\"base_position\":[" + field(position, "x") + ","
+                    + field(position, "y") + "," + field(position, "z") + "]"
+                    + ",\"shader_pack_loaded\":" + shaders.getField("shaderPackLoaded").get(null)
+                    + ",\"shadow_pass\":" + shaders.getField("isShadowPass").get(null) + "}";
+        } catch (Exception error) {
+            line("{\"kind\":\"render_error\"}");
+            throw new IllegalStateException("render matrix audit failed", error);
+        }
+    }
+
     public static void capture(Object recorder) {
         try {
             if (sequence >= 10000) throw new IllegalStateException("camera audit sample budget exceeded");
@@ -125,6 +178,7 @@ public final class CameraAudit {
                     + ",\"third_person\":" + call(info, "isThirdPerson")
                     + ",\"camera_valid\":" + call(info, "isValid")
                     + ",\"eye_height\":" + call(entity, "getEyeHeight")
+                    + ",\"render\":" + lastRender
                     + ",\"player\":" + player(entity, false)
                     + ",\"previous_player\":" + player(entity, true)
                     + ",\"camera_base\":{\"xpos\":" + field(position, "x")

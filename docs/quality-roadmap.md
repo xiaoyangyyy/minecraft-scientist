@@ -64,6 +64,12 @@ telemetry. Next align new geometric evaluation to capture-time camera evidence,
 while retaining body scoring and accounting for view bobbing. This changes the
 diagnostic priority, not navigation acceptance or any required outcome below.
 
+The subsequent `docs/rendered-camera-motion-development.md` checkpoint now binds
+full matrices to RGB and scores camera/body motion separately, with a public
+half-pixel convention repair. None of 18 registered candidates passes all future
+pixel tests. Next investigate short-horizon rolling maps and original-landmark
+support/uncertainty; do not accept gate-rejected diagnostics as navigation success.
+
 - Agent policy inputs contain RGB/opaque public observations and learned action
   programs. Coordinate telemetry and hidden rules remain evaluator-only.
 - Development results are not held-out evaluation. State which failed trajectories

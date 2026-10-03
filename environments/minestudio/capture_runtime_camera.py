@@ -21,15 +21,20 @@ ENGINE = Path("/opt/minecraft-scientist-engine/engine/build/libs/mcprec-6.13.jar
 # All actions are fixed before observation, including two turns and inertia waits.
 SCHEDULE = (
     [("wait", None)] * 12
+    + [("look", None), ("wait", None), ("wait", None)] * 12
     + [("move", 0)] * 6
-    + [("move", 2)] * 6
+    + [("move", 2)] * 4
+    + [("move", 1)] * 4
     + [("wait", None)] * 12
     + [("look", None)]
     + [("wait", None)] * 4
     + [("move", 0)] * 6
-    + [("move", 3)] * 6
+    + [("move", 3)] * 4
+    + [("move", 2)] * 4
     + [("wait", None)] * 12
 )
+REFERENCE_INDICES = tuple(range(15, 49, 3))
+TRIAL_INTERVALS = ((48, 58, 62), (79, 89, 93))
 
 
 def digest(path):
@@ -153,16 +158,18 @@ def main():
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(path.read_bytes())
     config = {
-        "schema": "runtime-camera-timing-v1",
+        "schema": "runtime-camera-projection-v2",
         "seed": args.seed,
         "schedule": SCHEDULE,
+        "reference_indices": REFERENCE_INDICES,
+        "trial_intervals": TRIAL_INTERVALS,
         "render_size": [1280, 720],
         "observation_size": [448, 448],
         "engine_sha256": digest(ENGINE),
         "agent_sha256": digest(jar),
         "source_sha256": {name: digest(path) for name, path in sources.items()},
         "sdk_runtime_sha256": runtime_before,
-        "scope": "fresh development timing diagnostic; base camera excludes bobbing matrix; evaluator-only; no navigation promotion",
+        "scope": "fresh full world-render projection diagnostic; all matrix telemetry evaluator-only; preregistered distinct-control trials; no navigation promotion",
     }
     write_json(directory / "config.json", config)
     config_hash = digest(directory / "config.json")
