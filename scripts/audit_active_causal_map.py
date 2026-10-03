@@ -28,7 +28,15 @@ THRESHOLDS = {
 
 
 def registration(directory, config, report, definition):
-    settings = ActiveMapPolicy()
+    declared = config.get("active_policy")
+    if not isinstance(declared, dict):
+        raise TypeError("active registration requires a declared public policy")
+    strategy = declared.get("control_strategy")
+    if strategy not in ("past_support", "fixed_cap"):
+        raise ValueError(
+            "active registration requires an explicit known control strategy"
+        )
+    settings = ActiveMapPolicy(control_strategy=strategy)
     baseline = [list(item) for item in definition.SCHEDULE[:48]]
     registered = {
         "valid": False,
@@ -37,7 +45,7 @@ def registration(directory, config, report, definition):
         "capture_checks": ["active_policy_completed"],
     }
     if not (
-        config["schema"] == "active-causal-camera-projection-v1"
+        config["schema"] == "active-causal-camera-projection-v2"
         and config["schedule"] == baseline
         and config["active_policy"] == settings.model_dump(mode="json")
         and type(config["active_seed"]) is int
@@ -250,6 +258,8 @@ def audit(directory, engine):
         "fit_count": active["fit_count"],
         "acquisition_attempts": len(active["acquisition_attempts"]),
         "executed_acquisition_actions": len(active["steps"]),
+        "first_control_end_tick": active["first_control_end_tick"],
+        "control_strategy": active["policy"]["control_strategy"],
         "evaluation": evaluation if valid else None,
         "navigation_accepted": False,
         "scope": config["scope"],

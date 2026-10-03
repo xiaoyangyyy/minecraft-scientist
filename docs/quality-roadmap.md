@@ -84,6 +84,14 @@ public geometry/visibility rather than a fixed six-tick first leg, and investiga
 past-only landmark conditioning without changing gates or dropping failed maps.
 All full-scope requirements above remain unchanged.
 
+`docs/past-support-acquisition-development.md` now replicates public-support-triggered
+early switching: rendered-camera estimates pass in two development sessions while
+fixed-cap controls abstain. Both current-player scores are wrong at the short action
+switch because image/body sampling phases differ. Next make the separate
+position/orientation timing contract explicit, test longer/settled interventions,
+and integrate frame-aware continued map/goal control with independent arrival.
+Do not substitute a diagnostic shifted-body score or call this navigation success.
+
 - Agent policy inputs contain RGB/opaque public observations and learned action
   programs. Coordinate telemetry and hidden rules remain evaluator-only.
 - Development results are not held-out evaluation. State which failed trajectories

@@ -1,4 +1,5 @@
 import copy
+import json
 
 import numpy as np
 import pytest
@@ -66,12 +67,15 @@ def test_exhaustion_retains_all_prefixes_and_never_requests_future(runner, monke
 
     monkeypatch.setattr(causal, "fit_joint_map", unsupported)
     result = active.acquire_causal_map(initial, execute, CAMERA, anchor_frame=48)
-    assert requests == [0] * 6 + [2] * 4
+    assert requests == [0] * 3 + [2] * 7
     assert result["terminal"] == "exhausted"
     assert result["fit_count"] == 44
     assert len(result["acquisition_attempts"]) == 8
     assert result["snapshot"] is None and result["controller_decision"] is None
     assert all(not item["eligible"] for item in result["acquisition_attempts"])
+    assert result["first_control_end_tick"] == 3
+    switch = result["control_decisions"][2]
+    assert switch["instruction"] == "switch" and switch["supported_maps"] == 0
 
 
 def test_original_support_loss_aborts_before_replenishment(runner, monkeypatch):
@@ -191,3 +195,90 @@ def test_replay_is_deterministic_and_snapshots_do_not_alias(runner):
     frozen = copy.deepcopy(first["acquisition_attempts"])
     first["snapshot"]["maps"].clear()
     assert first["acquisition_attempts"] == frozen
+
+
+def test_fixed_cap_reference_keeps_same_budgets_but_delays_switch(runner, monkeypatch):
+    initial, execute, requests, _ = runner
+    original = causal.fit_joint_map
+    monkeypatch.setattr(
+        causal,
+        "fit_joint_map",
+        lambda *args, **kw: original(*args, **kw).model_copy(
+            update={"supported": False}
+        ),
+    )
+    result = active.acquire_causal_map(
+        initial,
+        execute,
+        CAMERA,
+        anchor_frame=0,
+        policy={"control_strategy": "fixed_cap"},
+    )
+    assert requests == [0] * 6 + [2] * 4
+    assert result["first_control_end_tick"] == 6 and result["fit_count"] == 44
+    assert result["control_decisions"][5]["reason"] == "first-control cap reached"
+
+
+def test_unsupported_public_prefix_requests_new_control_before_latching(
+    runner, monkeypatch
+):
+    initial, execute, requests, trace = runner
+    original = causal.fit_joint_map
+
+    def fit(*args, **kwargs):
+        fitted = original(*args, **kwargs)
+        return fitted.model_copy(update={"supported": requests[-1] == 2})
+
+    monkeypatch.setattr(causal, "fit_joint_map", fit)
+    result = active.acquire_causal_map(initial, execute, CAMERA, anchor_frame=48)
+    assert requests == [0] * 3 + [2] + [1] * 2
+    assert result["first_control_end_tick"] == 3
+    assert [item["eligible"] for item in result["acquisition_attempts"]] == [
+        False,
+        True,
+    ]
+    assert result["control_decisions"][2]["instruction"] == "switch"
+    assert result["control_decisions"][3]["instruction"] == "validate"
+    assert trace.index(("execute", 2)) < trace.index(("execute", 1))
+    assert result["terminal"] == "validated"
+
+
+@pytest.mark.parametrize("field", ["executed_handle", "ticks", "compliant"])
+def test_malformed_receipt_metadata_is_still_json_serializable(runner, field):
+    initial, _, _, _ = runner
+
+    def execute(handle):
+        params = {
+            "frame": initial,
+            "executed_handle": handle,
+            "ticks": 1,
+            "compliant": True,
+        }
+        params[field] = np.int64(1)
+        return PublicProbeStep(**params)
+
+    result = active.acquire_causal_map(initial, execute, CAMERA, anchor_frame=0)
+    assert result["terminal"] == "control_failed"
+    assert result["steps"][0]["invalid_receipt_types"][field] == "int64"
+    json.dumps(result, allow_nan=False)
+
+
+def test_tracking_gap_cannot_enter_acquisition_state(runner, monkeypatch):
+    initial, execute, requests, _ = runner
+    monkeypatch.setattr(active, "track_frame_chain", lambda frames, **kw: tracks(3))
+    result = active.acquire_causal_map(initial, execute, CAMERA, anchor_frame=0)
+    assert result["terminal"] == "tracking_failed" and requests == [0]
+    assert result["prefixes"] == result["control_decisions"] == []
+
+
+def test_unknown_strategy_cannot_dispatch_actions(runner):
+    initial, execute, requests, _ = runner
+    with pytest.raises(ValidationError):
+        active.acquire_causal_map(
+            initial,
+            execute,
+            CAMERA,
+            anchor_frame=0,
+            policy={"control_strategy": "private_best"},
+        )
+    assert not requests

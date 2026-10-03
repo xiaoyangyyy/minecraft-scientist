@@ -95,9 +95,12 @@ def main():
         action="store_true",
         help="dispatch public-only first-eligible map acquisition after calibration",
     )
+    parser.add_argument("--acquisition-strategy", choices=("past_support", "fixed_cap"))
     args = parser.parse_args()
     if args.seed < 0:
         parser.error("seed must be nonnegative")
+    if args.acquisition_strategy is not None and not args.active_causal:
+        parser.error("acquisition strategy requires --active-causal")
     directory = args.output.resolve()
     directory.mkdir(parents=True, exist_ok=False)
     build = directory / "agent-build"
@@ -180,10 +183,12 @@ def main():
         from minecraft_scientist.exploration.active_causal_map import ActiveMapPolicy
 
         config.update(
-            schema="active-causal-camera-projection-v1",
+            schema="active-causal-camera-projection-v2",
             schedule=SCHEDULE[:48],
             trial_intervals=[],
-            active_policy=ActiveMapPolicy().model_dump(mode="json"),
+            active_policy=ActiveMapPolicy(
+                control_strategy=args.acquisition_strategy or "past_support"
+            ).model_dump(mode="json"),
             active_seed=2000,
             scope="live public-only first-eligible acquisition and distinct two-tick validation; one development trajectory; no navigation promotion",
         )

@@ -4,10 +4,10 @@ This audit compares the current repository with the original self-evolving symbo
 Minecraft system, not merely with the smaller offline MVP. A green unit test is not
 treated as proof of live Minecraft behavior.
 
-The latest checkpoint is `docs/active-causal-acquisition-development.md`: real
-public-only first-eligible acquisition dispatch is independently replayed, but its
-fresh movement estimate remains unsupported (0/1). Reliable visual goal navigation
-and the full-project completion gates remain open.
+The latest checkpoint is `docs/past-support-acquisition-development.md`: public-only
+early switching gives correct rendered-camera movement in two same-seed development
+sessions, but simultaneous current-player direction remains wrong. Reliable goal
+navigation, held-out generalization and full-project completion remain open.
 
 The current full-project execution gates are in `docs/quality-roadmap.md`.
 Subsequent RGB-geometry development and its rejected tracking results are recorded
@@ -1175,3 +1175,24 @@ passes 89, WSL package/controller 45, isolated default-only WSL 521/70 skips.
 MVP/build/changed-file Ruff pass. Global lint debt and hosted CI remain separately
 unverified/unresolved. Next improve public-only acquisition conditioning; all
 original full-project outcomes remain required and the goal remains active.
+
+## Past-support switching checkpoint
+
+The unchanged `past_support` policy is now run twice against `fixed_cap`, with
+all four fresh seed-201 sessions retained in
+`runs/past-support-comparison-seed201-v{1,2}`. Both comparison manifests pass all
+six checks; each raw capture/audit passes its seven capture and three/eighteen
+outer/nested checks. Early switching moves the cap-triggered switch from tick 6
+to a public-geometry-triggered tick 3. It uses 27 fitted candidates/10 policy
+actions versus 35/11 and supports correct rendered-camera motion twice (about
+0.91547 degrees direction error). This is shared **caps**, not identical-image
+or identical-compute superiority. Current-player direction is wrong twice at
+about 64.39 degrees. Diagnostic previous-position scoring does not replace those
+registered failures. See `docs/past-support-acquisition-development.md`.
+
+Current V22 releases pass thirty seeds/two repeats/eighteen artifacts and six
+checks on both platforms. Full tests pass Windows 995/two skips and WSL 997/two;
+default-only WSL 533/70 skips and focused Windows package/comparison 57 pass.
+MVP/build/changed-file lint pass. The next gate is explicit sampling-phase,
+frame-aware continuous control and independent actual arrival; all held-out,
+natural-science, recovery and consolidated-release requirements remain open.

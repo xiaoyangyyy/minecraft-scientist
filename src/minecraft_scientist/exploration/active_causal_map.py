@@ -6,6 +6,8 @@ two-tick control test; it is not metric localization or navigation acceptance.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 
 from .causal_map_window import CausalMapWindow, CausalWindowPolicy
@@ -18,6 +20,7 @@ from .visual_geometry import _frame
 
 class ActiveMapPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
+    control_strategy: Literal["past_support", "fixed_cap"] = "past_support"
     minimum_ticks: int = Field(default=3, ge=3, le=10, strict=True)
     first_control_ticks: int = Field(default=6, ge=2, le=10, strict=True)
     maximum_ticks: int = Field(default=10, ge=3, le=11, strict=True)
@@ -68,16 +71,14 @@ def acquire_causal_map(
     previous, retained, controller = None, None, None
     steps, prefixes, attempts = [], [], []
     decision, failure, terminal = None, None, "exhausted"
+    next_acquisition_handle, first_control_end_tick = policy.handles[0], None
+    control_decisions = []
     future_handle = next(
         item for item in range(policy.handle_count) if item not in policy.handles
     )
     for tick in range(1, policy.maximum_ticks + policy.window.horizon + 1):
         validating = controller is not None
-        handle = (
-            future_handle
-            if validating
-            else policy.handles[int(tick > policy.first_control_ticks)]
-        )
+        handle = future_handle if validating else next_acquisition_handle
         receipt_data = {
             "requested_handle": handle,
             "executed_handle": None,
@@ -91,10 +92,24 @@ def acquire_causal_map(
             if not isinstance(receipt, PublicProbeStep):
                 raise TypeError("active map requires an RGB-only public receipt")
             receipt_data.update(
-                executed_handle=receipt.executed_handle,
-                compliant=receipt.compliant,
-                ticks=receipt.ticks,
+                executed_handle=receipt.executed_handle
+                if type(receipt.executed_handle) is int
+                else None,
+                compliant=receipt.compliant
+                if type(receipt.compliant) is bool
+                else False,
+                ticks=receipt.ticks if type(receipt.ticks) is int else None,
             )
+            if (
+                type(receipt.executed_handle) is not int
+                or type(receipt.compliant) is not bool
+                or type(receipt.ticks) is not int
+            ):
+                receipt_data["invalid_receipt_types"] = {
+                    "executed_handle": type(receipt.executed_handle).__name__,
+                    "compliant": type(receipt.compliant).__name__,
+                    "ticks": type(receipt.ticks).__name__,
+                }
             if (
                 type(receipt.executed_handle) is not int
                 or receipt.executed_handle != handle
@@ -116,6 +131,10 @@ def acquire_causal_map(
         frames.append(image)
         try:
             current = track_frame_chain(frames, config=policy.temporal)
+            if current.frame_count != len(frames):
+                raise ValueError(
+                    "tracking must preserve exactly the executed image prefix"
+                )
             retained = _append_tracks(previous, current, retained)
             previous = retain_tracks(current, retained)
             prefixes.append(previous.model_dump(mode="json"))
@@ -130,7 +149,18 @@ def acquire_causal_map(
                 # A lost original population cannot recover by moving longer.
                 if len(retained) < policy.window.fitting.geometry.minimum_tracks:
                     terminal = "support_aborted"
+                    control_decisions.append(
+                        {
+                            "absolute_frame": anchor_frame + tick,
+                            "instruction": "abort",
+                            "next_handle": None,
+                            "reason": "original track support lost; no replenishment",
+                            "supported_maps": None,
+                            "retained_tracks": len(retained),
+                        }
+                    )
                     break
+                supported = None
                 if tick >= policy.minimum_ticks:
                     candidate = CausalMapWindow(
                         previous,
@@ -140,10 +170,8 @@ def acquire_causal_map(
                         policy=policy.window,
                     )
                     snapshot = candidate.snapshot()
-                    eligible = (
-                        sum(item["supported"] for item in snapshot["maps"])
-                        >= policy.window.minimum_models
-                    )
+                    supported = sum(item["supported"] for item in snapshot["maps"])
+                    eligible = supported >= policy.window.minimum_models
                     attempts.append(
                         {
                             "absolute_frame": anchor_frame + tick,
@@ -154,8 +182,50 @@ def acquire_causal_map(
                     )
                     if eligible:
                         controller = candidate
-                    elif tick == policy.maximum_ticks:
-                        break
+                instruction, reason = "collect", "continue bounded acquisition"
+                if controller is not None:
+                    instruction, reason = (
+                        "validate",
+                        "first eligible past prefix frozen before new control",
+                    )
+                    next_handle = future_handle
+                elif tick == policy.maximum_ticks:
+                    instruction, reason, next_handle = (
+                        "exhausted",
+                        "past-map acquisition budget exhausted",
+                        None,
+                    )
+                elif first_control_end_tick is None and (
+                    tick >= policy.first_control_ticks
+                    or (
+                        policy.control_strategy == "past_support"
+                        and supported is not None
+                        and supported < policy.window.minimum_models
+                    )
+                ):
+                    first_control_end_tick = tick
+                    next_acquisition_handle = policy.handles[1]
+                    instruction = "switch"
+                    reason = (
+                        "insufficient past-map support; request different public control"
+                        if tick < policy.first_control_ticks
+                        else "first-control cap reached"
+                    )
+                    next_handle = next_acquisition_handle
+                else:
+                    next_handle = next_acquisition_handle
+                control_decisions.append(
+                    {
+                        "absolute_frame": anchor_frame + tick,
+                        "instruction": instruction,
+                        "next_handle": next_handle,
+                        "reason": reason,
+                        "supported_maps": supported,
+                        "retained_tracks": len(retained),
+                    }
+                )
+                if instruction == "exhausted":
+                    break
         except Exception as error:  # noqa: BLE001 -- preserve estimator failures
             terminal, failure = (
                 "tracking_failed",
@@ -174,6 +244,8 @@ def acquire_causal_map(
         "fit_count": sum(len(item["snapshot"]["maps"]) for item in attempts),
         "evidence_frames": len(frames),
         "future_handle": future_handle,
+        "control_decisions": control_decisions,
+        "first_control_end_tick": first_control_end_tick,
         "snapshot": None if controller is None else controller.snapshot(),
         "snapshot_sha256": None if controller is None else controller.digest(),
         "controller_decision": None

@@ -588,7 +588,7 @@ def active_capture(diagnostic, scripts, monkeypatch):
     monkeypatch.setattr(active, "calibrate_reference_camera", lambda *args: calibration)
     config = json.loads((route / "config.json").read_bytes())
     config.update(
-        schema="active-causal-camera-projection-v1",
+        schema="active-causal-camera-projection-v2",
         schedule=[list(item) for item in definition.SCHEDULE[:48]],
         trial_intervals=[],
         active_seed=2000,

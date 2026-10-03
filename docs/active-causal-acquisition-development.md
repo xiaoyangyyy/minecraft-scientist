@@ -1,5 +1,10 @@
 # First-eligible acquisition and live dispatch: development checkpoint
 
+This records the preceding fixed-first-control/V21 checkpoint. The later
+`docs/past-support-acquisition-development.md` implements public-support-triggered
+switching and replicates a rendered-camera improvement, while retaining the
+current-body counterexample. This document's frozen runs remain historical.
+
 The estimator now chooses when to end acquisition and dispatch a distinct control
 in the actual game. The fresh result is still negative: every new-view map test
 fails. This is not useful navigation, held-out generalization, equal-budget
