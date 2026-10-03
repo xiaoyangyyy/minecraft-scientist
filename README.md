@@ -11,14 +11,14 @@ Fabric mod supplies resettable hidden rules, and the Python boundary replaces it
 block, and entity names with seeded opaque IDs before an agent can observe them.
 Live execution still requires the user's explicit Minecraft EULA acceptance.
 
-Latest visual-development result: the new public frozen-map MOVE/WAIT controller
-and independent chronological audit run in three fresh natural-world sessions.
-None completes the settled motion trials: two lose map support during WAIT and
-one exhausts initial acquisition. One WAIT trajectory includes actual falling;
-another player's pose is stationary while a map fails its withheld-pixel gate.
-Short camera-motion successes do not establish reliable goal navigation. See
-[`docs/settled-control-development.md`](docs/settled-control-development.md) for
-all outcomes, separate camera/body scores, and the next recovery/refresh gate.
+Latest visual-development result: public image stability now triggers bounded
+recovery and a separately versioned local map. Two fresh development sessions
+independently confirm stationary recovery intervals, but one reacquisition fails
+and the other loses support during later movement. A correct stationary-motion
+abstention is retained separately from a moving unsupported counterexample.
+This is not reliable goal navigation. See
+[`docs/public-map-recovery-development.md`](docs/public-map-recovery-development.md)
+for all outcomes, camera/body scores, costs and outstanding full-project gates.
 
 ## Quick start
 

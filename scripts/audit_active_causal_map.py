@@ -8,11 +8,21 @@ from pathlib import Path
 
 import audit_runtime_camera as runtime
 
-from minecraft_scientist.evaluation.relative_motion import score_relative_motion
-from minecraft_scientist.evaluation.rendered_camera import score_rendered_motion
+from minecraft_scientist.evaluation.relative_motion import (
+    relative_motion_truth,
+    score_relative_motion,
+)
+from minecraft_scientist.evaluation.rendered_camera import (
+    rendered_motion_truth,
+    score_rendered_motion,
+)
 from minecraft_scientist.exploration.active_causal_map import (
     ActiveMapPolicy,
     acquire_causal_map,
+)
+from minecraft_scientist.exploration.map_recovery import (
+    MapRecoveryPolicy,
+    recover_public_map,
 )
 from minecraft_scientist.exploration.online_landmark_probe import (
     calibrate_reference_camera,
@@ -34,10 +44,19 @@ THRESHOLDS = {
 
 def _settled_registration(config):
     """A separate declared protocol; never enlarge the old capture budget."""
-    return config.get("schema") == "settled-causal-camera-projection-v1"
+    return config.get("schema") in (
+        "settled-causal-camera-projection-v1",
+        "recovery-causal-camera-projection-v1",
+    )
+
+
+def _recovery_registration(config):
+    return config.get("schema") == "recovery-causal-camera-projection-v1"
 
 
 def _frame_limit(config):
+    if _recovery_registration(config):
+        return 193
     return 105 if _settled_registration(config) else 61
 
 
@@ -53,6 +72,8 @@ def registration(directory, config, report, definition):
     settings = ActiveMapPolicy(control_strategy=strategy)
     settled = _settled_registration(config)
     continuation = SettledControlPolicy()
+    recovering = _recovery_registration(config)
+    recovery_policy = MapRecoveryPolicy()
     baseline = [list(item) for item in definition.SCHEDULE[:48]]
     registered = {
         "valid": False,
@@ -62,6 +83,14 @@ def registration(directory, config, report, definition):
     }
     if settled:
         registered["capture_checks"].append("settled_policy_completed")
+    if recovering:
+        registered["capture_checks"].append("recovery_policy_completed")
+    if (
+        recovering
+        and json.dumps(config.get("recovery_policy"), sort_keys=True)
+        != json.dumps(recovery_policy.model_dump(mode="json"), sort_keys=True)
+    ) or (not recovering and "recovery_policy" in config):
+        return registered
     if settled and (
         strategy != "past_support"
         or json.dumps(config.get("settled_policy"), sort_keys=True)
@@ -70,7 +99,11 @@ def registration(directory, config, report, definition):
         return registered
     if not (
         config["schema"]
-        in ("active-causal-camera-projection-v2", "settled-causal-camera-projection-v1")
+        in (
+            "active-causal-camera-projection-v2",
+            "settled-causal-camera-projection-v1",
+            "recovery-causal-camera-projection-v1",
+        )
         and (settled or "settled_policy" not in config)
         and config["schedule"] == baseline
         and json.dumps(config["active_policy"], sort_keys=True)
@@ -197,6 +230,16 @@ def registration(directory, config, report, definition):
             execute_control,
             policy=continuation,
         )
+        if recovering:
+            parent = {
+                key: replayed[key] for key in ("calibration", "acquisition", "settled")
+            }
+            replayed["recovery"] = recover_public_map(
+                parent,
+                images[cursor].copy(),
+                execute_control,
+                policy=recovery_policy,
+            )
     registered.update(
         valid=(
             json.dumps(saved, sort_keys=True, allow_nan=False)
@@ -204,11 +247,80 @@ def registration(directory, config, report, definition):
             and cursor == len(events) == count - 1
             and replayed["acquisition"]["failure"] is None
             and (not settled or replayed["settled"]["failure"] is None)
+            and (not recovering or replayed["recovery"]["failure"] is None)
             and all(runtime.digest(path) == value for path, value in frozen.items())
         ),
         schedule=requested,
     )
     return registered
+
+
+def _score_acquisition(active, positions, cameras):
+    window, decision = active["snapshot"], active["controller_decision"]
+    if window is None or decision is None or decision["instruction"] == "collect":
+        return None
+    first = active["anchor_frame"] + window["past"]["frame_count"] - 1
+    last = decision["absolute_frame"]
+    predicted = (
+        {
+            "supported": True,
+            "relative_rotation": decision["relative_rotation"],
+            "unit_translation": decision["unit_translation"],
+        }
+        if decision["instruction"] == "refresh"
+        else {"supported": False}
+    )
+    return {
+        "interval": [first, last],
+        "rendered": score_rendered_motion(
+            predicted, cameras[first], cameras[last], **THRESHOLDS
+        ),
+        "body": score_relative_motion(
+            predicted, positions[first], positions[last], **THRESHOLDS
+        ),
+    }
+
+
+def _score_continuation(continuation, positions, cameras):
+    trials = []
+    for trial in continuation["trials"]:
+        first, last = trial["start_frame"], trial["end_frame"]
+        scores = None
+        if last is not None:
+            if not (
+                type(first) is int
+                and type(last) is int
+                and 0 <= first < last < len(positions)
+            ):
+                raise ValueError("settled trial has invalid public frame endpoints")
+            predicted = trial["motion"] or {"supported": False}
+            scores = {
+                "rendered": score_rendered_motion(
+                    predicted, cameras[first], cameras[last], **THRESHOLDS
+                ),
+                "body": score_relative_motion(
+                    predicted, positions[first], positions[last], **THRESHOLDS
+                ),
+            }
+        trials.append(
+            {
+                "handle": trial["handle"],
+                "interval": [first, last],
+                "move_end_frame": trial["move_end_frame"],
+                "settle": trial["settle"],
+                "motion": trial["motion"],
+                "scores": scores,
+            }
+        )
+    return {
+        "terminal": continuation["terminal"],
+        "initial_settle": continuation["initial_settle"],
+        "executed_actions": len(continuation["steps"]),
+        "trials": trials,
+        "pose_domain": continuation["pose_domain"],
+        "metric_scale_known": False,
+        "navigation_accepted": False,
+    }
 
 
 def audit(directory, engine):
@@ -280,74 +392,45 @@ def audit(directory, engine):
         "positions"
     ]
     cameras = physical["rendered_cameras"]
-    window = active["snapshot"]
-    decision = active["controller_decision"]
-    evaluation = None
-    if (
-        window is not None
-        and decision is not None
-        and decision["instruction"] != "collect"
-    ):
-        first = active["anchor_frame"] + window["past"]["frame_count"] - 1
-        last = decision["absolute_frame"]
-        predicted = (
-            {
-                "supported": True,
-                "relative_rotation": decision["relative_rotation"],
-                "unit_translation": decision["unit_translation"],
-            }
-            if decision["instruction"] == "refresh"
-            else {"supported": False}
-        )
-        evaluation = {
-            "interval": [first, last],
-            "rendered": score_rendered_motion(
-                predicted, cameras[first], cameras[last], **THRESHOLDS
-            ),
-            "body": score_relative_motion(
-                predicted, positions[first], positions[last], **THRESHOLDS
-            ),
-        }
+    evaluation = _score_acquisition(active, positions, cameras)
     settled_evaluation = None
     if _settled_registration(config):
-        continuation = public_run["settled"]
-        trials = []
-        for trial in continuation["trials"]:
-            first, last = trial["start_frame"], trial["end_frame"]
-            scores = None
-            if last is not None:
-                if not (
-                    type(first) is int
-                    and type(last) is int
-                    and 0 <= first < last < count
-                ):
-                    raise ValueError("settled trial has invalid public frame endpoints")
-                predicted = trial["motion"] or {"supported": False}
-                scores = {
-                    "rendered": score_rendered_motion(
-                        predicted, cameras[first], cameras[last], **THRESHOLDS
-                    ),
-                    "body": score_relative_motion(
-                        predicted, positions[first], positions[last], **THRESHOLDS
-                    ),
-                }
-            trials.append(
-                {
-                    "handle": trial["handle"],
-                    "interval": [first, last],
-                    "move_end_frame": trial["move_end_frame"],
-                    "settle": trial["settle"],
-                    "motion": trial["motion"],
-                    "scores": scores,
-                }
+        settled_evaluation = _score_continuation(
+            public_run["settled"], positions, cameras
+        )
+    recovery_evaluation = None
+    if _recovery_registration(config):
+        recovered = public_run["recovery"]
+        stability = None
+        if recovered.get("new_anchor_frame") is not None:
+            intervals = [entry["interval"] for entry in recovered["flow_prefixes"][-3:]]
+            stability = {
+                "public_intervals": intervals,
+                "maximum_body_step_translation": max(
+                    relative_motion_truth(positions[first], positions[last])["distance"]
+                    for first, last in intervals
+                ),
+                "maximum_rendered_step_translation": max(
+                    rendered_motion_truth(cameras[first], cameras[last])["distance"]
+                    for first, last in intervals
+                ),
+                "diagnostic_only": True,
+            }
+        recovery_evaluation = {
+            "terminal": recovered["terminal"],
+            "parent_sha256": recovered["parent_sha256"],
+            "wait_actions": len(recovered["wait_steps"]),
+            "new_anchor_frame": recovered.get("new_anchor_frame"),
+            "stability_diagnostic": stability,
+            "acquisition": _score_acquisition(
+                recovered["acquisition"], positions, cameras
             )
-        settled_evaluation = {
-            "terminal": continuation["terminal"],
-            "initial_settle": continuation["initial_settle"],
-            "executed_actions": len(continuation["steps"]),
-            "trials": trials,
-            "pose_domain": continuation["pose_domain"],
-            "metric_scale_known": False,
+            if recovered["acquisition"]
+            else None,
+            "settled": _score_continuation(recovered["settled"], positions, cameras)
+            if recovered["settled"]
+            else None,
+            "global_gauge_aligned": False,
             "navigation_accepted": False,
         }
     checks = {
@@ -374,6 +457,7 @@ def audit(directory, engine):
         "control_strategy": active["policy"]["control_strategy"],
         "evaluation": evaluation if valid else None,
         "settled_evaluation": settled_evaluation if valid else None,
+        "recovery_evaluation": recovery_evaluation if valid else None,
         "navigation_accepted": False,
         "scope": config["scope"],
     }
@@ -412,6 +496,7 @@ def main():
                     "failure",
                     "evaluation",
                     "settled_evaluation",
+                    "recovery_evaluation",
                 )
             }
         )

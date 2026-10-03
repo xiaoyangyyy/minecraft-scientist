@@ -1228,3 +1228,32 @@ validation, then actual goal arrival. Waiting with an old frozen short-baseline
 map is insufficient. These negative experiments do not replace or close the
 original held-out navigation, natural scientific/map integration, long recovery,
 comparison and consolidated release gates. The full goal remains active.
+
+## Public stability recovery and new-epoch checkpoint
+
+`exploration/map_recovery.py` adds bounded pair-local optical-flow WAITs after a
+public map/settle abort. It hashes its immutable parent, refuses invalid/failed
+controls before evidence, retains all prefixes, and creates a fresh past-only
+local map at the consumed public endpoint. New track names and seed/parent lineage
+are explicit; gauges are not stitched. Capture and the independent auditor register
+and replay the entire new protocol before opening private camera/player data.
+
+Two fresh seed-201/202 development captures each pass nine capture and three/
+eighteen outer/nested audit checks. Public stability chooses intervals whose
+independent player displacement is zero, with maximum rendered step displacements
+0.000074010/0.000010949 blocks. Seed 201 then exhausts all 24 reacquisition fits.
+Seed 202 validates a new local map, correctly abstains on one actually stationary
+settled control, then loses fixed-point ray consistency during real movement.
+The moving partial interval remains an unsupported-motion failure. Neither completes
+three supported motion trials or navigation. Sufficient tracks remain at that
+failure; withheld errors 4.764483/4.794050 exceed the unchanged three-pixel limit.
+See `docs/public-map-recovery-development.md` for every score and provenance boundary.
+
+Current V24 core releases each pass thirty seeds/two repeats/eighteen exact artifacts
+and six checks, freezing 106 entries (103 package files), with zero current-source
+mismatches. Full tests pass Windows 1049/two skips, WSL 1051/two; isolated default
+passes 573/70 skips. All current live source/artifact/auditor hashes match. MVP
+bytes/build/changed-file lint pass. Next address public stall/observability-aware
+control selection and explicit map maintenance before actual arrival; no original
+generalization, natural science/map integration, longer recovery, comparison or
+consolidated-release gate is replaced or closed. The full goal remains active.

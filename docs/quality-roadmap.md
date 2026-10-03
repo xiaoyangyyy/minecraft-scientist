@@ -58,7 +58,15 @@ until each required gate has current, inspectable evidence.
 
 ## Evidence discipline
 
-The latest `docs/settled-control-development.md` checkpoint runs the public
+The current `docs/public-map-recovery-development.md` checkpoint adds bounded
+public optical-flow stability recovery and explicit fresh local-map epochs. Both
+development sessions select truly stationary intervals; one new map fails and the
+other correctly abstains on a stationary control but loses ray consistency during
+actual motion. Next add public stall/observability-aware controls and map maintenance,
+retaining that moving failure and independently verifying arrival. Local recovery
+does not satisfy global mapping/navigation or any other required outcome above.
+
+The preceding `docs/settled-control-development.md` checkpoint runs the public
 MOVE/WAIT controller and independent chronological replay in three fresh natural
 worlds. None completes settled motion trials: one loses support while falling,
 another loses a map despite stationary current-player telemetry, and the third

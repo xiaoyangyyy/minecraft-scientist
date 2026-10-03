@@ -950,6 +950,148 @@ def test_completed_settled_trajectory_replays_and_scores_every_registered_contro
     assert not result["navigation_accepted"]
 
 
+@pytest.fixture
+def recovery_capture(diagnostic, scripts, monkeypatch):
+    runtime, route, engine = diagnostic
+    _, definition = scripts
+    active = importlib.import_module("audit_active_causal_map")
+    calibration = {
+        "camera_intrinsics": [[180.0, 0, 224], [0, 320.0, 224], [0, 0, 1]],
+        "scope": "synthetic blank-pixel recovery fixture; not runtime proof",
+    }
+    monkeypatch.setattr(active, "calibrate_reference_camera", lambda *args: calibration)
+    images = [
+        runtime.load_image(route / "frames" / f"frame-{idx:05d}.png")
+        for idx in range(82)
+    ]
+    cursor = 48
+
+    def execute(handle):
+        nonlocal cursor
+        cursor += 1
+        return active.PublicProbeStep(images[cursor].copy(), handle, True)
+
+    acquired = active.acquire_causal_map(
+        images[48], execute, calibration["camera_intrinsics"], anchor_frame=48
+    )
+    assert acquired["terminal"] == "support_aborted" and cursor == 49
+    parent = {
+        "calibration": calibration,
+        "acquisition": acquired,
+        "settled": active.run_settled_controls(
+            acquired, [], lambda *args: pytest.fail("blank map must abstain")
+        ),
+    }
+
+    def wait(kind, handle):
+        nonlocal cursor
+        assert kind == "wait" and handle is None
+        cursor += 1
+        return active.PublicControlStep(images[cursor].copy(), kind, handle, True)
+
+    recovered = active.recover_public_map(parent, images[cursor], wait)
+    assert recovered["terminal"] == "wait_exhausted" and cursor == 81
+    config = json.loads((route / "config.json").read_bytes())
+    config.update(
+        schema="recovery-causal-camera-projection-v1",
+        schedule=[list(item) for item in definition.SCHEDULE[:48]],
+        trial_intervals=[],
+        active_seed=2000,
+        active_policy=active.ActiveMapPolicy().model_dump(mode="json"),
+        settled_policy=active.SettledControlPolicy().model_dump(mode="json"),
+        recovery_policy=active.MapRecoveryPolicy().model_dump(mode="json"),
+    )
+    save(route / "config.json", config)
+    save(route / "active-acquisition.json", parent | {"recovery": recovered})
+    events = [
+        TransitionRecord.model_validate_json(line)
+        for line in (route / "events.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    for index in range(49, 81):
+        events[index] = events[index].model_copy(
+            update={"executed_action": PrimitiveAction(kind=ActionKind.WAIT, ticks=1)}
+        )
+    (route / "events.jsonl").write_text(
+        "".join(event.model_dump_json() + "\n" for event in events[:81]),
+        encoding="utf-8",
+    )
+    for folder in ("frames", "evaluator-native"):
+        for path in (route / folder).glob("*.png"):
+            if int(path.stem.split("-")[-1]) >= 82:
+                path.unlink()  # test-owned temporary fixture only
+    private = json.loads((route / "evaluator-positions.json").read_bytes())
+    save(
+        route / "evaluator-positions.json",
+        {key: value[:82] for key, value in private.items()},
+    )
+    rows = (route / "evaluator-camera.jsonl").read_text(encoding="utf-8").splitlines()
+    (route / "evaluator-camera.jsonl").write_text(
+        "\n".join(rows[:84]) + "\n", encoding="utf-8"
+    )
+    report = json.loads((route / "report.json").read_bytes())
+    report.update(frame_count=82, config_sha256=runtime.digest(route / "config.json"))
+    report["checks"].update(
+        active_policy_completed=True,
+        settled_policy_completed=True,
+        recovery_policy_completed=True,
+    )
+    report["artifact_sha256"] = {
+        name: runtime.digest(route / name)
+        for name in report["artifact_sha256"]
+        if (route / name).exists()
+    }
+    report["artifact_sha256"]["active-acquisition.json"] = runtime.digest(
+        route / "active-acquisition.json"
+    )
+    save(route / "report.json", report)
+    return active, route, engine
+
+
+def test_recovery_replays_all_waits_before_private_reads_and_retains_abstention(
+    recovery_capture, monkeypatch
+):
+    active, route, engine = recovery_capture
+    with monkeypatch.context() as guards:
+        private_guard(guards)
+        public = active.runtime.public_data(
+            route, engine, registration=active.registration
+        )
+        assert public["valid"] and public["count"] == 82
+    result = active.audit(route, engine)
+    assert result["valid"] and result["evaluation"] is None
+    assert result["recovery_evaluation"]["terminal"] == "wait_exhausted"
+    assert result["recovery_evaluation"]["wait_actions"] == 32
+    assert result["recovery_evaluation"]["stability_diagnostic"] is None
+    assert not result["navigation_accepted"]
+
+
+@pytest.mark.parametrize("case", ["parent", "budget", "schema"])
+def test_forged_recovery_protocol_cannot_reach_private_evaluator(
+    recovery_capture, monkeypatch, case
+):
+    active, route, engine = recovery_capture
+    config = json.loads((route / "config.json").read_bytes())
+    if case == "parent":
+        extra = json.loads((route / "active-acquisition.json").read_bytes())
+        extra["recovery"]["parent_sha256"] = "0" * 64
+        save(route / "active-acquisition.json", extra)
+    elif case == "budget":
+        config["recovery_policy"]["minimum_wait_ticks"] = 1
+    else:
+        config["schema"] = "settled-causal-camera-projection-v1"
+    save(route / "config.json", config)
+    report = json.loads((route / "report.json").read_bytes())
+    report["config_sha256"] = active.runtime.digest(route / "config.json")
+    report["artifact_sha256"]["active-acquisition.json"] = active.runtime.digest(
+        route / "active-acquisition.json"
+    )
+    save(route / "report.json", report)
+    private_guard(monkeypatch)
+    result = active.audit(route, engine)
+    assert not result["valid"]
+    assert not result["camera_audit"]["checks"]["registered_schedule"]
+
+
 def test_mutation_during_analysis_invalidates_audit(diagnostic, monkeypatch):
     script, route, engine = diagnostic
     analyze = script.timing_metrics
