@@ -106,11 +106,17 @@ The new raw capture freezes 125 project/SDK sources; public inference freezes 12
 sources. Prior V16 core and prior capture/map/diagnostic manifests remain historical
 and are not rewritten to claim current-source execution.
 
-Full current regressions pass **811 tests/two skips on Windows**, **813/two on
+Full regressions at this checkpoint pass **811 tests/two skips on Windows**, **813/two on
 WSL**, and **443/64 optional/platform skips** in an isolated default-only offline
 installation. JUnit artifacts are `runs/second-leg-shadow-regression-{windows,wsl}-v1.xml`,
 `runs/second-leg-shadow-regression-default-offline-v1.xml` and the 47-case
 `runs/second-leg-shadow-targeted-v2.xml`; all have zero failures and errors.
+
+This V17 package/capture/inference boundary is historical after adding the optional
+joint estimator. Its snapshots and completed 29-check audit are preserved. The
+separate source-frozen joint replay checks historical RGB/receipt integrity rather
+than falsely asserting current-source acquisition; see
+`docs/joint-multiview-map-development.md` for V18 and the remaining counterexample.
 
 ## Remaining work
 

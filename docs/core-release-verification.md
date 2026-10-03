@@ -58,10 +58,10 @@ unlearned primitive substitution, forged transfer events, changed repeat bytes,
 invalid budgets and incomplete runs. A failure preserves partial evidence and
 exits nonzero, not a smaller passing seed subset.
 
-## Current results (2026-10-02)
+## Current results (2026-10-03)
 
-`runs/core-release-seeds0-29-windows-v17/report.json` on Windows and
-`runs/core-release-seeds0-29-wsl-v17/report.json` on WSL each pass all six release
+`runs/core-release-seeds0-29-windows-v18/report.json` on Windows and
+`runs/core-release-seeds0-29-wsl-v18/report.json` on WSL each pass all six release
 checks for all thirty seeds. Each platform runs sixty complete benchmarks and
 reproduces eighteen artifacts per seed, including the transfer traces and
 experience database. All four learned-law accuracies, revised-law recovery and
@@ -85,7 +85,9 @@ second-phase new loss from original-anchor loss. V15 adds online fitting and
 protection of the first supported map's immutable landmark partitions. V16 adds
 optional disjoint per-ID tracking-loss accounting, with exact historical public
 prefix replay and unchanged tracker output. V17 adds optional completed-second-leg
-freezing and bounded different-control validation. All 100
+freezing and bounded different-control validation. V18 adds training-only joint
+multi-view pose/landmark optimization with disjoint validation and frozen-map
+future tests. All 101
 current frozen source hashes were rechecked with zero mismatches. Core behavior
 is unchanged by those optional modules.
 These earlier runs are historical checks, not the current source-frozen release.
@@ -139,13 +141,21 @@ suites preceded that final script refinement. See
 
 The V17 checkpoint passes **811 tests/two skips on Windows**, **813/two on WSL**,
 and **443/64 optional or platform skips** in the isolated default-only offline
-installation. Both 100-entry ledgers match current bytes. Forty-seven focused
+installation. Both 100-entry ledgers matched that checkpoint's bytes. Forty-seven focused
 second-leg acquisition/map tests also pass. The independent fresh real-image audit
 rejects the only second-leg candidate; these engineering checks do not establish
 navigation. See `docs/second-leg-shadow-development.md`.
 
+The V18 joint-map checkpoint freezes 101 source entries and passes both thirty-seed
+release gates. Forty-seven new joint-module/diagnostic tests pass; full Windows
+regression passes **858 tests/two skips**, WSL **860/two**, and isolated default-only
+offline **443/66**. The real development replay improves one matched interval but
+retains an incorrect short future direction despite consistent withheld pixels;
+see `docs/joint-multiview-map-development.md`. Ruff/format checks and both builds
+pass. Earlier V17 evidence remains historical after adding the new optional module.
+
 The current seed-zero MVP report at
-`runs/second-leg-shadow-regression-mvp-seed0/benchmark.json` remains byte-identical
+`runs/joint-map-regression-mvp-seed0/benchmark.json` remains byte-identical
 to the earlier regression: SHA-256
 `B95AF2E5C152B9F06EDC63004EA87FB183C37E6A5A13BFF53F21A39A4F48AEB8`.
 It retains 47 experiments, accuracy/task success 1.0, detection delay one, eight

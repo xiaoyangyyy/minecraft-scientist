@@ -363,3 +363,18 @@ Both V17 releases pass thirty seeds/two repeats/six checks with 100 source entri
 full regressions pass Windows 811/WSL 813 (two skips each), default offline 443/64.
 See `docs/second-leg-shadow-development.md`. All original generalization,
 science/map integration, long recovery, live/baseline release and CI gates remain.
+
+Joint multi-view optimization now reserves landmark partitions before bootstrap
+and fits all past camera poses/training points together. Its source-frozen replay
+retains 36 initializations/all eight historical trials and passes eleven scoped
+public-first component checks. Four internally consistent maps represent three
+past intervals, all locally direction-correct; on 77→84 the prior fixed two-view
+direction error of 21.754527° becomes 10.302308°. However, one future-pixel-consistent
+map still has 33.042212° incremental direction error on 113→115. Aggregate direction
+would hide this counterexample. No map is promoted, and this development-only result
+does not close navigation/generalization. Next investigate public short-baseline
+uncertainty and camera/projection model changes while preserving independent future
+validation and all original completion gates. Both V18 releases pass thirty seeds/
+two repeats/six checks with 101 source entries; regressions pass Windows 858/WSL 860
+(two skips each), default offline 443/66. Full evidence and historical source scopes
+are in `docs/joint-multiview-map-development.md`.

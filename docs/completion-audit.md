@@ -1054,3 +1054,26 @@ This is a verified rejection and stronger validation contract, not reliable visu
 navigation. Joint multi-view estimation/residual diagnosis, fresh generalization,
 natural scientific/map integration, long recovery and full live/baseline/CI release
 requirements remain incomplete. The broad goal remains active.
+
+### Joint training-only multi-view mapping (2026-10-03)
+
+The new bounded bundle optimizer jointly estimates past poses/landmarks, reserving
+validation identities before any geometric bootstrap. All 36 initialization
+candidates and all eight historical trials remain visible. Four internally
+consistent candidates cover three unique past intervals; each local direction is
+within the existing error gate. On the same 77→84 images a prior 21.754527° fixed
+two-view terminal error becomes 10.302308°, but the new candidate still fails its
+future pixel checks. One other candidate passes future pixels while estimating
+short 113→115 movement incorrectly by 33.042212°. Thus neither local fitting nor
+aggregate direction establishes reliable incremental navigation. No promotion
+or successful navigation attempt is claimed.
+
+A separate component auditor passes eleven public-first replay/byte checks before
+private scoring, with explicit historical-acquisition versus current-inference
+source roles. Both V18 core releases pass thirty seeds/two repeats/eighteen artifacts
+and all six checks; all 101 hashes match. Forty-seven new focused tests pass,
+full Windows 858/WSL 860 (two skips each), isolated default offline 443/66, and builds/
+Ruff/format pass. See `docs/joint-multiview-map-development.md`. The short-baseline
+uncertainty/camera-model counterexample changes the next engineering action, but
+all multi-world, natural science/map integration, long recovery, live/baseline
+release and CI gates remain incomplete. The original broad goal remains active.

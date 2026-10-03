@@ -806,9 +806,19 @@ acquisition preserves 203 RGB frames/all eight trials, and independent public-fi
 audit passes 29 checks. The only second-leg candidate has a 38.119-degree direction
 error and fails the new-control pixel tests; it is not promoted. This closes a
 missing validation boundary, not a navigation gain. Current regressions pass
-Windows 811/WSL 813 (two skips each), default-only offline 443/64; see
+Windows 811/WSL 813 (two skips each), default-only offline 443/64 at that checkpoint; see
 `docs/second-leg-shadow-development.md` for original denominators, extra action
 costs, all retained failures and the full remaining scope.
+
+Joint multi-view bundle adjustment now optimizes past poses and landmarks using
+training-only rays, with point partitions reserved before bootstrap. Replaying all
+eight trials produces four internally consistent candidates over three intervals.
+One also passes new-control pixel checks, but its incremental midpoint direction
+is wrong by 33.04 degrees; none is promoted for navigation. All 36 initialization
+candidates and both original aborts remain visible. Current full regressions pass
+Windows 858/WSL 860 (two skips each), isolated default-only offline 443/66. See
+`docs/joint-multiview-map-development.md` for the matched-interval observation,
+frozen public-first replay, uncertainty counterexample and remaining broad gates.
 
 The scientific core has a portable offline release verifier:
 
