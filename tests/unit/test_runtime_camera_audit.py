@@ -9,6 +9,10 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from test_causal_map_window import (
+    geometry as geometry,  # noqa: PLC0414 -- pytest fixture re-export
+)
+from test_causal_map_window import tracks
 
 cv2 = pytest.importorskip("cv2", reason="optional native camera image replay")
 Image = pytest.importorskip("PIL.Image", reason="optional runtime camera capture")
@@ -701,6 +705,249 @@ def test_active_bytes_changed_after_nested_audit_discard_scores(
     monkeypatch.setattr(active.runtime, "audit", mutate)
     result = active.audit(route, engine)
     assert not result["valid"] and result["evaluation"] is None
+
+
+@pytest.fixture
+def settled_capture(active_capture):
+    active, route, engine = active_capture
+    config = json.loads((route / "config.json").read_bytes())
+    config.update(
+        schema="settled-causal-camera-projection-v1",
+        settled_policy=active.SettledControlPolicy().model_dump(mode="json"),
+    )
+    save(route / "config.json", config)
+    extra = json.loads((route / "active-acquisition.json").read_bytes())
+    extra["settled"] = active.run_settled_controls(
+        extra["acquisition"],
+        [],
+        lambda *args: pytest.fail("aborted map must never dispatch continuation"),
+    )
+    save(route / "active-acquisition.json", extra)
+    report = json.loads((route / "report.json").read_bytes())
+    report["config_sha256"] = active.runtime.digest(route / "config.json")
+    report["checks"]["settled_policy_completed"] = True
+    report["artifact_sha256"]["active-acquisition.json"] = active.runtime.digest(
+        route / "active-acquisition.json"
+    )
+    save(route / "report.json", report)
+    return active, route, engine
+
+
+def test_settled_registration_replays_abstention_before_private_reads(
+    settled_capture, monkeypatch
+):
+    active, route, engine = settled_capture
+    private_guard(monkeypatch)
+    public = active.runtime.public_data(route, engine, registration=active.registration)
+    assert public["valid"] and public["count"] == 50
+    assert not active.runtime.public_data(route, engine)["valid"]
+
+
+def test_settled_audit_preserves_unstarted_condition_without_navigation_claim(
+    settled_capture,
+):
+    active, route, engine = settled_capture
+    result = active.audit(route, engine)
+    assert result["valid"] and result["evaluation"] is None
+    continuation = result["settled_evaluation"]
+    assert continuation["terminal"] == "not_started"
+    assert continuation["trials"] == [] and continuation["executed_actions"] == 0
+    assert not continuation["navigation_accepted"]
+
+
+@pytest.mark.parametrize(
+    "field", ["gate", "wait_budget", "bool_handle", "strategy", "schema"]
+)
+def test_forged_settled_protocol_never_reaches_private_scores(
+    settled_capture, monkeypatch, field
+):
+    active, route, engine = settled_capture
+    config = json.loads((route / "config.json").read_bytes())
+    if field == "gate":
+        extra = json.loads((route / "active-acquisition.json").read_bytes())
+        extra["settled"]["terminal"] = "completed"
+        save(route / "active-acquisition.json", extra)
+    elif field == "wait_budget":
+        config["settled_policy"]["minimum_wait_ticks"] = 1
+    elif field == "bool_handle":
+        config["settled_policy"]["handles"][0] = False
+    elif field == "strategy":
+        config["active_policy"]["control_strategy"] = "fixed_cap"
+    else:
+        config["schema"] = "active-causal-camera-projection-v2"
+    save(route / "config.json", config)
+    report = json.loads((route / "report.json").read_bytes())
+    report["config_sha256"] = active.runtime.digest(route / "config.json")
+    report["artifact_sha256"]["active-acquisition.json"] = active.runtime.digest(
+        route / "active-acquisition.json"
+    )
+    save(route / "report.json", report)
+    private_guard(monkeypatch)
+    result = active.audit(route, engine)
+    assert not result["valid"]
+    assert not result["camera_audit"]["checks"]["registered_schedule"]
+
+
+def test_settled_bytes_changed_after_nested_audit_discard_all_scores(
+    settled_capture, monkeypatch
+):
+    active, route, engine = settled_capture
+    original = active.runtime.audit
+
+    def mutate(*args, **kwargs):
+        result = original(*args, **kwargs)
+        path = route / "active-acquisition.json"
+        path.write_text(path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+        return result
+
+    monkeypatch.setattr(active.runtime, "audit", mutate)
+    result = active.audit(route, engine)
+    assert not result["valid"] and result["evaluation"] is None
+    assert result.get("settled_evaluation") is None
+
+
+def test_settled_registration_does_not_enlarge_old_protocol_frame_bound(active_capture):
+    active, route, engine = active_capture
+    report = json.loads((route / "report.json").read_bytes())
+    report["frame_count"] = 62
+    save(route / "report.json", report)
+    with pytest.raises(ValueError, match="exceeds registration"):
+        active.audit(route, engine)
+
+
+def test_completed_settled_trajectory_replays_and_scores_every_registered_control(
+    diagnostic, scripts, geometry, monkeypatch
+):
+    """Synthetic geometry/engine fixture, not actual navigation evidence."""
+    runtime, route, engine = diagnostic
+    _, definition = scripts
+    active = importlib.import_module("audit_active_causal_map")
+    from minecraft_scientist.exploration import active_causal_map as acquire
+    from minecraft_scientist.exploration import settled_map_control as controls
+
+    calibration = {
+        "camera_intrinsics": [[180.0, 0, 224], [0, 320.0, 224], [0, 0, 1]],
+        "scope": "unit-only public calibration mock",
+    }
+    monkeypatch.setattr(active, "calibrate_reference_camera", lambda *args: calibration)
+
+    def track(images, **kwargs):
+        return tracks(len(images)).model_copy(update={"image_shape": (448, 448)})
+
+    monkeypatch.setattr(acquire, "track_frame_chain", track)
+    monkeypatch.setattr(controls, "track_frame_chain", track)
+    _, original_future = geometry
+
+    def future(candidate, past, current, **kwargs):
+        result = original_future(candidate, past, current, **kwargs)
+        count = current.frame_count
+        offsets = [min(max(count - start, 0), 4) * 0.1 for start in (9, 16, 23)]
+        shift = np.array((offsets[0] - offsets[2], 0, offsets[1]))
+        result["poses"][0]["translation"] = (
+            np.array(result["poses"][0]["translation"]) + shift
+        ).tolist()
+        return result
+
+    monkeypatch.setattr(controls, "validate_joint_future", future)
+    images = [
+        runtime.load_image(route / "frames" / f"frame-{slot:05d}.png")
+        for slot in range(78)
+    ]
+    requests = [list(item) for item in definition.SCHEDULE[:48]]
+
+    def execute(handle):
+        requests.append(["move", handle])
+        return active.PublicProbeStep(images[len(requests)].copy(), handle, True)
+
+    acquired = active.acquire_causal_map(
+        images[48], execute, calibration["camera_intrinsics"], anchor_frame=48
+    )
+    acquired_frames = [image.copy() for image in images[48 : len(requests) + 1]]
+
+    def execute_control(kind, handle):
+        requests.append([kind, handle])
+        return active.PublicControlStep(
+            images[len(requests)].copy(), kind, handle, True
+        )
+
+    continued = active.run_settled_controls(acquired, acquired_frames, execute_control)
+    assert continued["terminal"] == "completed" and len(requests) == 77
+    events = [
+        TransitionRecord.model_validate_json(line)
+        for line in (route / "events.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    for index, (kind, handle) in enumerate(requests):
+        events[index] = events[index].model_copy(
+            update={
+                "executed_action": PrimitiveAction(
+                    kind=ActionKind(kind),
+                    ticks=1,
+                    target_id=f"anonymous-{handle}"
+                    if kind == "move"
+                    else "anonymous-camera"
+                    if kind == "look"
+                    else None,
+                )
+            }
+        )
+    (route / "events.jsonl").write_text(
+        "".join(event.model_dump_json() + "\n" for event in events[:77]),
+        encoding="utf-8",
+    )
+    for folder in ("frames", "evaluator-native"):
+        for path in (route / folder).glob("*.png"):
+            if int(path.stem.split("-")[-1]) >= 78:
+                path.unlink()  # test-owned temporary fixture only
+    private = json.loads((route / "evaluator-positions.json").read_bytes())
+    save(
+        route / "evaluator-positions.json",
+        {key: value[:78] for key, value in private.items()},
+    )
+    rows = (route / "evaluator-camera.jsonl").read_text(encoding="utf-8").splitlines()
+    (route / "evaluator-camera.jsonl").write_text(
+        "\n".join(rows[:80]) + "\n", encoding="utf-8"
+    )
+    config = json.loads((route / "config.json").read_bytes())
+    config.update(
+        schema="settled-causal-camera-projection-v1",
+        schedule=[list(item) for item in definition.SCHEDULE[:48]],
+        trial_intervals=[],
+        active_seed=2000,
+        active_policy=active.ActiveMapPolicy().model_dump(mode="json"),
+        settled_policy=active.SettledControlPolicy().model_dump(mode="json"),
+    )
+    save(route / "config.json", config)
+    save(
+        route / "active-acquisition.json",
+        {
+            "calibration": calibration,
+            "acquisition": acquired,
+            "settled": continued,
+        },
+    )
+    report = json.loads((route / "report.json").read_bytes())
+    report.update(frame_count=78, config_sha256=runtime.digest(route / "config.json"))
+    report["checks"].update(active_policy_completed=True, settled_policy_completed=True)
+    report["artifact_sha256"] = {
+        name: runtime.digest(route / name)
+        for name in report["artifact_sha256"]
+        if (route / name).exists()
+    }
+    report["artifact_sha256"]["active-acquisition.json"] = runtime.digest(
+        route / "active-acquisition.json"
+    )
+    save(route / "report.json", report)
+    with monkeypatch.context() as guards:
+        private_guard(guards)
+        public = runtime.public_data(route, engine, registration=active.registration)
+        assert public["valid"] and public["count"] == 78
+    result = active.audit(route, engine)
+    assert result["valid"] and result["evaluation"] is not None
+    assert result["settled_evaluation"]["executed_actions"] == 24
+    trials = result["settled_evaluation"]["trials"]
+    assert [trial["interval"] for trial in trials] == [[56, 63], [63, 70], [70, 77]]
+    assert all(trial["scores"]["body"]["supported"] for trial in trials)
+    assert not result["navigation_accepted"]
 
 
 def test_mutation_during_analysis_invalidates_audit(diagnostic, monkeypatch):

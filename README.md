@@ -11,12 +11,14 @@ Fabric mod supplies resettable hidden rules, and the Python boundary replaces it
 block, and entity names with seeded opaque IDs before an agent can observe them.
 Live execution still requires the user's explicit Minecraft EULA acceptance.
 
-Latest visual-development result: public past-support switching yields correct
-rendered-camera motion in two fresh development sessions; the fixed-cap reference
-abstains. Current-player direction remains wrong at the control switch, so this is
-not reliable goal navigation or held-out generalization. See
-[`docs/past-support-acquisition-development.md`](docs/past-support-acquisition-development.md)
-for simultaneous camera/body scores, costs and remaining gates.
+Latest visual-development result: the new public frozen-map MOVE/WAIT controller
+and independent chronological audit run in three fresh natural-world sessions.
+None completes the settled motion trials: two lose map support during WAIT and
+one exhausts initial acquisition. One WAIT trajectory includes actual falling;
+another player's pose is stationary while a map fails its withheld-pixel gate.
+Short camera-motion successes do not establish reliable goal navigation. See
+[`docs/settled-control-development.md`](docs/settled-control-development.md) for
+all outcomes, separate camera/body scores, and the next recovery/refresh gate.
 
 ## Quick start
 

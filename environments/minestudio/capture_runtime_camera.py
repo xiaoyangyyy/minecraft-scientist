@@ -96,11 +96,16 @@ def main():
         help="dispatch public-only first-eligible map acquisition after calibration",
     )
     parser.add_argument("--acquisition-strategy", choices=("past_support", "fixed_cap"))
+    parser.add_argument("--settled-controls", action="store_true")
     args = parser.parse_args()
     if args.seed < 0:
         parser.error("seed must be nonnegative")
     if args.acquisition_strategy is not None and not args.active_causal:
         parser.error("acquisition strategy requires --active-causal")
+    if args.settled_controls and (
+        not args.active_causal or args.acquisition_strategy == "fixed_cap"
+    ):
+        parser.error("settled controls require active past-support acquisition")
     directory = args.output.resolve()
     directory.mkdir(parents=True, exist_ok=False)
     build = directory / "agent-build"
@@ -192,6 +197,16 @@ def main():
             active_seed=2000,
             scope="live public-only first-eligible acquisition and distinct two-tick validation; one development trajectory; no navigation promotion",
         )
+        if args.settled_controls:
+            from minecraft_scientist.exploration.settled_map_control import (
+                SettledControlPolicy,
+            )
+
+            config["settled_policy"] = SettledControlPolicy().model_dump(mode="json")
+            config["schema"] = "settled-causal-camera-projection-v1"
+            config["scope"] = (
+                "live public frozen-map MOVE/WAIT controls and returned-image clock; no player timestamp inference, goal navigation or held-out claim"
+            )
     write_json(directory / "config.json", config)
     config_hash = digest(directory / "config.json")
     audit, images, native_images, native_hashes, records = (
@@ -331,6 +346,55 @@ def main():
                     raise RuntimeError(
                         "active causal acquisition failed; partial evidence retained"
                     )
+                if args.settled_controls:
+                    from minecraft_scientist.exploration.settled_map_control import (
+                        PublicControlStep,
+                        run_settled_controls,
+                    )
+
+                    def execute_control(kind, handle):
+                        targets = [
+                            obj.object_id
+                            for obj in world.observe().objects
+                            if obj.affordances == (ActionKind.MOVE,)
+                        ]
+                        record = world.step(
+                            PrimitiveAction(
+                                kind=ActionKind(kind),
+                                ticks=1,
+                                target_id=targets[handle] if kind == "move" else None,
+                            )
+                        )
+                        records.append(record)
+                        actual = (
+                            targets.index(record.executed_action.target_id)
+                            if record.executed_action.target_id in targets
+                            else None
+                        )
+                        compliant = (
+                            record.intervention_compliance is True
+                            and record.event.success is True
+                            and record.controller_failure is None
+                            and record.event.duration == 1
+                        )
+                        return PublicControlStep(
+                            images[-1].copy(),
+                            record.executed_action.kind.value,
+                            actual,
+                            compliant,
+                            record.executed_action.ticks,
+                        )
+
+                    active["settled"] = run_settled_controls(
+                        active["acquisition"],
+                        images[48:],
+                        execute_control,
+                        policy=config["settled_policy"],
+                    )
+                    if active["settled"]["failure"] is not None:
+                        raise RuntimeError(
+                            "settled controls failed; partial public evidence retained"
+                        )
     except Exception as failure:  # noqa: BLE001 -- preserve real launch/capture failures
         error = {"type": type(failure).__name__, "message": str(failure)}
     finally:
@@ -374,8 +438,19 @@ def main():
             and active["acquisition"]["failure"] is None
             and active["acquisition"]["terminal"]
             in ("validated", "rejected", "exhausted", "support_aborted")
-            and len(records) == 48 + len(active["acquisition"]["steps"])
+            and len(records)
+            == 48
+            + len(active["acquisition"]["steps"])
+            + len(active.get("settled", {}).get("steps", []))
         )
+        if args.settled_controls:
+            checks["settled_policy_completed"] = (
+                active is not None
+                and "settled" in active
+                and active["settled"]["failure"] is None
+                and active["settled"]["terminal"]
+                in ("completed", "not_started", "support_aborted", "settle_exhausted")
+            )
         write_json(directory / "active-acquisition.json", active)
     report = {
         "completed": error is None and all(checks.values()),

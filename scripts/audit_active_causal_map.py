@@ -17,6 +17,11 @@ from minecraft_scientist.exploration.active_causal_map import (
 from minecraft_scientist.exploration.online_landmark_probe import (
     calibrate_reference_camera,
 )
+from minecraft_scientist.exploration.settled_map_control import (
+    PublicControlStep,
+    SettledControlPolicy,
+    run_settled_controls,
+)
 from minecraft_scientist.exploration.visibility_acquisition import PublicProbeStep
 from minecraft_scientist.protocols import TransitionRecord
 
@@ -25,6 +30,15 @@ THRESHOLDS = {
     "maximum_direction_error": 20,
     "maximum_rotation_error": 5,
 }
+
+
+def _settled_registration(config):
+    """A separate declared protocol; never enlarge the old capture budget."""
+    return config.get("schema") == "settled-causal-camera-projection-v1"
+
+
+def _frame_limit(config):
+    return 105 if _settled_registration(config) else 61
 
 
 def registration(directory, config, report, definition):
@@ -37,6 +51,8 @@ def registration(directory, config, report, definition):
             "active registration requires an explicit known control strategy"
         )
     settings = ActiveMapPolicy(control_strategy=strategy)
+    settled = _settled_registration(config)
+    continuation = SettledControlPolicy()
     baseline = [list(item) for item in definition.SCHEDULE[:48]]
     registered = {
         "valid": False,
@@ -44,18 +60,27 @@ def registration(directory, config, report, definition):
         "artifacts": ["active-acquisition.json"],
         "capture_checks": ["active_policy_completed"],
     }
+    if settled:
+        registered["capture_checks"].append("settled_policy_completed")
+    if settled and (
+        strategy != "past_support"
+        or json.dumps(config.get("settled_policy"), sort_keys=True)
+        != json.dumps(continuation.model_dump(mode="json"), sort_keys=True)
+    ):
+        return registered
     if not (
-        config["schema"] == "active-causal-camera-projection-v2"
+        config["schema"]
+        in ("active-causal-camera-projection-v2", "settled-causal-camera-projection-v1")
+        and (settled or "settled_policy" not in config)
         and config["schedule"] == baseline
-        and config["active_policy"] == settings.model_dump(mode="json")
+        and json.dumps(config["active_policy"], sort_keys=True)
+        == json.dumps(settings.model_dump(mode="json"), sort_keys=True)
         and type(config["active_seed"]) is int
         and config["active_seed"] == 2000
         and config["reference_indices"] == list(definition.REFERENCE_INDICES)
         and config["trial_intervals"] == []
         and type(report["frame_count"]) is int
-        and 50
-        <= report["frame_count"]
-        <= 49 + settings.maximum_ticks + settings.window.horizon
+        and 50 <= report["frame_count"] <= _frame_limit(config)
     ):
         return registered
     count = report["frame_count"]
@@ -130,12 +155,55 @@ def registration(directory, config, report, definition):
             policy=settings,
         ),
     }
+    if settled:
+        # Only already consumed acquisition frames enter the checkpoint. Later
+        # frames become visible one at a time through executed public receipts.
+        acquired_frames = [image.copy() for image in images[48 : cursor + 1]]
+
+        def execute_control(kind, handle):
+            nonlocal cursor
+            if cursor >= len(events) or cursor + 1 >= len(images):
+                raise ValueError("saved run ended before a settled control request")
+            event = events[cursor]
+            requested.append([kind, handle])
+            targets = [
+                obj.object_id
+                for obj in event.state_before.objects
+                if tuple(action.value for action in obj.affordances) == ("move",)
+            ]
+            actual = (
+                targets.index(event.executed_action.target_id)
+                if event.executed_action.target_id in targets
+                else None
+            )
+            compliant = (
+                event.intervention_compliance is True
+                and event.event.success is True
+                and event.controller_failure is None
+                and event.event.duration == 1
+            )
+            cursor += 1
+            return PublicControlStep(
+                images[cursor].copy(),
+                event.executed_action.kind.value,
+                actual,
+                compliant,
+                event.executed_action.ticks,
+            )
+
+        replayed["settled"] = run_settled_controls(
+            replayed["acquisition"],
+            acquired_frames,
+            execute_control,
+            policy=continuation,
+        )
     registered.update(
         valid=(
             json.dumps(saved, sort_keys=True, allow_nan=False)
             == json.dumps(replayed, sort_keys=True, allow_nan=False)
             and cursor == len(events) == count - 1
             and replayed["acquisition"]["failure"] is None
+            and (not settled or replayed["settled"]["failure"] is None)
             and all(runtime.digest(path) == value for path, value in frozen.items())
         ),
         schedule=requested,
@@ -145,8 +213,9 @@ def registration(directory, config, report, definition):
 
 def audit(directory, engine):
     report = json.loads((directory / "report.json").read_bytes())
+    config = json.loads((directory / "config.json").read_bytes())
     count = report["frame_count"]
-    if type(count) is not int or not 50 <= count <= 61:
+    if type(count) is not int or not 50 <= count <= _frame_limit(config):
         raise ValueError("active capture frame count exceeds registration")
     # Freeze public inputs across the nested camera audit, not after it. Private
     # ledger names may be inspected here, but their bytes remain unopened.
@@ -205,7 +274,8 @@ def audit(directory, engine):
             },
             "navigation_accepted": False,
         }
-    active = json.loads(extra.read_bytes())["acquisition"]
+    public_run = json.loads(extra.read_bytes())
+    active = public_run["acquisition"]
     positions = json.loads((directory / "evaluator-positions.json").read_bytes())[
         "positions"
     ]
@@ -238,6 +308,48 @@ def audit(directory, engine):
                 predicted, positions[first], positions[last], **THRESHOLDS
             ),
         }
+    settled_evaluation = None
+    if _settled_registration(config):
+        continuation = public_run["settled"]
+        trials = []
+        for trial in continuation["trials"]:
+            first, last = trial["start_frame"], trial["end_frame"]
+            scores = None
+            if last is not None:
+                if not (
+                    type(first) is int
+                    and type(last) is int
+                    and 0 <= first < last < count
+                ):
+                    raise ValueError("settled trial has invalid public frame endpoints")
+                predicted = trial["motion"] or {"supported": False}
+                scores = {
+                    "rendered": score_rendered_motion(
+                        predicted, cameras[first], cameras[last], **THRESHOLDS
+                    ),
+                    "body": score_relative_motion(
+                        predicted, positions[first], positions[last], **THRESHOLDS
+                    ),
+                }
+            trials.append(
+                {
+                    "handle": trial["handle"],
+                    "interval": [first, last],
+                    "move_end_frame": trial["move_end_frame"],
+                    "settle": trial["settle"],
+                    "motion": trial["motion"],
+                    "scores": scores,
+                }
+            )
+        settled_evaluation = {
+            "terminal": continuation["terminal"],
+            "initial_settle": continuation["initial_settle"],
+            "executed_actions": len(continuation["steps"]),
+            "trials": trials,
+            "pose_domain": continuation["pose_domain"],
+            "metric_scale_known": False,
+            "navigation_accepted": False,
+        }
     checks = {
         "capture_and_public_policy_independently_replayed": physical["valid"],
         "artifacts_still_match_capture_ledger": all(
@@ -261,6 +373,7 @@ def audit(directory, engine):
         "first_control_end_tick": active["first_control_end_tick"],
         "control_strategy": active["policy"]["control_strategy"],
         "evaluation": evaluation if valid else None,
+        "settled_evaluation": settled_evaluation if valid else None,
         "navigation_accepted": False,
         "scope": config["scope"],
     }
@@ -293,7 +406,13 @@ def main():
         json.dumps(
             {
                 key: result.get(key)
-                for key in ("valid", "policy_terminal", "failure", "evaluation")
+                for key in (
+                    "valid",
+                    "policy_terminal",
+                    "failure",
+                    "evaluation",
+                    "settled_evaluation",
+                )
             }
         )
     )

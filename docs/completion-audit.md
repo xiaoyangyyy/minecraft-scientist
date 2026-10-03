@@ -1196,3 +1196,35 @@ default-only WSL 533/70 skips and focused Windows package/comparison 57 pass.
 MVP/build/changed-file lint pass. The next gate is explicit sampling-phase,
 frame-aware continuous control and independent actual arrival; all held-out,
 natural-science, recovery and consolidated-release requirements remain open.
+
+## Public settled-control continuation checkpoint
+
+The new pure package controller and its separately registered capture/auditor
+execute WAIT and bounded MOVE/WAIT trials only from returned public images. They
+freeze original maps/identities, reproduce checkpoints before dispatch, retain
+partial endpoints, reject forged budgets/schemas/receipts, and replay every
+requested action before any evaluator position is opened. Synthetic completed
+trajectory tests exercise all three motion trials; they are not actual runtime
+navigation proof.
+
+Three fresh natural-world development captures at seeds 201/202/203 preserve all
+eight capture checks and three outer/eighteen nested independent audit checks.
+**No session completes the three settled trials.** Seed 201 loses both maps after
+four WAITs while actual height decreases; seed 202 loses one of two maps after
+three WAITs despite identical current-player pose components; seed 203 exhausts
+all 44 acquisition fits and never dispatches continuation. Camera/body acquisition
+scores remain separate, including the original seed-201 wrong-body counterexample
+and seed-202 rendered `false_translation` below the unchanged 0.15-block gate.
+See `docs/settled-control-development.md` and
+`runs/settled-controls-live-seed{201,202,203}-v1` for every outcome.
+
+Current V23 Windows/WSL releases each pass thirty seeds/two repeats/eighteen exact
+artifacts and six checks, freezing 105 entries (102 package files). Full tests
+pass Windows 1028/two skips and WSL 1030/two; isolated default-only WSL passes
+556/70 skips. The seed-zero MVP retains identical benchmark bytes and package/
+changed-file lint checks pass. The next practical action is bounded public-image
+landing/stability recovery with explicit map epochs/refresh and independent motion
+validation, then actual goal arrival. Waiting with an old frozen short-baseline
+map is insufficient. These negative experiments do not replace or close the
+original held-out navigation, natural scientific/map integration, long recovery,
+comparison and consolidated release gates. The full goal remains active.

@@ -58,6 +58,15 @@ until each required gate has current, inspectable evidence.
 
 ## Evidence discipline
 
+The latest `docs/settled-control-development.md` checkpoint runs the public
+MOVE/WAIT controller and independent chronological replay in three fresh natural
+worlds. None completes settled motion trials: one loses support while falling,
+another loses a map despite stationary current-player telemetry, and the third
+exhausts acquisition. Next implement bounded public-image stability/landing
+recovery and explicit map refresh with new-control validation, then independent
+actual arrival. Do not equate WAIT, pixel consistency or a unit test with physical
+rest/navigation. All original completion gates above remain required.
+
 The runtime-camera follow-up in `docs/runtime-camera-timing-development.md`
 identifies a measured sampling mismatch between image camera positions and player
 telemetry. Next align new geometric evaluation to capture-time camera evidence,
