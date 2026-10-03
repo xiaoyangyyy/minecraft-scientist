@@ -1,0 +1,2 @@
+# A JAR manifest's main section intentionally ends with an empty line.
+environments/minestudio/camera_audit_agent/MANIFEST.MF whitespace=-blank-at-eof
