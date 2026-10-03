@@ -335,3 +335,15 @@ Full regressions pass Windows 749/WSL 751 (two skips each), default-only offline
 427/61; both V15 core releases pass six checks across thirty seeds/two repeats
 and freeze 99 source entries. Complete evidence and limits are in
 `docs/online-landmark-acquisition-development.md`.
+
+Public per-ID loss tracing now exactly reproduces all 51 historical acquisition
+prefixes and decisions. Of 43 lost map landmarks in the aborted trial, fifteen
+fail ROI gates, nineteen adjacent-cycle and nine patch-correlation. Reducing
+pyramid depth or widening horizontal crops does not restore adequate support in
+bounded public-only command checks. This rules out those simple proposed repairs,
+not all physical/rendering hypotheses. The next implementation is subsequent
+different-control validation of second-leg maps and joint geometry/landmark
+lifecycle as needed. All broad requirements remain. Both V16 core releases pass
+thirty seeds/two repeats/six checks with 99 source entries; prior V15 visual
+artifacts remain historical after the trace-source boundary. See
+`docs/landmark-track-loss-development.md`; no navigation promotion follows.

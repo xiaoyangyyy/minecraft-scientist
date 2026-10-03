@@ -1016,3 +1016,17 @@ Full regressions pass Windows 749/WSL 751 (two skips each), default-only offline
 frozen source entries. The seed-zero MVP artifact is unchanged. Source boundaries,
 costs and unresolved requirements are recorded in
 `docs/online-landmark-acquisition-development.md`. The broad goal remains active.
+
+### Per-identity landmark-loss diagnosis (2026-10-02)
+
+The optional tracer records each seed's first rejecting public-pixel gate and
+reconstructs all survival counts. A new source-frozen diagnostic exactly matches
+all 51 historical tracker prefixes, recorded tracks and controller decisions,
+retaining all eight trials without private poses. The failing map loses fifteen
+IDs to ROI gates, nineteen to adjacent cycles and nine to patch correlation. This
+does not establish a physical cause. Bounded public pyramid/crop alternatives
+leave insufficient map support and are not enabled as repairs. Both V16 core
+releases pass their thirty-seed/two-repeat/six-check gates with 99 entries.
+`docs/landmark-track-loss-development.md` records scope, failed diagnostic attempts
+and the historical-source boundary. Useful reliable navigation, subsequent
+second-leg validation and all broad completion requirements remain unproven.

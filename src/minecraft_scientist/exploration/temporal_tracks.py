@@ -9,15 +9,57 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from itertools import pairwise
+from typing import Literal
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict, Field, FiniteFloat, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    FiniteFloat,
+    StrictInt,
+    model_validator,
+)
 
 from .correspondence_refinement import _crop_gray, _odd
 from .dense_correspondence import DenseCorrespondences
 from .visual_geometry import _opencv
 
 Pixel = tuple[FiniteFloat, FiniteFloat]
+
+LossReason = Literal[
+    "seed_roi",
+    "forward_status",
+    "forward_roi",
+    "step_limit",
+    "reverse_status",
+    "reverse_roi",
+    "adjacent_cycle",
+    "patch_texture",
+    "patch_correlation",
+    "chain_reverse_status",
+    "chain_reverse_roi",
+    "chain_cycle",
+]
+
+
+class TrackRejection(BaseModel):
+    """First failing public-pixel gate for original detector identities."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    image_index: int = Field(ge=0, le=127, strict=True)
+    reason: LossReason
+    track_ids: tuple[StrictInt, ...]
+
+    @model_validator(mode="after")
+    def _identities(self):
+        if not self.track_ids or tuple(sorted(set(self.track_ids))) != self.track_ids:
+            raise ValueError("rejection needs sorted unique nonempty identities")
+        if any(
+            type(identity) is not int or identity < 0 for identity in self.track_ids
+        ):
+            raise ValueError("rejected identities must be nonnegative integers")
+        return self
 
 
 class TemporalTrackConfig(BaseModel):
@@ -109,11 +151,58 @@ class TemporalTracks(BaseModel):
         )
 
 
+class TemporalTrackDiagnosis(BaseModel):
+    """Exact unchanged tracking output plus an exhaustive disjoint loss ledger."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    tracks: TemporalTracks
+    rejections: tuple[TrackRejection, ...]
+
+    @model_validator(mode="after")
+    def _accounting(self):
+        rejected = [
+            identity for event in self.rejections for identity in event.track_ids
+        ]
+        if (
+            len(rejected) != len(set(rejected))
+            or set(rejected) & set(self.tracks.track_ids)
+            or set(rejected) | set(self.tracks.track_ids)
+            != set(range(self.tracks.seed_count))
+            or any(
+                event.image_index >= self.tracks.frame_count
+                for event in self.rejections
+            )
+        ):
+            raise ValueError(
+                "each seed must survive or have exactly one bounded rejection"
+            )
+        counts = [self.tracks.seed_count] * self.tracks.frame_count
+        for event in self.rejections:
+            if not event.reason.startswith("chain_"):
+                for index in range(event.image_index, self.tracks.frame_count):
+                    counts[index] -= len(event.track_ids)
+        if tuple(counts) != self.tracks.surviving_counts:
+            raise ValueError(
+                "rejection ledger must reproduce all adjacent survival counts"
+            )
+        return self
+
+
+def diagnose_frame_chain(frames, *, config=None, seed_pixels=None):
+    """Trace the same tracker; no retry, changed thresholds or extra pixel inputs."""
+    rejections = []
+    tracks = track_frame_chain(
+        frames, config=config, seed_pixels=seed_pixels, _rejections=rejections
+    )
+    return TemporalTrackDiagnosis(tracks=tracks, rejections=tuple(rejections))
+
+
 def track_frame_chain(
     frames: Sequence[np.ndarray],
     *,
     config: TemporalTrackConfig | None = None,
     seed_pixels: Sequence[Pixel] | None = None,
+    _rejections: list[TrackRejection] | None = None,
 ) -> TemporalTracks:
     """Track only first-frame points; validate adjacent and whole-chain cycles.
 
@@ -178,6 +267,18 @@ def track_frame_chain(
             )
         seeds = seeds - offset.astype(np.float32)
     seed_count = len(seeds)
+
+    def record_loss(identities, mask, reason, image_index):
+        if _rejections is not None and np.any(mask):
+            _rejections.append(
+                TrackRejection(
+                    image_index=image_index,
+                    reason=reason,
+                    track_ids=tuple(int(value) for value in identities[mask]),
+                )
+            )
+
+    record_loss(np.arange(seed_count), ~inside(seeds), "seed_roi", 0)
     ids = np.flatnonzero(inside(seeds))
     history = [seeds[ids].copy()]
     scores = np.ones(len(ids))
@@ -188,7 +289,7 @@ def track_frame_chain(
         "criteria": (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 50, 0.01),
     }
 
-    for previous_gray, current_gray in pairwise(grays):
+    for image_index, (previous_gray, current_gray) in enumerate(pairwise(grays), 1):
         if not len(ids):
             history.append(np.empty((0, 2), dtype=np.float32))
             counts.append(0)
@@ -198,32 +299,59 @@ def track_frame_chain(
             previous_gray, current_gray, previous, None, **kwargs
         )
         if current is None or status is None:
+            record_loss(
+                ids, np.ones(len(ids), dtype=bool), "forward_status", image_index
+            )
             valid = np.zeros(len(ids), dtype=bool)
             current = np.zeros_like(previous)
         else:
-            valid = (status.ravel() > 0) & inside(current.reshape(-1, 2))
-            valid &= (
+            valid = status.ravel() > 0
+            record_loss(ids, ~valid, "forward_status", image_index)
+            in_roi = inside(current.reshape(-1, 2))
+            record_loss(ids, valid & ~in_roi, "forward_roi", image_index)
+            valid &= in_roi
+            step_good = (
                 np.linalg.norm(current.reshape(-1, 2) - previous.reshape(-1, 2), axis=1)
                 <= config.reference_maximum_step * scale
             )
+            record_loss(ids, valid & ~step_good, "step_limit", image_index)
+            valid &= step_good
         selected = np.flatnonzero(valid)
         if len(selected):
             reverse, back_status, _ = cv2.calcOpticalFlowPyrLK(
                 current_gray, previous_gray, current[selected], None, **kwargs
             )
             if reverse is None or back_status is None:
+                record_loss(ids, valid, "reverse_status", image_index)
                 valid[:] = False
             else:
-                valid[selected] &= (back_status.ravel() > 0) & inside(
-                    reverse.reshape(-1, 2)
+                returned_status = back_status.ravel() > 0
+                record_loss(
+                    ids[selected], ~returned_status, "reverse_status", image_index
                 )
-                valid[selected] &= (
+                valid[selected] &= returned_status
+                returned_roi = inside(reverse.reshape(-1, 2))
+                record_loss(
+                    ids[selected],
+                    valid[selected] & ~returned_roi,
+                    "reverse_roi",
+                    image_index,
+                )
+                valid[selected] &= returned_roi
+                cycle_good = (
                     np.linalg.norm(
                         reverse.reshape(-1, 2) - previous[selected].reshape(-1, 2),
                         axis=1,
                     )
                     <= config.reference_cycle_error * scale
                 )
+                record_loss(
+                    ids[selected],
+                    valid[selected] & ~cycle_good,
+                    "adjacent_cycle",
+                    image_index,
+                )
+                valid[selected] &= cycle_good
         correlations = np.zeros(len(ids))
         for index in np.flatnonzero(valid):
             left = (
@@ -241,6 +369,12 @@ def track_frame_chain(
                 .ravel()
             )
             if min(float(left.std()), float(right.std())) < config.minimum_patch_std:
+                record_loss(
+                    ids[index : index + 1],
+                    np.ones(1, dtype=bool),
+                    "patch_texture",
+                    image_index,
+                )
                 valid[index] = False
                 continue
             left, right = left - left.mean(), right - right.mean()
@@ -249,7 +383,14 @@ def track_frame_chain(
                     left @ right / (np.linalg.norm(left) * np.linalg.norm(right)), -1, 1
                 )
             )
-            valid[index] &= correlations[index] >= config.minimum_patch_correlation
+            if not correlations[index] >= config.minimum_patch_correlation:
+                record_loss(
+                    ids[index : index + 1],
+                    np.ones(1, dtype=bool),
+                    "patch_correlation",
+                    image_index,
+                )
+                valid[index] = False
         ids, scores = ids[valid], np.minimum(scores[valid], correlations[valid])
         history = [points[valid] for points in history]
         history.append(current.reshape(-1, 2)[valid])
@@ -259,7 +400,10 @@ def track_frame_chain(
     # No failed frame is skipped and no replacement corner can fill its identity.
     reverse = history[-1].reshape(-1, 1, 2).copy()
     valid = np.ones(len(ids), dtype=bool)
-    for current_gray, previous_gray in zip(grays[:0:-1], grays[-2::-1]):
+    for image_index, (current_gray, previous_gray) in enumerate(
+        zip(grays[:0:-1], grays[-2::-1])
+    ):
+        target_index = len(grays) - 2 - image_index
         selected = np.flatnonzero(valid)
         if not len(selected):
             break
@@ -267,15 +411,29 @@ def track_frame_chain(
             current_gray, previous_gray, reverse[selected], None, **kwargs
         )
         if returned is None or status is None:
+            record_loss(ids, valid, "chain_reverse_status", target_index)
             valid[:] = False
             break
-        good = (status.ravel() > 0) & inside(returned.reshape(-1, 2))
+        returned_status = status.ravel() > 0
+        record_loss(
+            ids[selected], ~returned_status, "chain_reverse_status", target_index
+        )
+        returned_roi = inside(returned.reshape(-1, 2))
+        record_loss(
+            ids[selected],
+            returned_status & ~returned_roi,
+            "chain_reverse_roi",
+            target_index,
+        )
+        good = returned_status & returned_roi
         valid[selected] &= good
         reverse[selected[good]] = returned[good]
     errors = np.linalg.norm(reverse.reshape(-1, 2) - history[0], axis=1)
-    valid &= np.isfinite(errors) & (
+    cycle_good = np.isfinite(errors) & (
         errors <= config.reference_chain_cycle_error * scale
     )
+    record_loss(ids, valid & ~cycle_good, "chain_cycle", 0)
+    valid &= cycle_good
     return TemporalTracks(
         image_shape=image_shape,
         frame_count=len(frames),

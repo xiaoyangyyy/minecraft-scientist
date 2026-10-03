@@ -794,6 +794,12 @@ validation. This is not reliable navigation or held-out generalization. See
 `docs/online-landmark-acquisition-development.md` for the independent audit,
 current regressions and all remaining full-project requirements.
 
+Per-ID loss tracing now exactly replays every historical acquisition prefix and
+shows that map loss combines ROI, adjacent-cycle and patch-correlation rejection;
+simple pyramid/crop changes do not rescue the failing map. No navigation repair
+is claimed. See `docs/landmark-track-loss-development.md` for the evidence and
+next independent-control validation requirement.
+
 The scientific core has a portable offline release verifier:
 
 ```powershell

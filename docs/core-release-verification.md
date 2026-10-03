@@ -60,8 +60,8 @@ exits nonzero, not a smaller passing seed subset.
 
 ## Current results (2026-10-02)
 
-`runs/core-release-seeds0-29-windows-v15/report.json` on Windows and
-`runs/core-release-seeds0-29-wsl-v15/report.json` on WSL each pass all six release
+`runs/core-release-seeds0-29-windows-v16/report.json` on Windows and
+`runs/core-release-seeds0-29-wsl-v16/report.json` on WSL each pass all six release
 checks for all thirty seeds. Each platform runs sixty complete benchmarks and
 reproduces eighteen artifacts per seed, including the transfer traces and
 experience database. All four learned-law accuracies, revised-law recovery and
@@ -82,7 +82,9 @@ adds original-map replay and the optional direction-constrained map search. V11
 adds optional frozen-map action-switch validation. V12 adds a causal visibility
 controller; V13 repairs its anchor-denominator definition, and V14 separates
 second-phase new loss from original-anchor loss. V15 adds online fitting and
-protection of the first supported map's immutable landmark partitions. All 99
+protection of the first supported map's immutable landmark partitions. V16 adds
+optional disjoint per-ID tracking-loss accounting, with exact historical public
+prefix replay and unchanged tracker output. All 99
 current frozen source hashes match. Core behavior
 is unchanged by those optional modules.
 These earlier runs are historical checks, not the current source-frozen release.
@@ -106,7 +108,8 @@ The subsequent decorator-source locator correction affects experiment scripts,
 not the then-96-entry package/core ledger. V10 is historical after adding the
 action-switch module. V11 matches the prior 97-entry checkpoint; V13 freezes the
 prior 98-entry core after anchor-denominator refinement. V14 freezes the historical
-phase-relative controller; V15 freezes the current online-landmark module. Visual
+phase-relative controller; V15 freezes the prior online-landmark checkpoint and
+V16 freezes the optional loss tracing. Visual
 inference/plan/diagnostic manifests have a separate historical
 boundary after that correction, detailed in `docs/source-ledger-development.md`.
 The scientific-core verifier does not substitute for their source checks.
@@ -119,14 +122,22 @@ adaptive capture and independent map auditing complete, but two direction errors
 remain; see `docs/phase-visibility-development.md`. These results are not reliable
 navigation or completion of the broad project requirements.
 
-The current online-landmark V15 checkpoint passes **749/two skips on Windows**,
+The historical online-landmark V15 checkpoint passes **749/two skips on Windows**,
 **751/two on WSL**, and **427/61 in the isolated default-only offline installation**.
-Both 99-entry core ledgers were rechecked against current bytes, with no mismatch.
+Both 99-entry core ledgers matched that checkpoint's bytes, with no mismatch.
 The optional acquisition change does not establish reliable navigation; see
 `docs/online-landmark-acquisition-development.md` for fresh real-world evidence.
 
+The V16 loss-tracing checkpoint passes **785/two skips on Windows**,
+**787/two on WSL**, and **427/63 in the isolated default-only offline installation**.
+Both 99-entry core ledgers match current package/verifier/configuration bytes.
+The later script-only in-memory historical loader refinement passes 45 targeted
+tests, including input-tree immutability and forged bytecode refusal; the full
+suites preceded that final script refinement. See
+`docs/landmark-track-loss-development.md` for source boundaries and remaining work.
+
 The current seed-zero MVP report at
-`runs/online-landmark-regression-mvp-seed0/benchmark.json` remains byte-identical
+`runs/public-landmark-loss-regression-mvp-seed0/benchmark.json` remains byte-identical
 to the earlier regression: SHA-256
 `B95AF2E5C152B9F06EDC63004EA87FB183C37E6A5A13BFF53F21A39A4F48AEB8`.
 It retains 47 experiments, accuracy/task success 1.0, detection delay one, eight

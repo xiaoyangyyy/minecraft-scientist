@@ -132,3 +132,8 @@ without tuning policies to private labels. Then obtain independent subsequent
 views, held-out worlds/terrains/conditions, natural science/map integration,
 long-horizon recovery and current live release/baseline/CI evidence. The original
 full-project requirements remain intact.
+
+The next checkpoint, `landmark-track-loss-development.md`, traces all original
+IDs through every rejecting pixel gate. The V15 ledgers above are historical
+after that tracker-source change; their raw artifacts are preserved. Its exact
+historical replay is not relabeled as new acquisition or navigation accuracy.
