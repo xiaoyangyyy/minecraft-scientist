@@ -11,15 +11,15 @@ Fabric mod supplies resettable hidden rules, and the Python boundary replaces it
 block, and entity names with seeded opaque IDs before an agent can observe them.
 Live execution still requires the user's explicit Minecraft EULA acceptance.
 
-Latest visual-development result: public past-only local-gauge registration now
-freezes all candidate transforms before subsequent controls and is independently
-replayed before private scoring. No complete link passes in three fresh sessions:
-one recovers two correct rendered-camera motion intervals (2.60/1.11 degrees),
-another exhausts new map fits, and a same-seed replication rejects both future
-motions. Current-player movement is not recovered reliably. This is not a
-persistent global map or reliable goal navigation. See
-[`docs/local-gauge-registration-development.md`](docs/local-gauge-registration-development.md)
-for retained outcomes and the required shared-landmark reconstruction work.
+Latest visual-development result: training-only shared-anchor reconstruction now
+preserves the original landmark partitions and freezes new map versions before
+different controls. One independently audited development run passes the new
+camera-motion test (0.65-degree direction error); a replication rejects its future
+rays and another world exhausts all map fits. Current-player motion remains wrong
+in the passing camera run (37-degree error). Earlier rigid gauge failures remain
+explicit. This is not a persistent global map or reliable goal navigation. See
+[`docs/shared-anchor-reconstruction-development.md`](docs/shared-anchor-reconstruction-development.md)
+for all outcomes, limited ablation results and outstanding full-project gates.
 
 ## Quick start
 

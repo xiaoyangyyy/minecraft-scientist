@@ -1256,6 +1256,110 @@ def test_forged_gauge_links_never_reach_private_evaluator(
     assert not result["camera_audit"]["checks"]["registered_schedule"]
 
 
+@pytest.fixture
+def shared_capture(gauge_capture):
+    active, route, engine = gauge_capture
+    config = json.loads((route / "config.json").read_bytes())
+    config.update(
+        schema="registered-shared-anchor-camera-projection-v1",
+        shared_anchor_policy=active.SharedAnchorPolicy().model_dump(mode="json"),
+    )
+    save(route / "config.json", config)
+    extra = json.loads((route / "active-acquisition.json").read_bytes())
+    extra["maintenance"] = active.maintain_public_maps(
+        extra["recovery"],
+        [],
+        lambda *args: pytest.fail("no acquired root can request shared controls"),
+        extra["calibration"]["camera_intrinsics"],
+        gauge_policy={},
+        shared_policy={},
+    )
+    save(route / "active-acquisition.json", extra)
+    report = json.loads((route / "report.json").read_bytes())
+    report["config_sha256"] = active.runtime.digest(route / "config.json")
+    report["artifact_sha256"]["active-acquisition.json"] = active.runtime.digest(
+        route / "active-acquisition.json"
+    )
+    report["checks"]["shared_anchor_policy_completed"] = True
+    save(route / "report.json", report)
+    return active, route, engine
+
+
+def test_shared_registration_replays_before_private_reads_without_invented_versions(
+    shared_capture, monkeypatch
+):
+    active, route, engine = shared_capture
+    with monkeypatch.context() as guards:
+        private_guard(guards)
+        result = active.runtime.public_data(
+            route, engine, registration=active.registration
+        )
+        assert result["valid"] and result["count"] == 82
+    result = active.audit(route, engine)
+    assert result["valid"]
+    assert result["shared_anchor_evaluation"] == {
+        "versions": [],
+        "shadow_validated_versions": 0,
+        "global_gauge_aligned": False,
+        "metric_scale_known": False,
+        "navigation_accepted": False,
+    }
+
+
+@pytest.mark.parametrize(
+    "case", ["policy", "schema", "version", "metric", "count", "history"]
+)
+def test_forged_shared_version_refuses_before_private_scoring(
+    shared_capture, monkeypatch, case
+):
+    active, route, engine = shared_capture
+    config = json.loads((route / "config.json").read_bytes())
+    extra = json.loads((route / "active-acquisition.json").read_bytes())
+    if case == "policy":
+        config["shared_anchor_policy"]["fitting"]["geometry"][
+            "reference_validation_pixels"
+        ] = 3
+    elif case == "schema":
+        config["schema"] = "registered-maintenance-camera-projection-v1"
+    elif case == "version":
+        extra["maintenance"]["shared_anchor_versions"] = [
+            {"status": "shadow_validated"}
+        ]
+    elif case == "metric":
+        extra["maintenance"]["metric_scale_known"] = True
+    elif case == "count":
+        extra["maintenance"]["shadow_validated_shared_versions"] = 1
+    else:
+        extra["maintenance"]["shared_anchor_versions"] = [
+            {"original_snapshot_sha256": "0" * 64}
+        ]
+    save(route / "config.json", config)
+    save(route / "active-acquisition.json", extra)
+    report = json.loads((route / "report.json").read_bytes())
+    report["config_sha256"] = active.runtime.digest(route / "config.json")
+    report["artifact_sha256"]["active-acquisition.json"] = active.runtime.digest(
+        route / "active-acquisition.json"
+    )
+    save(route / "report.json", report)
+    private_guard(monkeypatch)
+    result = active.audit(route, engine)
+    assert not result["valid"] and result["shared_anchor_evaluation"] is None
+    assert not result["camera_audit"]["checks"]["registered_schedule"]
+
+
+def test_shared_capture_flag_requires_complete_parent_protocol(
+    scripts, tmp_path, monkeypatch
+):
+    _, capture = scripts
+    output = tmp_path / "must-not-create"
+    monkeypatch.setattr(
+        sys, "argv", [capture.__file__, "--share-anchor", "--output", str(output)]
+    )
+    with pytest.raises(SystemExit) as error:
+        capture.main()
+    assert error.value.code == 2 and not output.exists()
+
+
 def test_mutation_during_analysis_invalidates_audit(diagnostic, monkeypatch):
     script, route, engine = diagnostic
     analyze = script.timing_metrics

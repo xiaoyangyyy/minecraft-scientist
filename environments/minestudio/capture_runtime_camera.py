@@ -100,6 +100,7 @@ def main():
     parser.add_argument("--recover-map", action="store_true")
     parser.add_argument("--maintain-map", action="store_true")
     parser.add_argument("--register-gauges", action="store_true")
+    parser.add_argument("--share-anchor", action="store_true")
     args = parser.parse_args()
     if args.seed < 0:
         parser.error("seed must be nonnegative")
@@ -115,6 +116,8 @@ def main():
         parser.error("rolling maintenance requires --recover-map")
     if args.register_gauges and not args.maintain_map:
         parser.error("gauge registration requires --maintain-map")
+    if args.share_anchor and not args.register_gauges:
+        parser.error("shared-anchor reconstruction requires --register-gauges")
     directory = args.output.resolve()
     directory.mkdir(parents=True, exist_ok=False)
     build = directory / "agent-build"
@@ -250,6 +253,20 @@ def main():
                         config["scope"] = (
                             "public past-only local gauge links before future controls; all bootstrap pairs and withheld rays retained; no global/metric localization or arrival claim"
                         )
+                        if args.share_anchor:
+                            from minecraft_scientist.exploration.shared_anchor_map import (
+                                SharedAnchorPolicy,
+                            )
+
+                            config["shared_anchor_policy"] = (
+                                SharedAnchorPolicy().model_dump(mode="json")
+                            )
+                            config["schema"] = (
+                                "registered-shared-anchor-camera-projection-v1"
+                            )
+                            config["scope"] = (
+                                "training-only versioned shared-anchor reconstruction before new controls; original holdouts and all candidates retained; no global/metric localization or arrival claim"
+                            )
     write_json(directory / "config.json", config)
     config_hash = digest(directory / "config.json")
     audit, images, native_images, native_hashes, records = (
@@ -475,6 +492,7 @@ def main():
                                 calibration["camera_intrinsics"],
                                 policy=config["maintenance_policy"],
                                 gauge_policy=config.get("gauge_policy"),
+                                shared_policy=config.get("shared_anchor_policy"),
                             )
                             if active["maintenance"]["failure"] is not None:
                                 raise RuntimeError(
@@ -579,6 +597,13 @@ def main():
                 and "maintenance" in active
                 and active["maintenance"]["failure"] is None
                 and "gauge_bridges" in active["maintenance"]
+            )
+        if args.share_anchor:
+            checks["shared_anchor_policy_completed"] = (
+                active is not None
+                and "maintenance" in active
+                and active["maintenance"]["failure"] is None
+                and "shared_anchor_versions" in active["maintenance"]
             )
     report = {
         "completed": error is None and all(checks.values()),

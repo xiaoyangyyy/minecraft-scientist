@@ -58,6 +58,17 @@ until each required gate has current, inspectable evidence.
 
 ## Evidence discipline
 
+The latest `docs/shared-anchor-reconstruction-development.md` checkpoint revises
+training poses/landmarks in an immutable original-anchor lineage, protects every
+withheld identity, freezes before new controls and independently replays three
+fresh sessions. One new shared camera model passes (0.65-degree direction), one
+fails future rays and another acquires no map; current-player direction remains
+wrong. This supports only bounded shared-anchor camera reconstruction. Next address
+counterexample-driven map crises and observable camera/control endpoint timing,
+then persistent routes and independent actual arrival. A current ten-seed structured
+ablation repeats exactly but does not establish planner efficiency superiority or
+the complete four-form/live/fixed-library comparison gate.
+
 The latest `docs/local-gauge-registration-development.md` checkpoint independently
 replays three fresh registered sessions. All complete gauge links reject; one
 same-seed replication rejects both future motions despite an earlier local success.

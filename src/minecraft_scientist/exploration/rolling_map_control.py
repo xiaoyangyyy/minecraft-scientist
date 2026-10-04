@@ -14,7 +14,9 @@ from .causal_map_window import CausalMapWindow, CausalWindowPolicy
 from .joint_multiview_map import _camera
 from .map_gauge_bridge import GaugeBridgePolicy, register_map_gauges
 from .map_recovery import _digest
+from .second_leg_shadow import retain_tracks
 from .settled_map_control import PublicControlStep
+from .shared_anchor_map import SharedAnchorPolicy, SharedAnchorWindow
 from .temporal_tracks import TemporalTrackConfig, track_frame_chain
 from .visual_geometry import _frame
 
@@ -43,7 +45,14 @@ def _choose_handle(counts, excluded):
 
 
 def maintain_public_maps(
-    parent, frames, execute, camera, *, policy=None, gauge_policy=None
+    parent,
+    frames,
+    execute,
+    camera,
+    *,
+    policy=None,
+    gauge_policy=None,
+    shared_policy=None,
 ):
     """Two bounded map epochs after public recovery, not global navigation.
 
@@ -66,6 +75,17 @@ def maintain_public_maps(
         else None
     )
     parent_digest = _digest(parent)
+    shared_settings = (
+        SharedAnchorPolicy.model_validate(
+            shared_policy.model_dump()
+            if isinstance(shared_policy, SharedAnchorPolicy)
+            else shared_policy
+        )
+        if shared_policy is not None
+        else None
+    )
+    if shared_settings is not None and gauge_settings is None:
+        raise ValueError("shared reconstruction requires the retained gauge journal")
     result = {
         "policy": settings.model_dump(mode="json"),
         "parent_sha256": parent_digest,
@@ -83,6 +103,12 @@ def maintain_public_maps(
             gauge_bridges=[],
             supported_local_gauge_links=0,
         )
+    if shared_settings is not None:
+        result.update(
+            shared_anchor_policy=shared_settings.model_dump(mode="json"),
+            shared_anchor_versions=[],
+            shadow_validated_shared_versions=0,
+        )
 
     def finish():
         if _digest(parent) != parent_digest:
@@ -95,6 +121,19 @@ def maintain_public_maps(
                 raise ValueError("future controls changed a frozen gauge checkpoint")
             result["supported_local_gauge_links"] = sum(
                 item["evidence"]["supported"] for item in result["gauge_bridges"]
+            )
+        if shared_settings is not None:
+            for version in result["shared_anchor_versions"]:
+                if (
+                    version["frozen"] is not None
+                    and _digest(version["frozen"]) != version["frozen_sha256"]
+                ):
+                    raise ValueError(
+                        "future controls changed a frozen shared-anchor version"
+                    )
+            result["shadow_validated_shared_versions"] = sum(
+                item["status"] == "shadow_validated"
+                for item in result["shared_anchor_versions"]
             )
         return result
 
@@ -213,6 +252,7 @@ def maintain_public_maps(
         result["epochs"].append(entry)
         acquisition_handle = _choose_handle(counts, {last_handle})
         controller = None
+        shared_controller, shared_images, shared_version = None, None, None
         for attempt in range(settings.maximum_acquisition_ticks + 1):
             if len(images) < 3:
                 entry["terminal"] = "insufficient_history"
@@ -271,6 +311,62 @@ def maintain_public_maps(
                                     "evidence_sha256": _digest(bridge),
                                 }
                             )
+                            if shared_settings is not None:
+                                shared_version = {
+                                    "parent_epoch": epoch - 1,
+                                    "child_epoch": epoch,
+                                    "original_snapshot_sha256": previous[
+                                        "snapshot_sha256"
+                                    ],
+                                    "frozen": None,
+                                    "frozen_sha256": None,
+                                    "future_prefixes": [],
+                                    "decision": None,
+                                    "status": "proposed",
+                                    "terminal": "not_started",
+                                }
+                                result["shared_anchor_versions"].append(shared_version)
+                                shared_images = images[
+                                    previous["anchor_frame"] - anchor :
+                                ]
+                                if (
+                                    len(shared_images)
+                                    > shared_settings.maximum_consumed_frames
+                                ):
+                                    shared_version.update(
+                                        status="rejected",
+                                        terminal="history_budget_exhausted",
+                                    )
+                                else:
+                                    shared_temporal = settings.temporal.model_copy(
+                                        update={"maximum_frames": 16}
+                                    )
+                                    consumed = track_frame_chain(
+                                        shared_images, config=shared_temporal
+                                    )
+                                    # Earlier lost IDs can never be regenerated by a later tracker call.
+                                    retained = set(
+                                        previous["snapshot"]["past"]["track_ids"]
+                                    )
+                                    for prefix in result["epochs"][-2][
+                                        "future_prefixes"
+                                    ]:
+                                        retained &= set(prefix["track_ids"])
+                                    consumed = retain_tracks(consumed, retained)
+                                    shared_controller = SharedAnchorWindow(
+                                        previous["snapshot"],
+                                        consumed,
+                                        policy=shared_settings,
+                                    )
+                                    shared_version.update(
+                                        frozen=shared_controller.snapshot(),
+                                        frozen_sha256=shared_controller.digest(),
+                                        rgb_sha256=[
+                                            hashlib.sha256(image.tobytes()).hexdigest()
+                                            for image in shared_images
+                                        ],
+                                        terminal="awaiting_new_controls",
+                                    )
                     break
                 if attempt == settings.maximum_acquisition_ticks:
                     entry["terminal"] = "map_unavailable"
@@ -305,6 +401,16 @@ def maintain_public_maps(
                 decision = controller.advance(extended)
                 entry["future_prefixes"].append(extended.model_dump(mode="json"))
                 entry["decision"] = decision.model_dump(mode="json")
+                if shared_controller is not None:
+                    shared_images.append(images[-1].copy())
+                    shared_prefix = track_frame_chain(
+                        shared_images, config=shared_temporal
+                    )
+                    shared_decision = shared_controller.advance(shared_prefix)
+                    shared_version["future_prefixes"].append(
+                        shared_prefix.model_dump(mode="json")
+                    )
+                    shared_version["decision"] = shared_decision.model_dump(mode="json")
             except Exception as error:  # noqa: BLE001 -- preserve future failed prefix
                 entry["terminal"] = "tracking_failed"
                 result.update(
@@ -324,6 +430,17 @@ def maintain_public_maps(
         entry["terminal"] = (
             "validated" if decision.instruction == "refresh" else "rejected"
         )
+        if shared_controller is not None:
+            shared_version.update(
+                terminal="validated"
+                if shared_decision.instruction == "refresh"
+                else "rejected",
+                status="shadow_validated"
+                if shared_decision.instruction == "refresh"
+                else "rejected",
+                terminal_snapshot=shared_controller.snapshot(),
+                terminal_sha256=shared_controller.digest(),
+            )
         lineage = _digest(entry)
     result.update(terminal="completed", final_handle_counts=counts)
     return finish()

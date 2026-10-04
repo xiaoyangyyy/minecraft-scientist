@@ -39,6 +39,7 @@ from minecraft_scientist.exploration.settled_map_control import (
     SettledControlPolicy,
     run_settled_controls,
 )
+from minecraft_scientist.exploration.shared_anchor_map import SharedAnchorPolicy
 from minecraft_scientist.exploration.visibility_acquisition import PublicProbeStep
 from minecraft_scientist.protocols import TransitionRecord
 
@@ -56,6 +57,7 @@ def _settled_registration(config):
         "recovery-causal-camera-projection-v1",
         "maintenance-causal-camera-projection-v1",
         "registered-maintenance-camera-projection-v1",
+        "registered-shared-anchor-camera-projection-v1",
     )
 
 
@@ -64,6 +66,7 @@ def _recovery_registration(config):
         "recovery-causal-camera-projection-v1",
         "maintenance-causal-camera-projection-v1",
         "registered-maintenance-camera-projection-v1",
+        "registered-shared-anchor-camera-projection-v1",
     )
 
 
@@ -71,11 +74,19 @@ def _maintenance_registration(config):
     return config.get("schema") in (
         "maintenance-causal-camera-projection-v1",
         "registered-maintenance-camera-projection-v1",
+        "registered-shared-anchor-camera-projection-v1",
     )
 
 
 def _gauge_registration(config):
-    return config.get("schema") == "registered-maintenance-camera-projection-v1"
+    return config.get("schema") in (
+        "registered-maintenance-camera-projection-v1",
+        "registered-shared-anchor-camera-projection-v1",
+    )
+
+
+def _shared_registration(config):
+    return config.get("schema") == "registered-shared-anchor-camera-projection-v1"
 
 
 def _frame_limit(config):
@@ -104,6 +115,8 @@ def registration(directory, config, report, definition):
     maintenance_policy = RollingMapPolicy()
     gauging = _gauge_registration(config)
     gauge_policy = GaugeBridgePolicy()
+    sharing = _shared_registration(config)
+    shared_policy = SharedAnchorPolicy()
     baseline = [list(item) for item in definition.SCHEDULE[:48]]
     registered = {
         "valid": False,
@@ -119,6 +132,14 @@ def registration(directory, config, report, definition):
         registered["capture_checks"].append("maintenance_policy_completed")
     if gauging:
         registered["capture_checks"].append("gauge_policy_completed")
+    if sharing:
+        registered["capture_checks"].append("shared_anchor_policy_completed")
+    if (
+        sharing
+        and json.dumps(config.get("shared_anchor_policy"), sort_keys=True)
+        != json.dumps(shared_policy.model_dump(mode="json"), sort_keys=True)
+    ) or (not sharing and "shared_anchor_policy" in config):
+        return registered
     if (
         gauging
         and json.dumps(config.get("gauge_policy"), sort_keys=True)
@@ -151,6 +172,7 @@ def registration(directory, config, report, definition):
             "recovery-causal-camera-projection-v1",
             "maintenance-causal-camera-projection-v1",
             "registered-maintenance-camera-projection-v1",
+            "registered-shared-anchor-camera-projection-v1",
         )
         and (settled or "settled_policy" not in config)
         and config["schedule"] == baseline
@@ -302,6 +324,7 @@ def registration(directory, config, report, definition):
                     calibration["camera_intrinsics"],
                     policy=maintenance_policy,
                     gauge_policy=gauge_policy if gauging else None,
+                    shared_policy=shared_policy if sharing else None,
                 )
     registered.update(
         valid=(
@@ -502,6 +525,7 @@ def audit(directory, engine):
             "recovery_evaluation": None,
             "maintenance_evaluation": None,
             "gauge_evaluation": None,
+            "shared_anchor_evaluation": None,
             "navigation_accepted": False,
         }
     if not all(runtime.digest(path) == value for path, value in frozen.items()):
@@ -513,6 +537,7 @@ def audit(directory, engine):
             "recovery_evaluation": None,
             "maintenance_evaluation": None,
             "gauge_evaluation": None,
+            "shared_anchor_evaluation": None,
             "failure": {
                 "type": "ValueError",
                 "message": "public bytes changed across camera audit",
@@ -535,6 +560,7 @@ def audit(directory, engine):
             "recovery_evaluation": None,
             "maintenance_evaluation": None,
             "gauge_evaluation": None,
+            "shared_anchor_evaluation": None,
             "failure": {
                 "type": "ValueError",
                 "message": "private bytes changed after camera audit",
@@ -629,6 +655,37 @@ def audit(directory, engine):
         if _gauge_registration(config)
         else None
     )
+    shared_evaluation = None
+    if _shared_registration(config):
+        maintenance = public_run["maintenance"]
+        shared_evaluation = {
+            "versions": [
+                {
+                    "parent_epoch": version["parent_epoch"],
+                    "child_epoch": version["child_epoch"],
+                    "status": version["status"],
+                    "terminal": version["terminal"],
+                    "evaluation": _score_acquisition(
+                        {
+                            "snapshot": version["frozen"],
+                            "anchor_frame": version["frozen"]["anchor_frame"],
+                            "controller_decision": version["decision"],
+                        },
+                        positions,
+                        cameras,
+                    )
+                    if version["frozen"] is not None
+                    else None,
+                }
+                for version in maintenance["shared_anchor_versions"]
+            ],
+            "shadow_validated_versions": maintenance[
+                "shadow_validated_shared_versions"
+            ],
+            "global_gauge_aligned": False,
+            "metric_scale_known": False,
+            "navigation_accepted": False,
+        }
     checks = {
         "capture_and_public_policy_independently_replayed": physical["valid"],
         "artifacts_still_match_capture_ledger": all(
@@ -656,6 +713,7 @@ def audit(directory, engine):
         "recovery_evaluation": recovery_evaluation if valid else None,
         "maintenance_evaluation": maintenance_evaluation if valid else None,
         "gauge_evaluation": gauge_evaluation if valid else None,
+        "shared_anchor_evaluation": shared_evaluation if valid else None,
         "navigation_accepted": False,
         "scope": config["scope"],
     }
@@ -697,6 +755,7 @@ def main():
                     "recovery_evaluation",
                     "maintenance_evaluation",
                     "gauge_evaluation",
+                    "shared_anchor_evaluation",
                 )
             }
         )
