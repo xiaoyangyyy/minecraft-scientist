@@ -1176,6 +1176,86 @@ def test_forged_maintenance_protocol_is_rejected_before_private_reads(
     assert result["maintenance_evaluation"] is None
 
 
+@pytest.fixture
+def gauge_capture(maintenance_capture):
+    active, route, engine = maintenance_capture
+    config = json.loads((route / "config.json").read_bytes())
+    config.update(
+        schema="registered-maintenance-camera-projection-v1",
+        gauge_policy=active.GaugeBridgePolicy().model_dump(mode="json"),
+    )
+    save(route / "config.json", config)
+    extra = json.loads((route / "active-acquisition.json").read_bytes())
+    extra["maintenance"] = active.maintain_public_maps(
+        extra["recovery"],
+        [],
+        lambda *args: pytest.fail("no acquired map can request gauge controls"),
+        extra["calibration"]["camera_intrinsics"],
+        gauge_policy={},
+    )
+    save(route / "active-acquisition.json", extra)
+    report = json.loads((route / "report.json").read_bytes())
+    report["config_sha256"] = active.runtime.digest(route / "config.json")
+    report["artifact_sha256"]["active-acquisition.json"] = active.runtime.digest(
+        route / "active-acquisition.json"
+    )
+    report["checks"]["gauge_policy_completed"] = True
+    save(route / "report.json", report)
+    return active, route, engine
+
+
+def test_gauge_registration_replays_publicly_before_truth_without_invented_links(
+    gauge_capture, monkeypatch
+):
+    active, route, engine = gauge_capture
+    with monkeypatch.context() as guards:
+        private_guard(guards)
+        public = active.runtime.public_data(
+            route, engine, registration=active.registration
+        )
+        assert public["valid"] and public["count"] == 82
+    result = active.audit(route, engine)
+    assert result["valid"]
+    assert result["gauge_evaluation"] == {
+        "links": [],
+        "supported_local_links": 0,
+        "global_gauge_aligned": False,
+        "metric_scale_known": False,
+        "navigation_accepted": False,
+    }
+
+
+@pytest.mark.parametrize("case", ["policy", "schema", "link", "metric", "count"])
+def test_forged_gauge_links_never_reach_private_evaluator(
+    gauge_capture, monkeypatch, case
+):
+    active, route, engine = gauge_capture
+    config = json.loads((route / "config.json").read_bytes())
+    extra = json.loads((route / "active-acquisition.json").read_bytes())
+    if case == "policy":
+        config["gauge_policy"]["reference_validation_pixels"] = 2
+    elif case == "schema":
+        config["schema"] = "maintenance-causal-camera-projection-v1"
+    elif case == "link":
+        extra["maintenance"]["gauge_bridges"] = [{"evidence": {"supported": True}}]
+    elif case == "metric":
+        extra["maintenance"]["metric_scale_known"] = True
+    else:
+        extra["maintenance"]["supported_local_gauge_links"] = 1
+    save(route / "config.json", config)
+    save(route / "active-acquisition.json", extra)
+    report = json.loads((route / "report.json").read_bytes())
+    report["config_sha256"] = active.runtime.digest(route / "config.json")
+    report["artifact_sha256"]["active-acquisition.json"] = active.runtime.digest(
+        route / "active-acquisition.json"
+    )
+    save(route / "report.json", report)
+    private_guard(monkeypatch)
+    result = active.audit(route, engine)
+    assert not result["valid"] and result["gauge_evaluation"] is None
+    assert not result["camera_audit"]["checks"]["registered_schedule"]
+
+
 def test_mutation_during_analysis_invalidates_audit(diagnostic, monkeypatch):
     script, route, engine = diagnostic
     analyze = script.timing_metrics

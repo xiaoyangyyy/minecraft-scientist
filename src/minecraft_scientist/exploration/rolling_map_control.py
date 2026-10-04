@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .causal_map_window import CausalMapWindow, CausalWindowPolicy
 from .joint_multiview_map import _camera
+from .map_gauge_bridge import GaugeBridgePolicy, register_map_gauges
 from .map_recovery import _digest
 from .settled_map_control import PublicControlStep
 from .temporal_tracks import TemporalTrackConfig, track_frame_chain
@@ -41,7 +42,9 @@ def _choose_handle(counts, excluded):
     return min(choices, key=lambda handle: (counts[handle], handle))
 
 
-def maintain_public_maps(parent, frames, execute, camera, *, policy=None):
+def maintain_public_maps(
+    parent, frames, execute, camera, *, policy=None, gauge_policy=None
+):
     """Two bounded map epochs after public recovery, not global navigation.
 
     Each failed/passing past fit has a distinct immutable image/track namespace.
@@ -53,6 +56,15 @@ def maintain_public_maps(parent, frames, execute, camera, *, policy=None):
         policy.model_dump() if isinstance(policy, RollingMapPolicy) else policy or {}
     )
     camera = _camera(camera)
+    gauge_settings = (
+        GaugeBridgePolicy.model_validate(
+            gauge_policy.model_dump()
+            if isinstance(gauge_policy, GaugeBridgePolicy)
+            else gauge_policy
+        )
+        if gauge_policy is not None
+        else None
+    )
     parent_digest = _digest(parent)
     result = {
         "policy": settings.model_dump(mode="json"),
@@ -65,10 +77,25 @@ def maintain_public_maps(parent, frames, execute, camera, *, policy=None):
         "metric_scale_known": False,
         "navigation_accepted": False,
     }
+    if gauge_settings is not None:
+        result.update(
+            gauge_policy=gauge_settings.model_dump(mode="json"),
+            gauge_bridges=[],
+            supported_local_gauge_links=0,
+        )
 
     def finish():
         if _digest(parent) != parent_digest:
             raise ValueError("rolling control changed its immutable parent")
+        if gauge_settings is not None:
+            if any(
+                _digest(item["evidence"]) != item["evidence_sha256"]
+                for item in result["gauge_bridges"]
+            ):
+                raise ValueError("future controls changed a frozen gauge checkpoint")
+            result["supported_local_gauge_links"] = sum(
+                item["evidence"]["supported"] for item in result["gauge_bridges"]
+            )
         return result
 
     if parent["failure"] is not None:
@@ -224,6 +251,26 @@ def maintain_public_maps(parent, frames, execute, camera, *, policy=None):
                 if supported >= settings.window.minimum_models:
                     controller = candidate
                     entry["frozen"] = evidence
+                    if gauge_settings is not None and epoch > 0:
+                        previous = result["epochs"][-2]["frozen"]
+                        if previous is not None:
+                            bridge = register_map_gauges(
+                                previous["snapshot"],
+                                evidence["snapshot"],
+                                parent_images=previous["rgb_sha256"],
+                                child_images=evidence["rgb_sha256"],
+                                parent_namespace=previous["track_namespace"],
+                                child_namespace=evidence["track_namespace"],
+                                policy=gauge_settings,
+                            )
+                            result["gauge_bridges"].append(
+                                {
+                                    "parent_epoch": epoch - 1,
+                                    "child_epoch": epoch,
+                                    "evidence": bridge,
+                                    "evidence_sha256": _digest(bridge),
+                                }
+                            )
                     break
                 if attempt == settings.maximum_acquisition_ticks:
                     entry["terminal"] = "map_unavailable"

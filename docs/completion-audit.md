@@ -4,10 +4,11 @@ This audit compares the current repository with the original self-evolving symbo
 Minecraft system, not merely with the smaller offline MVP. A green unit test is not
 treated as proof of live Minecraft behavior.
 
-The latest checkpoint is `docs/past-support-acquisition-development.md`: public-only
-early switching gives correct rendered-camera movement in two same-seed development
-sessions, but simultaneous current-player direction remains wrong. Reliable goal
-navigation, held-out generalization and full-project completion remain open.
+The latest verified checkpoint is `docs/local-gauge-registration-development.md`:
+three fresh public-policy captures retain failed fits and all gauge candidates.
+One has two correct rendered-camera motions, but a same-seed replication rejects
+both future motions and no complete gauge link passes. Reliable goal navigation,
+held-out generalization and full-project completion remain open.
 
 The current full-project execution gates are in `docs/quality-roadmap.md`.
 Subsequent RGB-geometry development and its rejected tracking results are recorded

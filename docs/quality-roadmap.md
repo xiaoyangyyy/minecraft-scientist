@@ -58,6 +58,14 @@ until each required gate has current, inspectable evidence.
 
 ## Evidence discipline
 
+The latest `docs/local-gauge-registration-development.md` checkpoint independently
+replays three fresh registered sessions. All complete gauge links reject; one
+same-seed replication rejects both future motions despite an earlier local success.
+Private parameter scores never select or rescue a rejected public candidate. Next
+implement training-only shared-anchor reconstruction with immutable partitions,
+new version lineage and independent subsequent controls. Persistent public routes,
+goal control and actual arrival still require direct runtime evidence.
+
 The current `docs/rolling-map-maintenance-development.md` checkpoint retains
 failed fits and the moving unsupported parent, replaces local maps using only
 consumed public history, and validates two consecutive rendered-camera motion

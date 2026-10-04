@@ -58,10 +58,10 @@ unlearned primitive substitution, forged transfer events, changed repeat bytes,
 invalid budgets and incomplete runs. A failure preserves partial evidence and
 exits nonzero, not a smaller passing seed subset.
 
-## Current results (2026-10-03)
+## Current results (2026-10-04)
 
-`runs/core-release-seeds0-29-windows-v25/report.json` on Windows and
-`runs/core-release-seeds0-29-wsl-v25/report.json` on WSL each pass all six release
+`runs/core-release-seeds0-29-windows-v26/report.json` on Windows and
+`runs/core-release-seeds0-29-wsl-v26/report.json` on WSL each pass all six release
 checks for all thirty seeds. Each platform runs sixty complete benchmarks and
 reproduces eighteen artifacts per seed, including the transfer traces and
 experience database. All four learned-law accuracies, revised-law recovery and
@@ -94,21 +94,24 @@ V23 freezes the preceding 105 entries including 102 package files. V24 adds
 public-image stability recovery and explicit fresh local-map epochs, freezing
 106 entries including 103 package files. V25 adds bounded rolling maintenance,
 explicit epoch journals and alternative opaque controls, freezing 107 entries
-including 104 package files. Both V25 current/source-snapshot ledgers are rechecked
-with zero mismatches. Core behavior is unchanged by these
+including 104 package files. V26 adds optional local-gauge registration and its
+separate privileged evaluator, freezing 109 entries including 106 package files.
+Both V26 current/source-snapshot ledgers are rechecked with zero mismatches.
+Core behavior is unchanged by these
 optional modules; visual results remain separately scoped in
-`docs/rolling-map-maintenance-development.md`.
+`docs/local-gauge-registration-development.md`.
 These earlier runs are historical checks, not the current source-frozen release.
 Neither local multi-seed verification
 proves remote CI execution, fresh live-server gates, learned-planner release
 comparisons, broad visual generalization or integrated long-horizon exploration.
 
-The V25 full frozen regressions pass **1075 tests/two skips on Windows** and
-**1077/two on WSL**, `runs/rolling-map-full-windows-v1.xml` and
-`runs/rolling-map-full-wsl-v2.xml`. The isolated default-only WSL installation
-passes **593/70 optional or platform skips**; the focused rolling/recovery/auditor
-Windows profile passes 47 cases. Original MVP bytes, builds and changed-file
-lint/format/whitespace checks pass. A failed initial WSL suite is retained, not
+The V26 full frozen regressions pass **1128 tests/two skips on Windows** and
+**1130/two on WSL**, `runs/gauge-bridge-full-windows-v1.xml` and
+`runs/gauge-bridge-full-wsl-v1.xml`. The isolated default-only WSL installation
+passes **640/70 optional or platform skips**; focused geometry/controller/evaluator
+and runtime audit profiles pass 65 and 12 cases. Original MVP bytes, builds and
+changed-file lint/format/whitespace checks pass. The preceding V25 full tests
+pass 1075/two on Windows and 1077/two on WSL. Its failed initial WSL suite is retained, not
 counted as a release pass: its temporary root disappeared during concurrent pytest
 jobs. The unchanged rerun uses a verified-unused dedicated `--basetemp` and passes
 the complete suite. See the rolling-map document for failure and identity details.

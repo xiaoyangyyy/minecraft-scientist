@@ -99,6 +99,7 @@ def main():
     parser.add_argument("--settled-controls", action="store_true")
     parser.add_argument("--recover-map", action="store_true")
     parser.add_argument("--maintain-map", action="store_true")
+    parser.add_argument("--register-gauges", action="store_true")
     args = parser.parse_args()
     if args.seed < 0:
         parser.error("seed must be nonnegative")
@@ -112,6 +113,8 @@ def main():
         parser.error("map recovery requires --settled-controls")
     if args.maintain_map and not args.recover_map:
         parser.error("rolling maintenance requires --recover-map")
+    if args.register_gauges and not args.maintain_map:
+        parser.error("gauge registration requires --maintain-map")
     directory = args.output.resolve()
     directory.mkdir(parents=True, exist_ok=False)
     build = directory / "agent-build"
@@ -235,6 +238,18 @@ def main():
                     config["scope"] = (
                         "bounded public rolling map epochs and least-used opaque controls; no metric/global gauge, goal arrival or held-out generalization claim"
                     )
+                    if args.register_gauges:
+                        from minecraft_scientist.exploration.map_gauge_bridge import (
+                            GaugeBridgePolicy,
+                        )
+
+                        config["gauge_policy"] = GaugeBridgePolicy().model_dump(
+                            mode="json"
+                        )
+                        config["schema"] = "registered-maintenance-camera-projection-v1"
+                        config["scope"] = (
+                            "public past-only local gauge links before future controls; all bootstrap pairs and withheld rays retained; no global/metric localization or arrival claim"
+                        )
     write_json(directory / "config.json", config)
     config_hash = digest(directory / "config.json")
     audit, images, native_images, native_hashes, records = (
@@ -459,6 +474,7 @@ def main():
                                 execute_control,
                                 calibration["camera_intrinsics"],
                                 policy=config["maintenance_policy"],
+                                gauge_policy=config.get("gauge_policy"),
                             )
                             if active["maintenance"]["failure"] is not None:
                                 raise RuntimeError(
@@ -557,6 +573,13 @@ def main():
                 )
             )
         write_json(directory / "active-acquisition.json", active)
+        if args.register_gauges:
+            checks["gauge_policy_completed"] = (
+                active is not None
+                and "maintenance" in active
+                and active["maintenance"]["failure"] is None
+                and "gauge_bridges" in active["maintenance"]
+            )
     report = {
         "completed": error is None and all(checks.values()),
         "failure": error,

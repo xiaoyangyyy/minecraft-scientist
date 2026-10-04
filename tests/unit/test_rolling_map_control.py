@@ -99,6 +99,58 @@ def test_unobservable_initial_history_requests_least_used_nonsemantic_handle(
     )
 
 
+def test_gauge_bridge_freezes_before_second_epoch_future_and_never_promotes_navigation(
+    session, monkeypatch
+):
+    parent, frames, execute, requests, _ = session
+    seen = []
+
+    def bridge(first, second, **kwargs):
+        assert len(requests) == 2
+        assert first["decisions"] == second["decisions"] == []
+        assert first["prefixes"] == second["prefixes"] == []
+        seen.append((first["anchor_frame"], second["anchor_frame"]))
+        return {"supported": True, "proof": "unit fake; not geometric/runtime evidence"}
+
+    monkeypatch.setattr(rolling, "register_map_gauges", bridge)
+    result = rolling.maintain_public_maps(
+        parent, frames, execute, CAMERA, gauge_policy={}
+    )
+    assert seen == [(0, 2)] and len(requests) == 4
+    assert result["supported_local_gauge_links"] == 1
+    item = result["gauge_bridges"][0]
+    assert item["evidence_sha256"] == rolling._digest(item["evidence"])
+    assert (item["parent_epoch"], item["child_epoch"]) == (0, 1)
+    assert not result["global_gauge_aligned"] and not result["navigation_accepted"]
+
+
+def test_rejected_gauge_pair_cannot_rewrite_already_accepted_motion(session):
+    parent, frames, execute, requests, _ = session
+    result = rolling.maintain_public_maps(
+        parent, frames, execute, CAMERA, gauge_policy={}
+    )
+    assert result["terminal"] == "completed" and len(requests) == 4
+    assert result["supported_local_gauge_links"] == 0
+    assert not result["gauge_bridges"][0]["evidence"]["supported"]
+    assert all(epoch["terminal"] == "validated" for epoch in result["epochs"])
+
+
+def test_future_control_cannot_modify_frozen_gauge_record(session, monkeypatch):
+    parent, frames, execute, requests, _ = session
+    evidence = {"supported": True}
+    monkeypatch.setattr(
+        rolling, "register_map_gauges", lambda *args, **kwargs: evidence
+    )
+
+    def mutate(kind, handle):
+        if len(requests) >= 2:
+            evidence["supported"] = False
+        return execute(kind, handle)
+
+    with pytest.raises(ValueError, match="frozen gauge"):
+        rolling.maintain_public_maps(parent, frames, mutate, CAMERA, gauge_policy={})
+
+
 def test_exhaustion_retains_all_failed_fits_without_future_validation(
     session, monkeypatch
 ):

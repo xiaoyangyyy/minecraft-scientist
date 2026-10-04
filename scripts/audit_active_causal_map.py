@@ -7,7 +7,9 @@ import json
 from pathlib import Path
 
 import audit_runtime_camera as runtime
+import numpy as np
 
+from minecraft_scientist.evaluation.gauge_registration import score_gauge_truth
 from minecraft_scientist.evaluation.relative_motion import (
     relative_motion_truth,
     score_relative_motion,
@@ -20,6 +22,7 @@ from minecraft_scientist.exploration.active_causal_map import (
     ActiveMapPolicy,
     acquire_causal_map,
 )
+from minecraft_scientist.exploration.map_gauge_bridge import GaugeBridgePolicy
 from minecraft_scientist.exploration.map_recovery import (
     MapRecoveryPolicy,
     recover_public_map,
@@ -52,6 +55,7 @@ def _settled_registration(config):
         "settled-causal-camera-projection-v1",
         "recovery-causal-camera-projection-v1",
         "maintenance-causal-camera-projection-v1",
+        "registered-maintenance-camera-projection-v1",
     )
 
 
@@ -59,11 +63,19 @@ def _recovery_registration(config):
     return config.get("schema") in (
         "recovery-causal-camera-projection-v1",
         "maintenance-causal-camera-projection-v1",
+        "registered-maintenance-camera-projection-v1",
     )
 
 
 def _maintenance_registration(config):
-    return config.get("schema") == "maintenance-causal-camera-projection-v1"
+    return config.get("schema") in (
+        "maintenance-causal-camera-projection-v1",
+        "registered-maintenance-camera-projection-v1",
+    )
+
+
+def _gauge_registration(config):
+    return config.get("schema") == "registered-maintenance-camera-projection-v1"
 
 
 def _frame_limit(config):
@@ -90,6 +102,8 @@ def registration(directory, config, report, definition):
     recovery_policy = MapRecoveryPolicy()
     maintaining = _maintenance_registration(config)
     maintenance_policy = RollingMapPolicy()
+    gauging = _gauge_registration(config)
+    gauge_policy = GaugeBridgePolicy()
     baseline = [list(item) for item in definition.SCHEDULE[:48]]
     registered = {
         "valid": False,
@@ -103,6 +117,14 @@ def registration(directory, config, report, definition):
         registered["capture_checks"].append("recovery_policy_completed")
     if maintaining:
         registered["capture_checks"].append("maintenance_policy_completed")
+    if gauging:
+        registered["capture_checks"].append("gauge_policy_completed")
+    if (
+        gauging
+        and json.dumps(config.get("gauge_policy"), sort_keys=True)
+        != json.dumps(gauge_policy.model_dump(mode="json"), sort_keys=True)
+    ) or (not gauging and "gauge_policy" in config):
+        return registered
     if (
         maintaining
         and json.dumps(config.get("maintenance_policy"), sort_keys=True)
@@ -128,6 +150,7 @@ def registration(directory, config, report, definition):
             "settled-causal-camera-projection-v1",
             "recovery-causal-camera-projection-v1",
             "maintenance-causal-camera-projection-v1",
+            "registered-maintenance-camera-projection-v1",
         )
         and (settled or "settled_policy" not in config)
         and config["schedule"] == baseline
@@ -278,6 +301,7 @@ def registration(directory, config, report, definition):
                     execute_control,
                     calibration["camera_intrinsics"],
                     policy=maintenance_policy,
+                    gauge_policy=gauge_policy if gauging else None,
                 )
     registered.update(
         valid=(
@@ -363,6 +387,80 @@ def _score_continuation(continuation, positions, cameras):
     }
 
 
+def _score_gauge_links(maintenance, positions, cameras):
+    links = []
+    for link in maintenance["gauge_bridges"]:
+        parent, child = [
+            maintenance["epochs"][link[key]]["frozen"]["snapshot"]
+            for key in ("parent_epoch", "child_epoch")
+        ]
+        pmodels, cmodels = [
+            {item["bootstrap_slot"]: item for item in snapshot["maps"]}
+            for snapshot in (parent, child)
+        ]
+        first, last = parent["anchor_frame"], child["anchor_frame"]
+        scores = []
+        for pair in link["evidence"]["map_pairs"]:
+            result = {
+                "parent_bootstrap": pair["parent_bootstrap"],
+                "child_bootstrap": pair["child_bootstrap"],
+                "public_supported": pair["supported"],
+                "rendered": None,
+                "body": None,
+            }
+            if pair["similarity"] is not None:
+                pm, cm = (
+                    pmodels[pair["parent_bootstrap"]],
+                    cmodels[pair["child_bootstrap"]],
+                )
+                for domain, observations, truth in (
+                    ("rendered", cameras, rendered_motion_truth),
+                    ("body", positions, relative_motion_truth),
+                ):
+                    result[domain] = score_gauge_truth(
+                        pair["similarity"],
+                        truth(observations[first], observations[last]),
+                        parent_baseline=truth(
+                            observations[first],
+                            observations[first + pm["bootstrap_slot"]],
+                        )["distance"],
+                        child_baseline=truth(
+                            observations[last],
+                            observations[last + cm["bootstrap_slot"]],
+                        )["distance"],
+                        parent_gauge_baseline=float(
+                            np.linalg.norm(
+                                pm["poses"][pm["bootstrap_slot"]]["translation"]
+                            )
+                        ),
+                        child_gauge_baseline=float(
+                            np.linalg.norm(
+                                cm["poses"][cm["bootstrap_slot"]]["translation"]
+                            )
+                        ),
+                        policy=maintenance["gauge_policy"],
+                    )
+            scores.append(result)
+        links.append(
+            {
+                "parent_epoch": link["parent_epoch"],
+                "child_epoch": link["child_epoch"],
+                "anchor_interval": [first, last],
+                "public_supported": link["evidence"]["supported"],
+                "reference_pair": link["evidence"]["reference_pair"],
+                "matched_tracks": len(link["evidence"]["track_pairs"]),
+                "candidate_scores": scores,
+            }
+        )
+    return {
+        "links": links,
+        "supported_local_links": maintenance["supported_local_gauge_links"],
+        "global_gauge_aligned": False,
+        "metric_scale_known": False,
+        "navigation_accepted": False,
+    }
+
+
 def audit(directory, engine):
     report = json.loads((directory / "report.json").read_bytes())
     config = json.loads((directory / "config.json").read_bytes())
@@ -403,6 +501,7 @@ def audit(directory, engine):
             "settled_evaluation": None,
             "recovery_evaluation": None,
             "maintenance_evaluation": None,
+            "gauge_evaluation": None,
             "navigation_accepted": False,
         }
     if not all(runtime.digest(path) == value for path, value in frozen.items()):
@@ -413,6 +512,7 @@ def audit(directory, engine):
             "settled_evaluation": None,
             "recovery_evaluation": None,
             "maintenance_evaluation": None,
+            "gauge_evaluation": None,
             "failure": {
                 "type": "ValueError",
                 "message": "public bytes changed across camera audit",
@@ -434,6 +534,7 @@ def audit(directory, engine):
             "settled_evaluation": None,
             "recovery_evaluation": None,
             "maintenance_evaluation": None,
+            "gauge_evaluation": None,
             "failure": {
                 "type": "ValueError",
                 "message": "private bytes changed after camera audit",
@@ -523,6 +624,11 @@ def audit(directory, engine):
             "global_gauge_aligned": False,
             "navigation_accepted": False,
         }
+    gauge_evaluation = (
+        _score_gauge_links(public_run["maintenance"], positions, cameras)
+        if _gauge_registration(config)
+        else None
+    )
     checks = {
         "capture_and_public_policy_independently_replayed": physical["valid"],
         "artifacts_still_match_capture_ledger": all(
@@ -549,6 +655,7 @@ def audit(directory, engine):
         "settled_evaluation": settled_evaluation if valid else None,
         "recovery_evaluation": recovery_evaluation if valid else None,
         "maintenance_evaluation": maintenance_evaluation if valid else None,
+        "gauge_evaluation": gauge_evaluation if valid else None,
         "navigation_accepted": False,
         "scope": config["scope"],
     }
@@ -589,6 +696,7 @@ def main():
                     "settled_evaluation",
                     "recovery_evaluation",
                     "maintenance_evaluation",
+                    "gauge_evaluation",
                 )
             }
         )

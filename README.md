@@ -11,14 +11,15 @@ Fabric mod supplies resettable hidden rules, and the Python boundary replaces it
 block, and entity names with seeded opaque IDs before an agent can observe them.
 Live execution still requires the user's explicit Minecraft EULA acceptance.
 
-Latest visual-development result: bounded public rolling-map maintenance now
-recovers two consecutive supported rendered-camera motion intervals after a map
-failure, with independent direction errors about 2.60/1.11 degrees. Current-player
-directions are wrong on both intervals, and another development world exhausts
-every new map fit. All failures and unstitched local gauges remain explicit.
-This is not reliable goal navigation. See
-[`docs/rolling-map-maintenance-development.md`](docs/rolling-map-maintenance-development.md)
-for all outcomes, camera/body scores, costs and outstanding full-project gates.
+Latest visual-development result: public past-only local-gauge registration now
+freezes all candidate transforms before subsequent controls and is independently
+replayed before private scoring. No complete link passes in three fresh sessions:
+one recovers two correct rendered-camera motion intervals (2.60/1.11 degrees),
+another exhausts new map fits, and a same-seed replication rejects both future
+motions. Current-player movement is not recovered reliably. This is not a
+persistent global map or reliable goal navigation. See
+[`docs/local-gauge-registration-development.md`](docs/local-gauge-registration-development.md)
+for retained outcomes and the required shared-landmark reconstruction work.
 
 ## Quick start
 
