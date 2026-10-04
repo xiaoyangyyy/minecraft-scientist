@@ -11,15 +11,17 @@ Fabric mod supplies resettable hidden rules, and the Python boundary replaces it
 block, and entity names with seeded opaque IDs before an agent can observe them.
 Live execution still requires the user's explicit Minecraft EULA acceptance.
 
-Latest visual-development result: training-only shared-anchor reconstruction now
-preserves the original landmark partitions and freezes new map versions before
-different controls. One independently audited development run passes the new
-camera-motion test (0.65-degree direction error); a replication rejects its future
-rays and another world exhausts all map fits. Current-player motion remains wrong
-in the passing camera run (37-degree error). Earlier rigid gauge failures remain
-explicit. This is not a persistent global map or reliable goal navigation. See
-[`docs/shared-anchor-reconstruction-development.md`](docs/shared-anchor-reconstruction-development.md)
-for all outcomes, limited ablation results and outstanding full-project gates.
+Latest visual development adds a counterexample/maintenance map revision and a
+public WAIT–MOVE–WAIT trial with frozen stable-image endpoints. In its first
+independently audited fresh run, both selected tails are physically stationary
+and camera/player displacement magnitudes agree, but withheld map rays still fail;
+the version correctly remains rejected, without a supported motion prediction.
+This does not establish persistent mapping or reliable goal navigation. See
+[`docs/shared-endpoint-control-development.md`](docs/shared-endpoint-control-development.md)
+for two independently audited replications, a retained no-map world, and pending
+full regressions. The preceding
+[`shared-anchor checkpoint`](docs/shared-anchor-reconstruction-development.md)
+retains its bounded camera success, player-motion failure and limited ablations.
 
 ## Quick start
 

@@ -101,6 +101,7 @@ def main():
     parser.add_argument("--maintain-map", action="store_true")
     parser.add_argument("--register-gauges", action="store_true")
     parser.add_argument("--share-anchor", action="store_true")
+    parser.add_argument("--endpoint-controls", action="store_true")
     args = parser.parse_args()
     if args.seed < 0:
         parser.error("seed must be nonnegative")
@@ -118,6 +119,8 @@ def main():
         parser.error("gauge registration requires --maintain-map")
     if args.share_anchor and not args.register_gauges:
         parser.error("shared-anchor reconstruction requires --register-gauges")
+    if args.endpoint_controls and not args.share_anchor:
+        parser.error("endpoint controls require --share-anchor")
     directory = args.output.resolve()
     directory.mkdir(parents=True, exist_ok=False)
     build = directory / "agent-build"
@@ -267,6 +270,20 @@ def main():
                             config["scope"] = (
                                 "training-only versioned shared-anchor reconstruction before new controls; original holdouts and all candidates retained; no global/metric localization or arrival claim"
                             )
+                            if args.endpoint_controls:
+                                from minecraft_scientist.exploration.shared_map_endpoint import (
+                                    SharedEndpointPolicy,
+                                )
+
+                                config["shared_endpoint_policy"] = (
+                                    SharedEndpointPolicy().model_dump(mode="json")
+                                )
+                                config["schema"] = (
+                                    "shared-endpoint-camera-projection-v1"
+                                )
+                                config["scope"] = (
+                                    "counterexample-trained frozen shared map and public WAIT/MOVE/WAIT endpoint trial; player rest and displacement evaluated separately; no navigation/arrival or held-out generalization claim"
+                                )
     write_json(directory / "config.json", config)
     config_hash = digest(directory / "config.json")
     audit, images, native_images, native_hashes, records = (
@@ -498,6 +515,21 @@ def main():
                                 raise RuntimeError(
                                     "rolling map maintenance failed; partial evidence retained"
                                 )
+                            if args.endpoint_controls:
+                                from minecraft_scientist.exploration.shared_map_endpoint import (
+                                    run_shared_endpoint_trial,
+                                )
+
+                                active["shared_endpoint"] = run_shared_endpoint_trial(
+                                    active["maintenance"],
+                                    images,
+                                    execute_control,
+                                    policy=config["shared_endpoint_policy"],
+                                )
+                                if active["shared_endpoint"]["failure"] is not None:
+                                    raise RuntimeError(
+                                        "shared endpoint trial failed; partial evidence retained"
+                                    )
     except Exception as failure:  # noqa: BLE001 -- preserve real launch/capture failures
         error = {"type": type(failure).__name__, "message": str(failure)}
     finally:
@@ -553,6 +585,7 @@ def main():
             + len(active.get("settled", {}).get("steps", []))
             + recovery_actions
             + len(active.get("maintenance", {}).get("steps", []))
+            + len(active.get("shared_endpoint", {}).get("steps", []))
         )
         if args.settled_controls:
             checks["settled_policy_completed"] = (
@@ -604,6 +637,22 @@ def main():
                 and "maintenance" in active
                 and active["maintenance"]["failure"] is None
                 and "shared_anchor_versions" in active["maintenance"]
+            )
+        if args.endpoint_controls:
+            checks["shared_endpoint_policy_completed"] = (
+                active is not None
+                and "shared_endpoint" in active
+                and active["shared_endpoint"]["failure"] is None
+                and active["shared_endpoint"]["terminal"]
+                in (
+                    "not_started",
+                    "history_budget_exhausted",
+                    "budget_exhausted",
+                    "initial_wait_exhausted",
+                    "final_wait_exhausted",
+                    "validated",
+                    "rejected",
+                )
             )
     report = {
         "completed": error is None and all(checks.values()),

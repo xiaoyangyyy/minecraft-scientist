@@ -58,6 +58,16 @@ until each required gate has current, inspectable evidence.
 
 ## Evidence discipline
 
+The latest `docs/shared-endpoint-control-development.md` checkpoint consumes prior
+training-only counterexample/maintenance rays into a separately declared version,
+then freezes a public WAIT–MOVE–WAIT trial. Two fresh independently audited
+sessions select physically stationary player tails and matching camera/player
+displacement magnitudes, yet both reject their endpoint map predictions. A
+different world cannot acquire a map and executes no endpoint trial. Next improve
+observable stable-keyframe excitation/geometry and new-control validation, then
+integrate persistent routes and independently verified actual arrival. Timing
+diagnostics, repeated failures and green core tests do not close any gate above.
+
 The latest `docs/shared-anchor-reconstruction-development.md` checkpoint revises
 training poses/landmarks in an immutable original-anchor lineage, protects every
 withheld identity, freezes before new controls and independently replays three

@@ -4,11 +4,14 @@ This audit compares the current repository with the original self-evolving symbo
 Minecraft system, not merely with the smaller offline MVP. A green unit test is not
 treated as proof of live Minecraft behavior.
 
-The latest verified visual checkpoint is `docs/shared-anchor-reconstruction-development.md`:
-three fresh public-policy captures retain failed fits and all gauge candidates.
-One shared-anchor camera model passes new controls, another fails and a second
-world acquires no map. Simultaneous player motion is still wrong. Reliable goal
-navigation, held-out generalization and full-project completion remain open.
+The latest verified visual checkpoint is `docs/shared-endpoint-control-development.md`:
+two fresh independently audited sessions select physically stationary endpoints
+from public image stability, but both reject withheld map-ray predictions despite
+real motion. A second development world acquires no map and never starts an
+endpoint trial. Every earlier failure remains recorded. Reliable goal navigation,
+held-out generalization and full-project completion remain open. The current V28
+offline core releases pass on both platforms. The full Windows regression passes
+1197 cases/two skips; the WSL full regression is still running.
 
 The current full-project execution gates are in `docs/quality-roadmap.md`.
 Subsequent RGB-geometry development and its rejected tracking results are recorded

@@ -45,6 +45,22 @@ class SharedAnchorPolicy(BaseModel):
         return self
 
 
+class SharedCrisisFitPolicy(BaseModel):
+    """Separate registered fit budget; never relax the preceding 14-frame policy."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    maximum_consumed_frames: Literal[16] = 16
+    fitting: JointMapConfig = JointMapConfig(maximum_frames=16)
+
+    @model_validator(mode="after")
+    def _registered(self):
+        if self.fitting != JointMapConfig(maximum_frames=16):
+            raise ValueError(
+                "crisis reconstruction cannot relax original geometry gates"
+            )
+        return self
+
+
 def _sha(model):
     return hashlib.sha256(model.model_dump_json().encode()).hexdigest()
 
@@ -65,6 +81,20 @@ def refine_shared_map(parent, original, consumed, *, policy=None):
     settings = SharedAnchorPolicy.model_validate(
         policy.model_dump() if isinstance(policy, SharedAnchorPolicy) else policy or {}
     )
+    return _refine_original_map(parent, original, consumed, settings)
+
+
+def refine_shared_crisis_map(parent, original, consumed, *, policy=None):
+    """A new version may consume counterexample training rays, not resplit IDs."""
+    settings = SharedCrisisFitPolicy.model_validate(
+        policy.model_dump()
+        if isinstance(policy, SharedCrisisFitPolicy)
+        else policy or {}
+    )
+    return _refine_original_map(parent, original, consumed, settings)
+
+
+def _refine_original_map(parent, original, consumed, settings):
     parent = JointMapEvidence.model_validate(parent.model_dump())
     original, consumed = [
         TemporalTracks.model_validate(value.model_dump())
@@ -248,6 +278,32 @@ def refine_shared_map(parent, original, consumed, *, policy=None):
     )
 
 
+def original_shared_root(parent_snapshot):
+    """Validate the complete immutable public root, including failed bootstraps."""
+    frozen = json.loads(json.dumps(parent_snapshot, allow_nan=False))
+    original = TemporalTracks.model_validate(frozen["past"])
+    models = tuple(JointMapEvidence.model_validate(item) for item in frozen["maps"])
+    anchor, seed = frozen["anchor_frame"], frozen["seed"]
+    if (
+        type(anchor) is not int
+        or anchor < 0
+        or type(seed) is not int
+        or not 0 <= seed < 2**31 - 512
+        or frozen["prefixes"]
+        or frozen["decisions"]
+        or frozen["navigation_accepted"] is not False
+        or frozen["metric_scale_known"] is not False
+        or frozen["policy"] != CausalWindowPolicy().model_dump(mode="json")
+        or tuple(item.bootstrap_slot for item in models)
+        != tuple(range(2, original.frame_count))
+        or any(item.camera != models[0].camera for item in models)
+    ):
+        raise ValueError(
+            "shared version requires every original frozen bootstrap, not a future/private root"
+        )
+    return frozen, original, models
+
+
 class SharedAnchorWindow(CausalMapWindow):
     """A new frozen version with subsequent-control shadow validation.
 
@@ -261,27 +317,8 @@ class SharedAnchorWindow(CausalMapWindow):
             if isinstance(policy, SharedAnchorPolicy)
             else policy or {}
         )
-        frozen = json.loads(json.dumps(parent_snapshot, allow_nan=False))
-        original = TemporalTracks.model_validate(frozen["past"])
-        models = tuple(JointMapEvidence.model_validate(item) for item in frozen["maps"])
+        frozen, original, models = original_shared_root(parent_snapshot)
         anchor, seed = frozen["anchor_frame"], frozen["seed"]
-        if (
-            type(anchor) is not int
-            or anchor < 0
-            or type(seed) is not int
-            or not 0 <= seed < 2**31 - 512
-            or frozen["prefixes"]
-            or frozen["decisions"]
-            or frozen["navigation_accepted"] is not False
-            or frozen["metric_scale_known"] is not False
-            or frozen["policy"] != CausalWindowPolicy().model_dump(mode="json")
-            or tuple(item.bootstrap_slot for item in models)
-            != tuple(range(2, original.frame_count))
-            or any(item.camera != models[0].camera for item in models)
-        ):
-            raise ValueError(
-                "shared version requires every original frozen bootstrap, not a future/private root"
-            )
         self._parent_snapshot = frozen
         self._parent_digest = _json_digest(frozen)
         self._required = tuple(item.bootstrap_slot for item in models if item.supported)

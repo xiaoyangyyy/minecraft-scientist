@@ -99,9 +99,18 @@ separate privileged evaluator, freezing 109 entries including 106 package files.
 V27 adds original-partition shared-anchor reconstruction, freezing 110 entries
 including 107 package files. Both V27 current/source-snapshot ledgers are rechecked
 with zero mismatches.
+V28 adds separately registered sixteen-view crisis/maintenance reconstruction and
+publicly settled endpoint controls, freezing 111 entries including 108 package
+files. Both V28 thirty-seed/two-repeat/eighteen-artifact releases pass all six
+checks and current/source-snapshot hashes recheck with zero mismatches. The focused
+Windows profile passes 139 cases; isolated default-only WSL passes 640 cases/72
+optional or platform skips. Original MVP bytes and package builds pass. Full V28
+Windows regression passes 1197 cases/two skips in
+`runs/shared-endpoint-full-windows-v1.xml`; WSL is still running and must not be
+claimed complete.
 Core behavior is unchanged by these
 optional modules; visual results remain separately scoped in
-`docs/shared-anchor-reconstruction-development.md`.
+`docs/shared-endpoint-control-development.md` and preceding historical checkpoints.
 These earlier runs are historical checks, not the current source-frozen release.
 Neither local multi-seed verification
 proves remote CI execution, fresh live-server gates, learned-planner release

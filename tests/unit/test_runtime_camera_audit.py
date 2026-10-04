@@ -1360,6 +1360,109 @@ def test_shared_capture_flag_requires_complete_parent_protocol(
     assert error.value.code == 2 and not output.exists()
 
 
+@pytest.fixture
+def endpoint_capture(shared_capture):
+    active, route, engine = shared_capture
+    config = json.loads((route / "config.json").read_bytes())
+    config.update(
+        schema="shared-endpoint-camera-projection-v1",
+        shared_endpoint_policy=active.SharedEndpointPolicy().model_dump(mode="json"),
+    )
+    save(route / "config.json", config)
+    extra = json.loads((route / "active-acquisition.json").read_bytes())
+    extra["shared_endpoint"] = active.run_shared_endpoint_trial(
+        extra["maintenance"],
+        [],
+        lambda *args: pytest.fail("no root can request endpoint actions"),
+    )
+    save(route / "active-acquisition.json", extra)
+    report = json.loads((route / "report.json").read_bytes())
+    report["config_sha256"] = active.runtime.digest(route / "config.json")
+    report["artifact_sha256"]["active-acquisition.json"] = active.runtime.digest(
+        route / "active-acquisition.json"
+    )
+    report["checks"]["shared_endpoint_policy_completed"] = True
+    save(route / "report.json", report)
+    return active, route, engine
+
+
+def test_endpoint_registration_replays_before_private_reads_without_invented_rest_or_motion(
+    endpoint_capture, monkeypatch
+):
+    active, route, engine = endpoint_capture
+    with monkeypatch.context() as guards:
+        private_guard(guards)
+        result = active.runtime.public_data(
+            route, engine, registration=active.registration
+        )
+        assert result["valid"] and result["count"] == 82
+    result = active.audit(route, engine)
+    assert result["valid"]
+    assert result["shared_endpoint_evaluation"] == {
+        "terminal": "not_started",
+        "status": "not_started",
+        "update_kind": None,
+        "executed_actions": 0,
+        "initial_settle": None,
+        "final_settle": None,
+        "initial_stability_diagnostic": None,
+        "final_stability_diagnostic": None,
+        "evaluation": None,
+        "visual_stability_only": True,
+        "metric_scale_known": False,
+        "global_gauge_aligned": False,
+        "navigation_accepted": False,
+    }
+
+
+@pytest.mark.parametrize(
+    "case", ["policy", "schema", "model", "initial", "metric", "motion"]
+)
+def test_forged_endpoint_checkpoint_refuses_before_private_reads(
+    endpoint_capture, monkeypatch, case
+):
+    active, route, engine = endpoint_capture
+    config = json.loads((route / "config.json").read_bytes())
+    extra = json.loads((route / "active-acquisition.json").read_bytes())
+    if case == "policy":
+        config["shared_endpoint_policy"]["minimum_wait_ticks"] = 3
+    elif case == "schema":
+        config["schema"] = "registered-shared-anchor-camera-projection-v1"
+    elif case == "model":
+        extra["shared_endpoint"]["frozen"] = {"maps": [{"supported": True}]}
+    elif case == "initial":
+        extra["shared_endpoint"]["initial_endpoint"] = {"absolute_frame": 80}
+    elif case == "metric":
+        extra["shared_endpoint"]["metric_scale_known"] = True
+    else:
+        extra["shared_endpoint"]["motion"] = {"supported": True}
+    save(route / "config.json", config)
+    save(route / "active-acquisition.json", extra)
+    report = json.loads((route / "report.json").read_bytes())
+    report["config_sha256"] = active.runtime.digest(route / "config.json")
+    report["artifact_sha256"]["active-acquisition.json"] = active.runtime.digest(
+        route / "active-acquisition.json"
+    )
+    save(route / "report.json", report)
+    private_guard(monkeypatch)
+    result = active.audit(route, engine)
+    assert not result["valid"] and result["shared_endpoint_evaluation"] is None
+    assert not result["camera_audit"]["checks"]["registered_schedule"]
+
+
+def test_endpoint_capture_flag_requires_shared_parent_before_creating_output(
+    scripts, tmp_path, monkeypatch
+):
+    _, capture = scripts
+    output = tmp_path / "must-not-create"
+    monkeypatch.setattr(
+        sys, "argv", [capture.__file__, "--endpoint-controls", "--output", str(output)]
+    )
+    with pytest.raises(SystemExit) as error:
+        capture.main()
+    assert error.value.code == 2 and not output.exists()
+
+
 def test_mutation_during_analysis_invalidates_audit(diagnostic, monkeypatch):
     script, route, engine = diagnostic
     analyze = script.timing_metrics

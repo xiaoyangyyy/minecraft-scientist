@@ -40,6 +40,10 @@ from minecraft_scientist.exploration.settled_map_control import (
     run_settled_controls,
 )
 from minecraft_scientist.exploration.shared_anchor_map import SharedAnchorPolicy
+from minecraft_scientist.exploration.shared_map_endpoint import (
+    SharedEndpointPolicy,
+    run_shared_endpoint_trial,
+)
 from minecraft_scientist.exploration.visibility_acquisition import PublicProbeStep
 from minecraft_scientist.protocols import TransitionRecord
 
@@ -58,6 +62,7 @@ def _settled_registration(config):
         "maintenance-causal-camera-projection-v1",
         "registered-maintenance-camera-projection-v1",
         "registered-shared-anchor-camera-projection-v1",
+        "shared-endpoint-camera-projection-v1",
     )
 
 
@@ -67,6 +72,7 @@ def _recovery_registration(config):
         "maintenance-causal-camera-projection-v1",
         "registered-maintenance-camera-projection-v1",
         "registered-shared-anchor-camera-projection-v1",
+        "shared-endpoint-camera-projection-v1",
     )
 
 
@@ -75,6 +81,7 @@ def _maintenance_registration(config):
         "maintenance-causal-camera-projection-v1",
         "registered-maintenance-camera-projection-v1",
         "registered-shared-anchor-camera-projection-v1",
+        "shared-endpoint-camera-projection-v1",
     )
 
 
@@ -82,11 +89,19 @@ def _gauge_registration(config):
     return config.get("schema") in (
         "registered-maintenance-camera-projection-v1",
         "registered-shared-anchor-camera-projection-v1",
+        "shared-endpoint-camera-projection-v1",
     )
 
 
 def _shared_registration(config):
-    return config.get("schema") == "registered-shared-anchor-camera-projection-v1"
+    return config.get("schema") in (
+        "registered-shared-anchor-camera-projection-v1",
+        "shared-endpoint-camera-projection-v1",
+    )
+
+
+def _endpoint_registration(config):
+    return config.get("schema") == "shared-endpoint-camera-projection-v1"
 
 
 def _frame_limit(config):
@@ -117,6 +132,8 @@ def registration(directory, config, report, definition):
     gauge_policy = GaugeBridgePolicy()
     sharing = _shared_registration(config)
     shared_policy = SharedAnchorPolicy()
+    endpoint = _endpoint_registration(config)
+    endpoint_policy = SharedEndpointPolicy()
     baseline = [list(item) for item in definition.SCHEDULE[:48]]
     registered = {
         "valid": False,
@@ -134,6 +151,14 @@ def registration(directory, config, report, definition):
         registered["capture_checks"].append("gauge_policy_completed")
     if sharing:
         registered["capture_checks"].append("shared_anchor_policy_completed")
+    if endpoint:
+        registered["capture_checks"].append("shared_endpoint_policy_completed")
+    if (
+        endpoint
+        and json.dumps(config.get("shared_endpoint_policy"), sort_keys=True)
+        != json.dumps(endpoint_policy.model_dump(mode="json"), sort_keys=True)
+    ) or (not endpoint and "shared_endpoint_policy" in config):
+        return registered
     if (
         sharing
         and json.dumps(config.get("shared_anchor_policy"), sort_keys=True)
@@ -173,6 +198,7 @@ def registration(directory, config, report, definition):
             "maintenance-causal-camera-projection-v1",
             "registered-maintenance-camera-projection-v1",
             "registered-shared-anchor-camera-projection-v1",
+            "shared-endpoint-camera-projection-v1",
         )
         and (settled or "settled_policy" not in config)
         and config["schedule"] == baseline
@@ -326,6 +352,13 @@ def registration(directory, config, report, definition):
                     gauge_policy=gauge_policy if gauging else None,
                     shared_policy=shared_policy if sharing else None,
                 )
+                if endpoint:
+                    replayed["shared_endpoint"] = run_shared_endpoint_trial(
+                        replayed["maintenance"],
+                        images[: cursor + 1],
+                        execute_control,
+                        policy=endpoint_policy,
+                    )
     registered.update(
         valid=(
             json.dumps(saved, sort_keys=True, allow_nan=False)
@@ -335,6 +368,7 @@ def registration(directory, config, report, definition):
             and (not settled or replayed["settled"]["failure"] is None)
             and (not recovering or replayed["recovery"]["failure"] is None)
             and (not maintaining or replayed["maintenance"]["failure"] is None)
+            and (not endpoint or replayed["shared_endpoint"]["failure"] is None)
             and all(runtime.digest(path) == value for path, value in frozen.items())
         ),
         schedule=requested,
@@ -406,6 +440,77 @@ def _score_continuation(continuation, positions, cameras):
         "trials": trials,
         "pose_domain": continuation["pose_domain"],
         "metric_scale_known": False,
+        "navigation_accepted": False,
+    }
+
+
+def _score_shared_endpoint(trial, positions, cameras):
+    """Diagnostic-only rest and displacement, after complete public/native replay."""
+
+    def stable_tail(record):
+        if record is None or not record["settled"]:
+            return None
+        end = record["end_frame"]
+        if type(end) is not int or not 3 <= end < len(positions):
+            raise ValueError("public stable endpoint has invalid actual image bounds")
+        pairs = [(end - 3 + offset, end - 2 + offset) for offset in range(3)]
+        result = {
+            "public_intervals": [list(pair) for pair in pairs],
+            "diagnostic_only": True,
+        }
+        for domain, observations, truth in (
+            ("body", positions, relative_motion_truth),
+            ("rendered", cameras, rendered_motion_truth),
+        ):
+            values = [
+                truth(observations[first], observations[last]) for first, last in pairs
+            ]
+            result[f"maximum_{domain}_step_translation"] = max(
+                item["distance"] for item in values
+            )
+            result[f"maximum_{domain}_step_rotation_degrees"] = max(
+                float(
+                    np.degrees(
+                        np.arccos(
+                            np.clip(
+                                (np.trace(item["relative_rotation"]) - 1) / 2, -1, 1
+                            )
+                        )
+                    )
+                )
+                for item in values
+            )
+        return result
+
+    scores = None
+    first, last = trial["initial_endpoint"], trial["final_endpoint"]
+    if first is not None and last is not None:
+        a, b = first["absolute_frame"], last["absolute_frame"]
+        if type(a) is not int or type(b) is not int or not 0 <= a < b < len(positions):
+            raise ValueError("shared endpoint trial has invalid frozen image bounds")
+        predicted = trial["motion"] or {"supported": False}
+        scores = {
+            "interval": [a, b],
+            "rendered": score_rendered_motion(
+                predicted, cameras[a], cameras[b], **THRESHOLDS
+            ),
+            "body": score_relative_motion(
+                predicted, positions[a], positions[b], **THRESHOLDS
+            ),
+        }
+    return {
+        "terminal": trial["terminal"],
+        "status": trial["status"],
+        "update_kind": trial.get("update_kind"),
+        "executed_actions": len(trial["steps"]),
+        "initial_settle": trial["initial_settle"],
+        "final_settle": trial["final_settle"],
+        "initial_stability_diagnostic": stable_tail(trial["initial_settle"]),
+        "final_stability_diagnostic": stable_tail(trial["final_settle"]),
+        "evaluation": scores,
+        "visual_stability_only": True,
+        "metric_scale_known": False,
+        "global_gauge_aligned": False,
         "navigation_accepted": False,
     }
 
@@ -526,6 +631,7 @@ def audit(directory, engine):
             "maintenance_evaluation": None,
             "gauge_evaluation": None,
             "shared_anchor_evaluation": None,
+            "shared_endpoint_evaluation": None,
             "navigation_accepted": False,
         }
     if not all(runtime.digest(path) == value for path, value in frozen.items()):
@@ -538,6 +644,7 @@ def audit(directory, engine):
             "maintenance_evaluation": None,
             "gauge_evaluation": None,
             "shared_anchor_evaluation": None,
+            "shared_endpoint_evaluation": None,
             "failure": {
                 "type": "ValueError",
                 "message": "public bytes changed across camera audit",
@@ -561,6 +668,7 @@ def audit(directory, engine):
             "maintenance_evaluation": None,
             "gauge_evaluation": None,
             "shared_anchor_evaluation": None,
+            "shared_endpoint_evaluation": None,
             "failure": {
                 "type": "ValueError",
                 "message": "private bytes changed after camera audit",
@@ -686,6 +794,11 @@ def audit(directory, engine):
             "metric_scale_known": False,
             "navigation_accepted": False,
         }
+    endpoint_evaluation = (
+        _score_shared_endpoint(public_run["shared_endpoint"], positions, cameras)
+        if _endpoint_registration(config)
+        else None
+    )
     checks = {
         "capture_and_public_policy_independently_replayed": physical["valid"],
         "artifacts_still_match_capture_ledger": all(
@@ -714,6 +827,7 @@ def audit(directory, engine):
         "maintenance_evaluation": maintenance_evaluation if valid else None,
         "gauge_evaluation": gauge_evaluation if valid else None,
         "shared_anchor_evaluation": shared_evaluation if valid else None,
+        "shared_endpoint_evaluation": endpoint_evaluation if valid else None,
         "navigation_accepted": False,
         "scope": config["scope"],
     }
@@ -756,6 +870,7 @@ def main():
                     "maintenance_evaluation",
                     "gauge_evaluation",
                     "shared_anchor_evaluation",
+                    "shared_endpoint_evaluation",
                 )
             }
         )
