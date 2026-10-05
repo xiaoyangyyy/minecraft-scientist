@@ -81,12 +81,16 @@ Both package builds pass. The seed-zero MVP report at
 `runs/shared-endpoint-regression-mvp-seed0/benchmark.json` stays byte-identical,
 SHA-256 `B95AF2E5C152B9F06EDC63004EA87FB183C37E6A5A13BFF53F21A39A4F48AEB8`.
 The full Windows regression passes 1197 cases/two skips in
-`runs/shared-endpoint-full-windows-v1.xml`; the WSL full regression is still running.
+`runs/shared-endpoint-full-windows-v1.xml`. The exact frozen V28 Linux tree completes
+1199 passes/two skips, zero failures/errors in 752.149 seconds, recorded in
+`runs/shared-endpoint-full-frozen-tree-wsl-v1.xml` (terminal process exit zero).
 All three fresh runtime audits have completed as recorded below.
 Three initial mounted-source WSL profiles terminate nonzero without JUnit and are
 not passes. An exact 416-file native source/test/fixture snapshot and durable
-verified archive now preserve the V28 bytes. Its full suite is running with a
-separate declared runtime profile; Linux completion is still unproven. See
+verified archive now preserve the V28 bytes. All 416 frozen file hashes are
+independently rechecked after the suite, without mismatches. This separate native
+profile's pass does not replace the failed mounted-drive profiles or prove later
+source revisions. See
 `research/settled_keyframes/README.md` for provenance, thread/filesystem diagnostics
 and the negative same-evidence optimizer probe.
 Earlier focused XML results remain preserved separately. The initial synthetic

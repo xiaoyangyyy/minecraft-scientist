@@ -99,8 +99,69 @@ and verifies every archived member; archive SHA-256 is
 `F632DEE989F6BCD180CB9D71E36ADE8EC8D91DFF9E699A480D644C43EBCFA4EC`.
 This is source provenance, not successful testing.
 
-The exact-copy, single-thread, native-source/native-temporary full suite is running
+The exact-copy, single-thread, native-source/native-temporary full suite completes
 with a separate 3600-second cap and configuration at
 `runs/shared-endpoint-full-frozen-tree-wsl-v1.config.json`. It keeps the entire
-unchanged suite, budgets and gates. Wait for its actual terminal result and JUnit
-before asserting Linux completion. It remains independent of the failed profiles.
+unchanged suite, budgets and gates. The terminal process exits zero; its JUnit
+records 1199 passes/two skips, zero failures/errors and 752.149 seconds. All 416
+frozen file hashes are rechecked unchanged. This verifies V28, not subsequent
+keyframe acquisition revisions, and remains independent of the failed profiles.
+
+## Past-only fixed-pose point diagnostic
+
+`point_fit_probe.py` changes only the withheld points' estimator: DLT initialization
+followed by thirty bounded point-only robust LM iterations on the original twelve
+past views. Training poses/points, intrinsics, partitions, budgets and gates remain
+exactly unchanged. Every consumed-frame check is recomputed. No extension/future
+pixel enters point fitting, and all original candidates including failures remain.
+This is another known-data diagnostic, not new-control validation or promotion.
+
+Seven synthetic tests pass on Windows, including exact recovery, a genuinely unseen
+synthetic camera, noisy-ray determinism/cost decrease, malformed input and zero-
+baseline refusal. The real diagnostic's two repetitions at
+`runs/point-fit-same-evidence-seed202-v1` and `-v2` have identical report SHA-256
+`4DBE7FCE794E5A248622197BDF878E43DBB40581453F06E24BC6B679D2DB95C0`.
+All five preservation checks pass. Past cost decreases from 46.122245 to 44.828475
+and 46.962647 to 45.641959 for bootstraps 10/11, but initial withheld endpoint
+errors worsen to 6.165828/6.237189 pixels and final errors to 9.433341/9.530474.
+Both still reject the unchanged three-pixel gate. The point estimator alone is
+not adopted; improved historical loss is not evidence of better future prediction.
+
+## Sampled-keyframe tracking diagnostic
+
+`tracking_gap_probe.py` compares direct endpoint matching with complete public raw
+intervals, retaining identical anchor detector/gates and recording surviving IDs,
+image ordinals, cells and endpoint disagreement. Pair-local identities are not
+stitched across intervals. Over-128-frame raw intervals remain explicitly
+unavailable rather than subsampled. No map is fitted or private pose opened.
+Four synthetic tests cover unchanged inputs, shared detector, differing observation
+counts, failed middle-frame refusal and exact bounds.
+
+Reports at `runs/tracking-gap-same-evidence-seed202-v1` and `-seed201-v1` preserve
+all known development comparisons. Seed-202 initial survival increases from
+0.333333 to 0.454365, still below the live 0.5 gate. Its pair-local 78→90 interval
+increases from 0.194245 to 0.501199, but retaining the original frame-56 anchor over
+56→90 gives only 0.315476. Local improvement cannot rescue the global namespace.
+Seed-201 first interval increases from 0.5 to 0.595238; this is not a supported
+multi-view map or new-control prediction. Every source/public input hash remains
+unchanged. Full-project scope remains in the quality roadmap.
+
+## Persistent exact verification inputs
+
+`freeze_test_tree.py --ledger <config.json>` now accepts an explicit source ledger,
+without changing earlier archived V28 bytes. V29 freezes 423 files/4,665,376 bytes;
+archive SHA-256 is `533D8C163635CEBF7AB74FD5A1A6AF780499A4991F7CE2A08D993D988FECC957`.
+During the first V29 full suite both source/temp paths disappear from `/tmp`.
+The process subsequently terminates nonzero, including failure to restore its
+missing working directory; no test counts or green result are inferred without
+JUnit. Startup tmpfiles service activity correlates with disappearances. The
+prior focused/default-only failures remain separately recorded.
+
+`restore_test_tree.py` verifies archive/manifest identity, every member path/type
+and byte hash before allocating a fresh tree in a persistent task-specific parent.
+It never uses tar extraction, overwrites a checkout, deletes evidence or changes
+host cleanup policy. Six research tests cover exact restoration, refusal of
+overwrites/escaping paths/links/credentials and changed archive identity. The
+423-file byte-identical restoration report at
+`runs/v29-persistent-frozen-test-tree-v1/report.json` points to the `/opt` snapshot.
+Its default-only suite passes 640 cases/74 skips. Full suite remains pending.

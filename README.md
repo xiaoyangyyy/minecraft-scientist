@@ -11,15 +11,15 @@ Fabric mod supplies resettable hidden rules, and the Python boundary replaces it
 block, and entity names with seeded opaque IDs before an agent can observe them.
 Live execution still requires the user's explicit Minecraft EULA acceptance.
 
-Latest visual development adds a counterexample/maintenance map revision and a
-public WAIT–MOVE–WAIT trial with frozen stable-image endpoints. In its first
-independently audited fresh run, both selected tails are physically stationary
-and camera/player displacement magnitudes agree, but withheld map rays still fail;
-the version correctly remains rejected, without a supported motion prediction.
-This does not establish persistent mapping or reliable goal navigation. See
-[`docs/shared-endpoint-control-development.md`](docs/shared-endpoint-control-development.md)
-for two independently audited replications, a retained no-map world, and pending
-full regressions. The preceding
+Latest visual development acquires stable, novel sampled keyframes before freezing
+a map, with explicit actual-image clocks and a separate 288-action registration.
+Two fresh independently audited development worlds acquire only one/two eligible
+views and no map: this does not establish better mapping or reliable goal arrival.
+See [`stable-keyframe checkpoint`](docs/stable-keyframe-acquisition-development.md).
+The preceding
+[`settled-endpoint checkpoint`](docs/shared-endpoint-control-development.md)
+retains two future-map failures, a no-map world and completed frozen V28 regression;
+the
 [`shared-anchor checkpoint`](docs/shared-anchor-reconstruction-development.md)
 retains its bounded camera success, player-motion failure and limited ablations.
 

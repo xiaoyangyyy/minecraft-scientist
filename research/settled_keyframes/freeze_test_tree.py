@@ -15,11 +15,15 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def freeze(output):
+def freeze(output, ledger_path=None):
     output = output.resolve()
     if output.exists():
         raise FileExistsError("refusing to overwrite test-tree verification")
-    ledger_path = ROOT / "runs/core-release-seeds0-29-wsl-v28/config.json"
+    ledger_path = (
+        Path(ledger_path).resolve(strict=True)
+        if ledger_path is not None
+        else ROOT / "runs/core-release-seeds0-29-wsl-v28/config.json"
+    )
     ledger = json.loads(ledger_path.read_bytes())
     names = set(
         subprocess.run(
@@ -52,7 +56,7 @@ def freeze(output):
         if size > 64 * 1024 * 1024:
             raise ValueError("test source/fixture copy exceeds its byte budget")
         sources[name] = digest(source)
-    snapshot = Path(tempfile.mkdtemp(prefix="msc-v28-frozen-", dir="/tmp"))
+    snapshot = Path(tempfile.mkdtemp(prefix="msc-source-frozen-", dir="/tmp"))
     for name in sources:
         target = snapshot / name
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -69,7 +73,7 @@ def freeze(output):
             else name
         )
         if digest(snapshot / relative) != value:
-            raise ValueError("copied package/config differs from frozen V28 ledger")
+            raise ValueError("copied package/config differs from declared core ledger")
     result = {
         "schema": "exact-test-tree-snapshot-v1",
         "source_root": str(ROOT),
@@ -77,10 +81,11 @@ def freeze(output):
         "files_sha256": sources,
         "bytes": size,
         "core_ledger_sha256": digest(ledger_path),
+        "core_ledger_path": str(ledger_path),
         "checks": {
             "all_copied_bytes_match": True,
             "all_sources_unchanged": True,
-            "v28_package_ledger_matches": True,
+            "package_ledger_matches": True,
         },
         "scope": "complete tracked/unignored test tree plus existing checkpoint fixtures; not test success or clean-Git evidence",
     }
@@ -106,4 +111,6 @@ def freeze(output):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
-    freeze(parser.parse_args().output)
+    parser.add_argument("--ledger", type=Path)
+    arguments = parser.parse_args()
+    freeze(arguments.output, arguments.ledger)

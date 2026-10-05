@@ -106,11 +106,18 @@ checks and current/source-snapshot hashes recheck with zero mismatches. The focu
 Windows profile passes 139 cases; isolated default-only WSL passes 640 cases/72
 optional or platform skips. Original MVP bytes and package builds pass. Full V28
 Windows regression passes 1197 cases/two skips in
-`runs/shared-endpoint-full-windows-v1.xml`; WSL is still running and must not be
-claimed complete.
+`runs/shared-endpoint-full-windows-v1.xml`; the frozen V28 WSL suite completes
+1199 cases/two skips, zero failures/errors. Its 416 source/test/fixture hashes
+are rechecked unchanged after the terminal run.
+V29 adds stable/novel sampled-keyframe acquisition with explicit image ordinals,
+freezing 112 entries including 109 package files. Both thirty-seed/two-repeat
+releases pass all six checks with current source hashes independently rechecked.
+Default-only Linux passes 640 cases/74 optional/platform skips on a byte-verified
+persistent source snapshot. Full V29 Windows regression completes 1225 cases/two
+skips, zero failures/errors; persistent-snapshot Linux full regression remains pending.
 Core behavior is unchanged by these
 optional modules; visual results remain separately scoped in
-`docs/shared-endpoint-control-development.md` and preceding historical checkpoints.
+`docs/stable-keyframe-acquisition-development.md` and preceding historical checkpoints.
 These earlier runs are historical checks, not the current source-frozen release.
 Neither local multi-seed verification
 proves remote CI execution, fresh live-server gates, learned-planner release

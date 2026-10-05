@@ -4,14 +4,25 @@ This audit compares the current repository with the original self-evolving symbo
 Minecraft system, not merely with the smaller offline MVP. A green unit test is not
 treated as proof of live Minecraft behavior.
 
-The latest verified visual checkpoint is `docs/shared-endpoint-control-development.md`:
+The latest development checkpoint is `docs/stable-keyframe-acquisition-development.md`:
+two fresh independently audited public sampled-keyframe controllers acquire only
+one/two eligible views and no map. Current V29 offline core releases pass thirty
+seeds/two repetitions on both platforms. Default-only Linux regression passes
+640 cases/74 skips; full Windows regression completes 1225 cases/two skips, zero
+failures/errors. The persistent-snapshot Linux full suite remains pending.
+Known-data optimizer/point/tracking diagnostics are not live successes.
+
+The preceding verified visual checkpoint is `docs/shared-endpoint-control-development.md`:
 two fresh independently audited sessions select physically stationary endpoints
 from public image stability, but both reject withheld map-ray predictions despite
 real motion. A second development world acquires no map and never starts an
 endpoint trial. Every earlier failure remains recorded. Reliable goal navigation,
 held-out generalization and full-project completion remain open. The current V28
 offline core releases pass on both platforms. The full Windows regression passes
-1197 cases/two skips; the WSL full regression is still running.
+1197 cases/two skips; the frozen V28 WSL full regression completes 1199 cases/two
+skips, zero failures/errors. All 416 frozen source/test/fixture hashes remain
+unchanged after the terminal run. Later keyframe acquisition development requires
+its own fresh evidence; these tests do not establish navigation success.
 
 The current full-project execution gates are in `docs/quality-roadmap.md`.
 Subsequent RGB-geometry development and its rejected tracking results are recorded

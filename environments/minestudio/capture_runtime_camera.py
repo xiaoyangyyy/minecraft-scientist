@@ -102,6 +102,7 @@ def main():
     parser.add_argument("--register-gauges", action="store_true")
     parser.add_argument("--share-anchor", action="store_true")
     parser.add_argument("--endpoint-controls", action="store_true")
+    parser.add_argument("--stable-keyframes", action="store_true")
     args = parser.parse_args()
     if args.seed < 0:
         parser.error("seed must be nonnegative")
@@ -121,6 +122,17 @@ def main():
         parser.error("shared-anchor reconstruction requires --register-gauges")
     if args.endpoint_controls and not args.share_anchor:
         parser.error("endpoint controls require --share-anchor")
+    if args.stable_keyframes and (
+        args.active_causal
+        or args.acquisition_strategy is not None
+        or args.settled_controls
+        or args.recover_map
+        or args.maintain_map
+        or args.register_gauges
+        or args.share_anchor
+        or args.endpoint_controls
+    ):
+        parser.error("stable keyframes are a separate acquisition registration")
     directory = args.output.resolve()
     directory.mkdir(parents=True, exist_ok=False)
     build = directory / "agent-build"
@@ -284,6 +296,19 @@ def main():
                                 config["scope"] = (
                                     "counterexample-trained frozen shared map and public WAIT/MOVE/WAIT endpoint trial; player rest and displacement evaluated separately; no navigation/arrival or held-out generalization claim"
                                 )
+    if args.stable_keyframes:
+        from minecraft_scientist.exploration.stable_keyframe_map import (
+            StableKeyframePolicy,
+        )
+
+        config.update(
+            schema="stable-keyframe-camera-projection-v1",
+            schedule=SCHEDULE[:48],
+            trial_intervals=[],
+            active_seed=2000,
+            keyframe_policy=StableKeyframePolicy().model_dump(mode="json"),
+            scope="public stable and novel sampled-keyframe acquisition, immutable past proposal and new-control validation; explicit 288-action cap; no continuous raw-track, metric map or navigation claim",
+        )
     write_json(directory / "config.json", config)
     config_hash = digest(directory / "config.json")
     audit, images, native_images, native_hashes, records = (
@@ -333,6 +358,7 @@ def main():
     )
     error = None
     active = None
+    keyframes = None
     launches = []
     try:
         with isolated_agent_launch(
@@ -362,6 +388,66 @@ def main():
                         )
                     )
                 )
+            if args.stable_keyframes:
+                from minecraft_scientist.exploration.online_landmark_probe import (
+                    calibrate_reference_camera,
+                )
+                from minecraft_scientist.exploration.settled_map_control import (
+                    PublicControlStep,
+                )
+                from minecraft_scientist.exploration.stable_keyframe_map import (
+                    acquire_stable_keyframe_map,
+                )
+
+                calibration = calibrate_reference_camera(
+                    [images[slot] for slot in REFERENCE_INDICES], (1280, 720)
+                )
+
+                def execute_keyframe(kind, handle):
+                    targets = [
+                        obj.object_id
+                        for obj in world.observe().objects
+                        if obj.affordances == (ActionKind.MOVE,)
+                    ]
+                    record = world.step(
+                        PrimitiveAction(
+                            kind=ActionKind(kind),
+                            ticks=1,
+                            target_id=targets[handle] if kind == "move" else None,
+                        )
+                    )
+                    records.append(record)
+                    actual = (
+                        targets.index(record.executed_action.target_id)
+                        if record.executed_action.target_id in targets
+                        else None
+                    )
+                    return PublicControlStep(
+                        images[-1].copy(),
+                        record.executed_action.kind.value,
+                        actual,
+                        record.intervention_compliance is True
+                        and record.event.success is True
+                        and record.controller_failure is None
+                        and record.event.duration == 1,
+                        record.executed_action.ticks,
+                    )
+
+                keyframes = {
+                    "calibration": calibration,
+                    "acquisition": acquire_stable_keyframe_map(
+                        images[-1].copy(),
+                        execute_keyframe,
+                        calibration["camera_intrinsics"],
+                        anchor_frame=48,
+                        seed=config["active_seed"],
+                        policy=config["keyframe_policy"],
+                    ),
+                }
+                if keyframes["acquisition"]["failure"] is not None:
+                    raise RuntimeError(
+                        "keyframe acquisition failed; partial public actions retained"
+                    )
             if args.active_causal:
                 from minecraft_scientist.exploration.active_causal_map import (
                     acquire_causal_map,
@@ -551,7 +637,7 @@ def main():
     checks = {
         "one_fresh_instrumented_launch": len(launches) == 1,
         "complete_frames_actions_positions": (
-            args.active_causal or len(records) == len(SCHEDULE)
+            args.active_causal or args.stable_keyframes or len(records) == len(SCHEDULE)
         )
         and len(images)
         == len(native_images)
@@ -654,6 +740,24 @@ def main():
                     "rejected",
                 )
             )
+    if args.stable_keyframes:
+        write_json(directory / "keyframe-acquisition.json", keyframes)
+        checks["keyframe_policy_completed"] = (
+            keyframes is not None
+            and keyframes["acquisition"]["failure"] is None
+            and keyframes["acquisition"]["terminal"]
+            in (
+                "validated",
+                "rejected",
+                "map_unavailable",
+                "initial_wait_exhausted",
+                "acquisition_wait_exhausted",
+                "future_wait_exhausted",
+                "budget_exhausted",
+            )
+            and len(records) == 48 + len(keyframes["acquisition"]["steps"])
+            and len(records) <= config["keyframe_policy"]["maximum_episode_actions"]
+        )
     report = {
         "completed": error is None and all(checks.values()),
         "failure": error,
@@ -671,6 +775,11 @@ def main():
             + sorted(frame_dir.glob("*.png"))
             + sorted(native_dir.glob("*.png"))
             + ([directory / "active-acquisition.json"] if args.active_causal else [])
+            + (
+                [directory / "keyframe-acquisition.json"]
+                if args.stable_keyframes
+                else []
+            )
             if path.exists()
         },
     }

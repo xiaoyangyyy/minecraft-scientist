@@ -58,6 +58,15 @@ until each required gate has current, inspectable evidence.
 
 ## Evidence discipline
 
+The latest `docs/stable-keyframe-acquisition-development.md` checkpoint samples
+first-eligible public stable/novel images before fitting, binds sparse slots to
+actual global frame ordinals and retains all rejected samples. Two independently
+audited development worlds acquire one/two eligible views and no map. Known-data
+continuous-track comparisons improve some local survival counts but do not prove
+map/future-motion success. Next investigate smaller preregistered control steps,
+identity-preserving intermediate tracking and numerical-failure retention before
+fresh subsequent-control validation. None closes the original gates above.
+
 The latest `docs/shared-endpoint-control-development.md` checkpoint consumes prior
 training-only counterexample/maintenance rays into a separately declared version,
 then freezes a public WAIT–MOVE–WAIT trial. Two fresh independently audited

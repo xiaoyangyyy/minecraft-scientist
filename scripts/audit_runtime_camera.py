@@ -225,7 +225,25 @@ def public_data(directory, engine, *, registration=None):
         registered_schedule = registered["valid"] is True
         extra_artifacts = set(registered["artifacts"])
         expected_checks |= set(registered["capture_checks"])
-    if not 1 <= len(expected_schedule) <= 200:
+    action_cap = 200
+    if (
+        config.get("schema") == "stable-keyframe-camera-projection-v1"
+        and registration is not None
+    ):
+        from minecraft_scientist.exploration.stable_keyframe_map import (
+            StableKeyframePolicy,
+        )
+
+        if (
+            config.get("keyframe_policy")
+            != StableKeyframePolicy().model_dump(mode="json")
+            or registered.get("maximum_actions") != 288
+        ):
+            raise ValueError(
+                "keyframes require their exact separate action registration"
+            )
+        action_cap = 288
+    if not 1 <= len(expected_schedule) <= action_cap:
         raise ValueError("runtime registration exceeded bounded action count")
     count = len(expected_schedule) + 1
     checks = {
