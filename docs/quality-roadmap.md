@@ -58,7 +58,16 @@ until each required gate has current, inspectable evidence.
 
 ## Evidence discipline
 
-The latest `docs/stable-keyframe-acquisition-development.md` checkpoint samples
+The latest `docs/micro-keyframe-acquisition-development.md` checkpoint uses
+one-tick acquisition and an unchanged two-tick future control. Two independently
+audited development worlds acquire one/six keyframes, but neither supports a map.
+The six-view proposal records every rejected bootstrap, including a small-ray-error
+model whose withheld landmarks include negative depths. Complete raw tracking on
+the same past images also rejects. Next test bounded public-response action
+selection for novel-view/parallax acquisition; do not substitute appearance fit,
+green provenance audits or historical tests for future motion and actual arrival.
+
+The preceding `docs/stable-keyframe-acquisition-development.md` checkpoint samples
 first-eligible public stable/novel images before fitting, binds sparse slots to
 actual global frame ordinals and retains all rejected samples. Two independently
 audited development worlds acquire one/two eligible views and no map. Known-data

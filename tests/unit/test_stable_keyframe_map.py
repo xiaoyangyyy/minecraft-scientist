@@ -191,3 +191,170 @@ def test_geometry_and_stability_gates_cannot_be_relaxed():
     with pytest.raises(ValidationError, match="registered geometry"):
         stable.StableKeyframePolicy(fitting={"iterations": 1})
     assert stable.StableKeyframePolicy().maximum_episode_actions == 288
+
+
+def test_micro_acquisition_keeps_larger_unseen_future_control(
+    public_scene, monkeypatch
+):
+    first, execute, calls = public_scene
+    fitted_at = []
+    fit = stable.fit_joint_map
+
+    def recording(*args, **kwargs):
+        fitted_at.append(len(calls))
+        return fit(*args, **kwargs)
+
+    monkeypatch.setattr(stable, "fit_joint_map", recording)
+    result = stable.acquire_stable_keyframe_map(
+        first, execute, CAMERA, anchor_frame=48, seed=13, micro_controls=True
+    )
+    assert result["terminal"] == "validated"
+    assert (
+        result["micro_control_registration"]
+        == "one-tick-acquisition-two-tick-future-v1"
+    )
+    assert result["policy"] == stable.StableMicroKeyframePolicy().model_dump(
+        mode="json"
+    )
+    assert result["frozen"]["index"]["frame_ordinals"] == [56, 65, 74, 83, 92, 101]
+    assert fitted_at == [53] * 4
+    assert result["future"]["absolute_frame"] == 111
+    assert len(calls) == len(result["steps"]) == 63
+    assert calls[53:55] == [("move", result["future"]["handle"])] * 2
+    assert sum(kind == "move" for kind, _ in calls[:53]) == 5
+    assert result["future"]["handle"] != calls[44][1]
+    assert result["motion"]["frame_ordinals"] == [101, 111]
+    assert stable._digest(result["frozen"]) == result["frozen_sha256"]
+    assert not result["navigation_accepted"] and not result["metric_scale_known"]
+
+
+@pytest.mark.parametrize("flag", [1, "true", None])
+def test_micro_registration_is_explicit_boolean(public_scene, flag):
+    first, execute, calls = public_scene
+    with pytest.raises(ValueError, match="explicit boolean"):
+        stable.acquire_stable_keyframe_map(
+            first, execute, CAMERA, anchor_frame=48, micro_controls=flag
+        )
+    assert calls == []
+
+
+def test_micro_policy_cannot_disguise_default_protocol(public_scene):
+    first, execute, calls = public_scene
+    with pytest.raises(ValidationError):
+        stable.acquire_stable_keyframe_map(
+            first,
+            execute,
+            CAMERA,
+            anchor_frame=48,
+            policy=stable.StableMicroKeyframePolicy(),
+        )
+    assert calls == []
+    with pytest.raises(ValidationError):
+        stable.StableMicroKeyframePolicy(validation_move_ticks=1)
+    with pytest.raises(ValidationError, match="registered geometry"):
+        stable.StableMicroKeyframePolicy(fitting={"iterations": 1})
+
+
+@pytest.mark.parametrize("micro,expected_steps", [(False, 58), (True, 53)])
+def test_partial_bootstrap_failure_retains_completed_models_and_actions(
+    public_scene, monkeypatch, micro, expected_steps
+):
+    first, execute, calls = public_scene
+    fit = stable.fit_joint_map
+
+    def fail_second(*args, **kwargs):
+        if kwargs["bootstrap_slot"] == 3:
+            raise np.linalg.LinAlgError("injected singular bootstrap")
+        return fit(*args, **kwargs)
+
+    monkeypatch.setattr(stable, "fit_joint_map", fail_second)
+    result = stable.acquire_stable_keyframe_map(
+        first, execute, CAMERA, anchor_frame=48, seed=13, micro_controls=micro
+    )
+    assert result["terminal"] == "geometry_failed"
+    assert result["failure"]["stage"] == "past_fitting"
+    assert result["failure"]["type"] == "LinAlgError"
+    assert len(calls) == len(result["steps"]) == expected_steps
+    assert sum(sample["selected"] for sample in result["samples"]) == 6
+    attempt = result["attempts"][0]
+    assert attempt["failed_bootstrap_slot"] == 3
+    assert len(attempt["proposal"]["maps"]) == 1
+    assert attempt["proposal"]["maps"][0]["bootstrap_slot"] == 2
+    assert attempt["sha256"] == stable._digest(attempt["proposal"])
+    assert result["frozen"] is None and result["future"] is None
+    assert result["motion"] is None and not result["navigation_accepted"]
+
+
+@pytest.mark.parametrize("micro,expected_steps", [(False, 18), (True, 17)])
+def test_novelty_failure_retains_both_completed_settles(
+    public_scene, monkeypatch, micro, expected_steps
+):
+    first, execute, calls = public_scene
+    flow = stable._visible_flow
+
+    def fail_novelty(first, last, settings):
+        if int(last[0, 0, 0]) - int(first[0, 0, 0]) > 1:
+            raise ValueError("injected endpoint correspondence failure")
+        return flow(first, last, settings)
+
+    monkeypatch.setattr(stable, "_visible_flow", fail_novelty)
+    result = stable.acquire_stable_keyframe_map(
+        first, execute, CAMERA, anchor_frame=48, micro_controls=micro
+    )
+    assert result["terminal"] == "geometry_failed"
+    assert result["failure"]["stage"] == "novelty"
+    assert len(calls) == len(result["steps"]) == expected_steps
+    assert len(result["settles"]) == 2
+    assert len(result["samples"]) == 1 and result["attempts"] == []
+
+
+@pytest.mark.parametrize("stage", ["past_fitting", "future_validation"])
+def test_track_failure_keeps_selected_frames_and_frozen_parent(
+    public_scene, monkeypatch, stage
+):
+    first, execute, calls = public_scene
+    track = stable.track_frame_chain
+
+    def fail_tracks(frames, **kwargs):
+        if len(frames) == (6 if stage == "past_fitting" else 7):
+            raise np.linalg.LinAlgError("injected tracking failure")
+        return track(frames, **kwargs)
+
+    monkeypatch.setattr(stable, "track_frame_chain", fail_tracks)
+    result = stable.acquire_stable_keyframe_map(
+        first, execute, CAMERA, anchor_frame=48, seed=13, micro_controls=True
+    )
+    assert result["terminal"] == "geometry_failed"
+    assert result["failure"]["stage"] == stage
+    assert len(calls) == len(result["steps"]) == (53 if stage == "past_fitting" else 63)
+    assert sum(sample["selected"] for sample in result["samples"]) == 6
+    if stage == "past_fitting":
+        assert result["attempts"] == [] and result["frozen"] is None
+    else:
+        assert stable._digest(result["frozen"]) == result["frozen_sha256"]
+    assert result["future"] is None and result["motion"] is None
+
+
+@pytest.mark.parametrize("micro,expected_steps", [(False, 68), (True, 63)])
+def test_future_numerical_failure_keeps_prior_candidate_and_all_controls(
+    public_scene, monkeypatch, micro, expected_steps
+):
+    first, execute, calls = public_scene
+    validate = stable.validate_joint_future
+
+    def fail_second(model, *args, **kwargs):
+        if model.bootstrap_slot == 3:
+            raise np.linalg.LinAlgError("injected singular future pose")
+        return validate(model, *args, **kwargs)
+
+    monkeypatch.setattr(stable, "validate_joint_future", fail_second)
+    result = stable.acquire_stable_keyframe_map(
+        first, execute, CAMERA, anchor_frame=48, seed=13, micro_controls=micro
+    )
+    assert result["terminal"] == "geometry_failed"
+    assert result["failure"]["stage"] == "future_validation"
+    assert len(calls) == len(result["steps"]) == expected_steps
+    assert len(result["future"]["candidates"]) == 1
+    assert result["future"]["candidates"][0]["bootstrap_slot"] == 2
+    assert stable._digest(result["frozen"]) == result["frozen_sha256"]
+    assert result["motion"] is None and not result["navigation_accepted"]

@@ -24,10 +24,14 @@ from minecraft_scientist.protocols import ActionKind, PrimitiveAction, Transitio
 
 
 @pytest.fixture
-def keyframe_capture(diagnostic, scripts, monkeypatch):
+def keyframe_capture(diagnostic, scripts, monkeypatch, request):
     runtime, route, engine = diagnostic
     _, definition = scripts
     auditor = importlib.import_module("audit_stable_keyframes")
+    micro = getattr(request, "param", False)
+    policy_type = (
+        auditor.StableMicroKeyframePolicy if micro else auditor.StableKeyframePolicy
+    )
     calibration = {
         "camera_intrinsics": [[180, 0, 224], [0, 320, 224], [0, 0, 1]],
         "scope": "test-only calibration",
@@ -37,11 +41,13 @@ def keyframe_capture(diagnostic, scripts, monkeypatch):
     )
     config = json.loads((route / "config.json").read_bytes())
     config.update(
-        schema="stable-keyframe-camera-projection-v1",
+        schema="micro-stable-keyframe-camera-projection-v1"
+        if micro
+        else "stable-keyframe-camera-projection-v1",
         schedule=[list(item) for item in definition.SCHEDULE[:48]],
         trial_intervals=[],
         active_seed=2000,
-        keyframe_policy=auditor.StableKeyframePolicy().model_dump(mode="json"),
+        keyframe_policy=policy_type().model_dump(mode="json"),
     )
     save(route / "config.json", config)
     events = [
@@ -86,6 +92,7 @@ def keyframe_capture(diagnostic, scripts, monkeypatch):
         execute,
         calibration["camera_intrinsics"],
         anchor_frame=48,
+        micro_controls=micro,
     )
     assert result["terminal"] == "initial_wait_exhausted"
     save(
@@ -246,3 +253,60 @@ def test_nonempty_stationary_and_moving_diagnostics_are_json_serializable(script
                 "distance": float("nan"),
             }
         )
+
+
+@pytest.mark.parametrize("keyframe_capture", [True], indirect=True)
+def test_micro_registration_replays_before_private_reads(keyframe_capture, monkeypatch):
+    auditor, route, engine = keyframe_capture
+    with monkeypatch.context() as guards:
+        private_guard(guards)
+        result = auditor.runtime.public_data(
+            route, engine, registration=auditor.registration
+        )
+        assert result["valid"] and result["count"] == 65
+    result = auditor.audit(route, engine)
+    assert result["valid"] and all(result["checks"].values())
+    assert result["policy_terminal"] == "initial_wait_exhausted"
+    assert not result["navigation_accepted"]
+
+
+@pytest.mark.parametrize("keyframe_capture", [True], indirect=True)
+@pytest.mark.parametrize("case", ["schema", "bool_tick", "future_tick", "marker"])
+def test_micro_disguise_rejects_before_private_reads(
+    keyframe_capture, monkeypatch, case
+):
+    auditor, route, engine = keyframe_capture
+    config = json.loads((route / "config.json").read_bytes())
+    saved = json.loads((route / "keyframe-acquisition.json").read_bytes())
+    if case == "schema":
+        config["schema"] = "stable-keyframe-camera-projection-v1"
+    elif case == "bool_tick":
+        config["keyframe_policy"]["move_ticks"] = True
+    elif case == "future_tick":
+        config["keyframe_policy"]["validation_move_ticks"] = 1
+    else:
+        saved["acquisition"].pop("micro_control_registration")
+    save(route / "config.json", config)
+    save(route / "keyframe-acquisition.json", saved)
+    report = json.loads((route / "report.json").read_bytes())
+    report["config_sha256"] = auditor.runtime.digest(route / "config.json")
+    report["artifact_sha256"]["keyframe-acquisition.json"] = auditor.runtime.digest(
+        route / "keyframe-acquisition.json"
+    )
+    save(route / "report.json", report)
+    private_guard(monkeypatch)
+    result = auditor.audit(route, engine)
+    assert not result["valid"] and result["evaluation"] is None
+
+
+def test_micro_flag_requires_stable_protocol_before_output(
+    scripts, tmp_path, monkeypatch
+):
+    _, capture = scripts
+    output = tmp_path / "must-not-exist"
+    monkeypatch.setattr(
+        sys, "argv", [capture.__file__, "--micro-keyframes", "--output", str(output)]
+    )
+    with pytest.raises(SystemExit):
+        capture.main()
+    assert not output.exists()

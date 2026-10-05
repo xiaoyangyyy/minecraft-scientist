@@ -4,12 +4,24 @@ This audit compares the current repository with the original self-evolving symbo
 Minecraft system, not merely with the smaller offline MVP. A green unit test is not
 treated as proof of live Minecraft behavior.
 
-The latest development checkpoint is `docs/stable-keyframe-acquisition-development.md`:
+The latest development checkpoint is `docs/micro-keyframe-acquisition-development.md`:
+one-tick acquisition in two fresh audited worlds produces one/six keyframes.
+The six-view proposal retains four rejected bootstrap candidates, including a
+low-ray-error model with three negative-depth withheld landmarks. Neither world
+supports a map or future motion. Current V30 core releases pass thirty seeds/two
+repeats on both platforms; 47 keyframe/audit tests pass on each platform, Windows
+runtime-audit regression passes 86 and default-only Linux passes 640/74 skips.
+V30 full Windows/persistent Linux suites are still running. Raw-frame projection
+of known past data also rejects every candidate. No full-project gate is closed.
+
+The preceding development checkpoint is `docs/stable-keyframe-acquisition-development.md`:
 two fresh independently audited public sampled-keyframe controllers acquire only
 one/two eligible views and no map. Current V29 offline core releases pass thirty
 seeds/two repetitions on both platforms. Default-only Linux regression passes
 640 cases/74 skips; full Windows regression completes 1225 cases/two skips, zero
-failures/errors. The persistent-snapshot Linux full suite remains pending.
+failures/errors. The persistent-snapshot Linux full suite completes 1227 cases/two
+skips, zero failures/errors; all 423 frozen file hashes remain unchanged after
+completion. Subsequent micro-control changes require separate validation.
 Known-data optimizer/point/tracking diagnostics are not live successes.
 
 The preceding verified visual checkpoint is `docs/shared-endpoint-control-development.md`:

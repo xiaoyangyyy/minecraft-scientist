@@ -43,6 +43,25 @@ def test_continuous_tracking_cannot_skip_a_failed_middle_image():
     assert result["shared_endpoint_disagreement_95_pixels"] is None
 
 
+def test_each_original_seed_has_exactly_one_terminal_outcome():
+    result = compare(scene())
+    for name in ("direct", "continuous"):
+        record = result[name]
+        rejected = [
+            identity
+            for event in record["rejections"]
+            for identity in event["track_ids"]
+        ]
+        survivors = record["tracks"]["track_ids"]
+        assert len(rejected) == len(set(rejected))
+        assert not set(rejected) & set(survivors)
+        assert set(rejected) | set(survivors) == set(range(record["seed_count"]))
+        assert (
+            sum(record["loss_by_reason"].values()) + len(survivors)
+            == record["seed_count"]
+        )
+
+
 @pytest.mark.parametrize("count", [1, 129])
 def test_complete_raw_interval_is_bounded_not_subsampled(count):
     with pytest.raises(ValueError, match="complete bounded"):

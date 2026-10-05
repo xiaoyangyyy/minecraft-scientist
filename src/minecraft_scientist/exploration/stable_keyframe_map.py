@@ -58,6 +58,13 @@ class StableKeyframePolicy(BaseModel):
         return self
 
 
+class StableMicroKeyframePolicy(StableKeyframePolicy):
+    """Separately registered small acquisition, unchanged larger future control."""
+
+    move_ticks: Literal[1] = 1
+    validation_move_ticks: Literal[2] = 2
+
+
 class KeyframeIndex(BaseModel):
     """Explicit selected-image clock, not consecutive physical ticks/poses."""
 
@@ -87,7 +94,14 @@ class KeyframeIndex(BaseModel):
 
 
 def acquire_stable_keyframe_map(
-    first, execute, camera, *, anchor_frame, seed=2000, policy=None
+    first,
+    execute,
+    camera,
+    *,
+    anchor_frame,
+    seed=2000,
+    policy=None,
+    micro_controls=False,
 ):
     """First eligible past proposal, then a distinct control and first stable future.
 
@@ -95,7 +109,10 @@ def acquire_stable_keyframe_map(
     Only training landmarks fit poses; every supported frozen map must pass future
     withheld rays and consensus. Optical stability alone never asserts body rest.
     """
-    settings = StableKeyframePolicy.model_validate(
+    if type(micro_controls) is not bool:
+        raise ValueError("micro control registration must be explicit boolean")
+    policy_type = StableMicroKeyframePolicy if micro_controls else StableKeyframePolicy
+    settings = policy_type.model_validate(
         policy.model_dump()
         if isinstance(policy, StableKeyframePolicy)
         else policy or {}
@@ -130,6 +147,8 @@ def acquire_stable_keyframe_map(
         "visual_stability_only": True,
         "continuous_raw_identity": False,
     }
+    if micro_controls:
+        result["micro_control_registration"] = "one-tick-acquisition-two-tick-future-v1"
     shape = image.shape
     samples, ordinals = [], []
     handle, same, uses = 0, 0, [0] * 4
@@ -144,6 +163,17 @@ def acquire_stable_keyframe_map(
         ):
             raise ValueError("later controls changed the immutable keyframe proposal")
         return result
+
+    def geometry_failed(stage, error):
+        result.update(
+            terminal="geometry_failed",
+            failure={
+                "stage": stage,
+                "type": type(error).__name__,
+                "message": str(error),
+            },
+        )
+        return finish()
 
     def step(kind, requested):
         nonlocal image
@@ -268,16 +298,19 @@ def acquire_stable_keyframe_map(
         same += 1
         if not settle("acquisition"):
             return finish()
-        novelty = _visible_flow(samples[-1], image, settings.stability)
-        novel = bool(
-            len(novelty["tracks"]["track_ids"]) >= settings.stability.minimum_tracks
-            and novelty["cells"] >= settings.stability.minimum_cells
-            and len(novelty["tracks"]["track_ids"])
-            / max(novelty["tracks"]["seed_count"], 1)
-            >= settings.stability.minimum_survival
-            and novelty["median_flow_pixels"] is not None
-            and novelty["median_flow_pixels"] >= settings.novelty_median_pixels
-        )
+        try:
+            novelty = _visible_flow(samples[-1], image, settings.stability)
+            novel = bool(
+                len(novelty["tracks"]["track_ids"]) >= settings.stability.minimum_tracks
+                and novelty["cells"] >= settings.stability.minimum_cells
+                and len(novelty["tracks"]["track_ids"])
+                / max(novelty["tracks"]["seed_count"], 1)
+                >= settings.stability.minimum_survival
+                and novelty["median_flow_pixels"] is not None
+                and novelty["median_flow_pixels"] >= settings.novelty_median_pixels
+            )
+        except Exception as error:  # noqa: BLE001 -- retain completed settled controls
+            return geometry_failed("novelty", error)
         result["samples"].append(
             {
                 "absolute_frame": ordinal(),
@@ -300,31 +333,47 @@ def acquire_stable_keyframe_map(
         ordinals.append(ordinal())
         if len(samples) < settings.minimum_keyframes:
             continue
-        past = sampled_tracks()
-        index = KeyframeIndex(
-            namespace=f"sparse-keyframes-{ordinals[0]}",
-            frame_ordinals=tuple(ordinals),
-            rgb_sha256=tuple(
-                hashlib.sha256(frame.tobytes()).hexdigest() for frame in samples
-            ),
-            tracks=past,
-        )
-        maps = tuple(
-            fit_joint_map(
-                past, camera, bootstrap_slot=slot, seed=seed, config=settings.fitting
+        attempt = None
+        slot = None
+        try:
+            past = sampled_tracks()
+            index = KeyframeIndex(
+                namespace=f"sparse-keyframes-{ordinals[0]}",
+                frame_ordinals=tuple(ordinals),
+                rgb_sha256=tuple(
+                    hashlib.sha256(frame.tobytes()).hexdigest() for frame in samples
+                ),
+                tracks=past,
             )
-            for slot in range(2, past.frame_count)
-        )
-        proposal = {
-            "index": index.model_dump(mode="json"),
-            "past": past.model_dump(mode="json"),
-            "maps": [model.model_dump(mode="json") for model in maps],
-            "required_bootstraps": [
-                model.bootstrap_slot for model in maps if model.supported
-            ],
-            "frozen_at_frame": ordinal(),
-        }
-        result["attempts"].append({"proposal": proposal, "sha256": _digest(proposal)})
+            proposal = {
+                "index": index.model_dump(mode="json"),
+                "past": past.model_dump(mode="json"),
+                "maps": [],
+                "required_bootstraps": [],
+                "frozen_at_frame": ordinal(),
+            }
+            attempt = {"proposal": proposal, "sha256": None}
+            result["attempts"].append(attempt)
+            maps = []
+            for slot in range(2, past.frame_count):
+                model = fit_joint_map(
+                    past,
+                    camera,
+                    bootstrap_slot=slot,
+                    seed=seed,
+                    config=settings.fitting,
+                )
+                maps.append(model)
+                proposal["maps"].append(model.model_dump(mode="json"))
+                if model.supported:
+                    proposal["required_bootstraps"].append(model.bootstrap_slot)
+            maps = tuple(maps)
+            attempt["sha256"] = _digest(proposal)
+        except Exception as error:  # noqa: BLE001 -- retain partial bootstrap ledger
+            if attempt is not None:
+                attempt["failed_bootstrap_slot"] = slot
+                attempt["sha256"] = _digest(attempt["proposal"])
+            return geometry_failed("past_fitting", error)
         if sum(model.supported for model in maps) >= settings.consensus.minimum_models:
             result["frozen"], result["frozen_sha256"] = proposal, _digest(proposal)
             break
@@ -336,47 +385,58 @@ def acquire_stable_keyframe_map(
         (value for value in range(4) if value != frozen_handle),
         key=lambda value: (uses[value], value),
     )
-    for _ in range(settings.move_ticks):
+    future_ticks = (
+        settings.validation_move_ticks if micro_controls else settings.move_ticks
+    )
+    for _ in range(future_ticks):
         if not step("move", handle):
             return finish()
     if not settle("future"):
         return finish()
-    extended = retain_tracks(sampled_tracks(image), set(past.track_ids))
-    new_ordinals = ordinals + [ordinal()]
-    index = KeyframeIndex(
-        namespace=result["frozen"]["index"]["namespace"],
-        frame_ordinals=tuple(new_ordinals),
-        rgb_sha256=tuple(
-            hashlib.sha256(frame.tobytes()).hexdigest() for frame in samples + [image]
-        ),
-        tracks=extended,
-    )
     candidates, relative, ratios = [], [], []
-    for model in maps:
-        evidence = validate_joint_future(
-            model, past, extended, target_slots=(extended.frame_count - 1,)
+    try:
+        extended = retain_tracks(sampled_tracks(image), set(past.track_ids))
+        new_ordinals = ordinals + [ordinal()]
+        index = KeyframeIndex(
+            namespace=result["frozen"]["index"]["namespace"],
+            frame_ordinals=tuple(new_ordinals),
+            rgb_sha256=tuple(
+                hashlib.sha256(frame.tobytes()).hexdigest()
+                for frame in samples + [image]
+            ),
+            tracks=extended,
         )
-        candidates.append({"bootstrap_slot": model.bootstrap_slot, "future": evidence})
-        if model.supported and evidence["status"] == "consistent":
-            end = JointPose.model_validate(evidence["poses"][0])
-            relative.append(_relative(model.poses[-1], end))
-            radius = max(
-                np.linalg.norm(_center(pose) - _center(model.poses[0]))
-                for pose in model.poses
+        result["future"] = {
+            "index": index.model_dump(mode="json"),
+            "candidates": candidates,
+            "handle": handle,
+            "absolute_frame": ordinal(),
+        }
+        for model in maps:
+            evidence = validate_joint_future(
+                model, past, extended, target_slots=(extended.frame_count - 1,)
             )
-            ratios.append(
-                float(
-                    np.linalg.norm(_center(end) - _center(model.poses[-1]))
-                    / max(radius, 1e-9)
+            candidates.append(
+                {"bootstrap_slot": model.bootstrap_slot, "future": evidence}
+            )
+            if model.supported and evidence["status"] == "consistent":
+                end = JointPose.model_validate(evidence["poses"][0])
+                relative.append(_relative(model.poses[-1], end))
+                radius = max(
+                    np.linalg.norm(_center(pose) - _center(model.poses[0]))
+                    for pose in model.poses
                 )
-            )
-    direction, angle, rotation, translation = _consensus(relative, settings.consensus)
-    result["future"] = {
-        "index": index.model_dump(mode="json"),
-        "candidates": candidates,
-        "handle": handle,
-        "absolute_frame": ordinal(),
-    }
+                ratios.append(
+                    float(
+                        np.linalg.norm(_center(end) - _center(model.poses[-1]))
+                        / max(radius, 1e-9)
+                    )
+                )
+        direction, angle, rotation, translation = _consensus(
+            relative, settings.consensus
+        )
+    except Exception as error:  # noqa: BLE001 -- future failure never refits the parent
+        return geometry_failed("future_validation", error)
     passed = (
         len(relative) == len(result["frozen"]["required_bootstraps"])
         and rotation is not None

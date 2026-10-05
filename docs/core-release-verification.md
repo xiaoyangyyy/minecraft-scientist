@@ -114,7 +114,11 @@ freezing 112 entries including 109 package files. Both thirty-seed/two-repeat
 releases pass all six checks with current source hashes independently rechecked.
 Default-only Linux passes 640 cases/74 optional/platform skips on a byte-verified
 persistent source snapshot. Full V29 Windows regression completes 1225 cases/two
-skips, zero failures/errors; persistent-snapshot Linux full regression remains pending.
+skips, zero failures/errors; persistent-snapshot Linux full regression completes
+1227 cases/two skips, zero failures/errors in 918.562 seconds at
+`runs/stable-keyframe-full-persistent-tree-wsl-v2.xml`. All 423 frozen files retain
+their original hashes after completion. These V29 results do not validate later
+micro-control source changes.
 Core behavior is unchanged by these
 optional modules; visual results remain separately scoped in
 `docs/stable-keyframe-acquisition-development.md` and preceding historical checkpoints.
@@ -221,6 +225,15 @@ runner. Java/MineStudio/train extras and live/visual research gates are delibera
 not substituted by these offline jobs.
 
 ## Commands
+
+V30 adds a separately registered one-tick acquisition/two-tick future variant,
+strict protocol replay and partial numerical-failure retention. Both platform
+core verifiers pass thirty seeds/two repeats/all eighteen artifacts at
+`runs/core-release-seeds0-29-windows-v30` and `-wsl-v30`. Keyframe/audit tests pass
+47 on each platform, Windows runtime-audit regression passes 86, and default-only
+Linux passes 640/74 skips. Both full V30 regressions are still running; do not
+attribute historical V29 counts to the changed source. Fresh live and known-data
+failures are documented in `docs/micro-keyframe-acquisition-development.md`.
 
 From the repository root:
 

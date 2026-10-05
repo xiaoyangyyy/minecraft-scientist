@@ -110,7 +110,10 @@ The default-only Linux installation verifies the exact persistent snapshot:
 Minecraft or API provider. Full Windows regression completes 1225 passes/two
 skips, zero failures/errors in 1177.34 seconds at
 `runs/stable-keyframe-full-windows-v1.xml`. The persistent-snapshot Linux full
-suite is still running and must not yet be claimed complete.
+suite now completes 1227 passes/two skips, zero failures/errors in 918.562 seconds
+at `runs/stable-keyframe-full-persistent-tree-wsl-v2.xml`. All 423 frozen file
+hashes were independently rechecked after terminal completion: zero mismatches.
+These are V29 results, not regression proof for subsequent micro-control edits.
 
 A 423-file/4,665,376-byte snapshot matches every source/test/checkpoint byte and
 V29 ledger entry. Its verified archive is at `runs/v29-frozen-test-tree-v1`, SHA-256

@@ -23,6 +23,7 @@ from minecraft_scientist.exploration.online_landmark_probe import (
 from minecraft_scientist.exploration.settled_map_control import PublicControlStep
 from minecraft_scientist.exploration.stable_keyframe_map import (
     StableKeyframePolicy,
+    StableMicroKeyframePolicy,
     acquire_stable_keyframe_map,
 )
 from minecraft_scientist.protocols import TransitionRecord
@@ -54,7 +55,8 @@ def serializable_truth(truth):
 
 
 def registration(directory, config, report, definition):
-    settings = StableKeyframePolicy()
+    micro = config.get("schema") == "micro-stable-keyframe-camera-projection-v1"
+    settings = StableMicroKeyframePolicy() if micro else StableKeyframePolicy()
     baseline = [list(item) for item in definition.SCHEDULE[:48]]
     result = {
         "valid": False,
@@ -65,8 +67,13 @@ def registration(directory, config, report, definition):
     }
     count = report.get("frame_count")
     if (
-        config.get("schema") != "stable-keyframe-camera-projection-v1"
-        or config.get("keyframe_policy") != settings.model_dump(mode="json")
+        config.get("schema")
+        not in (
+            "stable-keyframe-camera-projection-v1",
+            "micro-stable-keyframe-camera-projection-v1",
+        )
+        or json.dumps(config.get("keyframe_policy"), sort_keys=True, allow_nan=False)
+        != json.dumps(settings.model_dump(mode="json"), sort_keys=True, allow_nan=False)
         or config.get("active_seed") != 2000
         or config.get("schedule") != baseline
         or config.get("reference_indices") != list(definition.REFERENCE_INDICES)
@@ -153,6 +160,7 @@ def registration(directory, config, report, definition):
             anchor_frame=48,
             seed=config["active_seed"],
             policy=settings,
+            micro_controls=micro,
         ),
     }
     result.update(

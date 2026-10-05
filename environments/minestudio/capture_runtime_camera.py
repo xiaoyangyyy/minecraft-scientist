@@ -103,6 +103,7 @@ def main():
     parser.add_argument("--share-anchor", action="store_true")
     parser.add_argument("--endpoint-controls", action="store_true")
     parser.add_argument("--stable-keyframes", action="store_true")
+    parser.add_argument("--micro-keyframes", action="store_true")
     args = parser.parse_args()
     if args.seed < 0:
         parser.error("seed must be nonnegative")
@@ -122,6 +123,10 @@ def main():
         parser.error("shared-anchor reconstruction requires --register-gauges")
     if args.endpoint_controls and not args.share_anchor:
         parser.error("endpoint controls require --share-anchor")
+    if args.micro_keyframes and not args.stable_keyframes:
+        parser.error(
+            "micro keyframes require the separate --stable-keyframes registration"
+        )
     if args.stable_keyframes and (
         args.active_causal
         or args.acquisition_strategy is not None
@@ -299,15 +304,25 @@ def main():
     if args.stable_keyframes:
         from minecraft_scientist.exploration.stable_keyframe_map import (
             StableKeyframePolicy,
+            StableMicroKeyframePolicy,
         )
 
+        keyframe_policy_type = (
+            StableMicroKeyframePolicy if args.micro_keyframes else StableKeyframePolicy
+        )
         config.update(
-            schema="stable-keyframe-camera-projection-v1",
+            schema="micro-stable-keyframe-camera-projection-v1"
+            if args.micro_keyframes
+            else "stable-keyframe-camera-projection-v1",
             schedule=SCHEDULE[:48],
             trial_intervals=[],
             active_seed=2000,
-            keyframe_policy=StableKeyframePolicy().model_dump(mode="json"),
-            scope="public stable and novel sampled-keyframe acquisition, immutable past proposal and new-control validation; explicit 288-action cap; no continuous raw-track, metric map or navigation claim",
+            keyframe_policy=keyframe_policy_type().model_dump(mode="json"),
+            scope=(
+                "public stable and novel one-tick sampled-keyframe acquisition, immutable past proposal and distinct two-tick future validation; explicit 288-action cap; no continuous raw-track, metric map or navigation claim"
+                if args.micro_keyframes
+                else "public stable and novel two-tick sampled-keyframe acquisition, immutable past proposal and new-control validation; explicit 288-action cap; no continuous raw-track, metric map or navigation claim"
+            ),
         )
     write_json(directory / "config.json", config)
     config_hash = digest(directory / "config.json")
@@ -442,6 +457,7 @@ def main():
                         anchor_frame=48,
                         seed=config["active_seed"],
                         policy=config["keyframe_policy"],
+                        micro_controls=args.micro_keyframes,
                     ),
                 }
                 if keyframes["acquisition"]["failure"] is not None:

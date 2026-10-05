@@ -227,16 +227,28 @@ def public_data(directory, engine, *, registration=None):
         expected_checks |= set(registered["capture_checks"])
     action_cap = 200
     if (
-        config.get("schema") == "stable-keyframe-camera-projection-v1"
+        config.get("schema")
+        in (
+            "stable-keyframe-camera-projection-v1",
+            "micro-stable-keyframe-camera-projection-v1",
+        )
         and registration is not None
     ):
         from minecraft_scientist.exploration.stable_keyframe_map import (
             StableKeyframePolicy,
+            StableMicroKeyframePolicy,
         )
 
+        policy_type = (
+            StableMicroKeyframePolicy
+            if config["schema"] == "micro-stable-keyframe-camera-projection-v1"
+            else StableKeyframePolicy
+        )
         if (
-            config.get("keyframe_policy")
-            != StableKeyframePolicy().model_dump(mode="json")
+            json.dumps(config.get("keyframe_policy"), sort_keys=True, allow_nan=False)
+            != json.dumps(
+                policy_type().model_dump(mode="json"), sort_keys=True, allow_nan=False
+            )
             or registered.get("maximum_actions") != 288
         ):
             raise ValueError(

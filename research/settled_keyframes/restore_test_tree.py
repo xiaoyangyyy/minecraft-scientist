@@ -98,7 +98,7 @@ def restore(manifest, parent, output):
             "original_manifest_unchanged": info["manifest_sha256"] == digest(manifest),
             "archive_unchanged": info["archive_sha256"] == digest(archive_path),
         },
-        "scope": "Restored exact frozen V29 inputs, not test success or current workspace identity",
+        "scope": "Restored exact inputs of the declared frozen manifest, not test success or current workspace identity",
     }
     output.mkdir(parents=True, exist_ok=False)
     (output / "report.json").write_text(

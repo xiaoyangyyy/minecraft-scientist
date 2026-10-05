@@ -9,13 +9,14 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+from collections import Counter
 from pathlib import Path
 
 import numpy as np
 
 from minecraft_scientist.exploration.temporal_tracks import (
     TemporalTrackConfig,
-    track_frame_chain,
+    diagnose_frame_chain,
 )
 from minecraft_scientist.exploration.visual_geometry import _cells
 
@@ -28,7 +29,8 @@ def compare(frames):
         )
     output, tracks = {}, {}
     for name, sequence in (("direct", [frames[0], frames[-1]]), ("continuous", frames)):
-        tracked = track_frame_chain(sequence, config=config)
+        diagnosis = diagnose_frame_chain(sequence, config=config)
+        tracked = diagnosis.tracks
         tracks[name] = tracked
         pixels = np.asarray(tracked.pixels)
         flow = (
@@ -47,6 +49,18 @@ def compare(frames):
             if len(flow)
             else None,
             "tracks": tracked.model_dump(mode="json"),
+            "rejections": [
+                event.model_dump(mode="json") for event in diagnosis.rejections
+            ],
+            "loss_by_reason": dict(
+                sorted(
+                    Counter(
+                        event.reason
+                        for event in diagnosis.rejections
+                        for _ in event.track_ids
+                    ).items()
+                )
+            ),
         }
     first, last = tracks["direct"], tracks["continuous"]
     if first.seed_count != last.seed_count:
@@ -90,7 +104,11 @@ def probe(route, output):
     digest = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
     before = {path: digest(path) for path in (report_path, config_path, public_path)}
     if (
-        capture["schema"] != "stable-keyframe-camera-projection-v1"
+        capture["schema"]
+        not in (
+            "stable-keyframe-camera-projection-v1",
+            "micro-stable-keyframe-camera-projection-v1",
+        )
         or report["completed"] is not True
         or not all(report["checks"].values())
         or report["config_sha256"] != before[config_path]
@@ -101,7 +119,8 @@ def probe(route, output):
         )
     output.mkdir(parents=True, exist_ok=False)
     inputs = {
-        "schema": "development-tracking-gap-diagnostic-v1",
+        "schema": "development-tracking-gap-loss-diagnostic-v2",
+        "capture_schema": capture["schema"],
         "source_sha256": digest(Path(__file__)),
         "capture_inputs_sha256": {path.name: value for path, value in before.items()},
         "tracking": TemporalTrackConfig(maximum_frames=128).model_dump(mode="json"),

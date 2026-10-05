@@ -164,4 +164,35 @@ host cleanup policy. Six research tests cover exact restoration, refusal of
 overwrites/escaping paths/links/credentials and changed archive identity. The
 423-file byte-identical restoration report at
 `runs/v29-persistent-frozen-test-tree-v1/report.json` points to the `/opt` snapshot.
-Its default-only suite passes 640 cases/74 skips. Full suite remains pending.
+Its default-only suite passes 640 cases/74 skips. The full persistent-snapshot suite
+completes 1227 passes/two skips with zero failures/errors in 918.562 seconds.
+All 423 frozen source hashes remain unchanged after completion. This verifies V29,
+not subsequent micro-control edits.
+
+## Micro-control loss and raw-projection diagnostics
+
+The fresh micro-control protocol is documented in
+`docs/micro-keyframe-acquisition-development.md`. Its two development captures
+produce one/six selected frames, but no supported map. The gap probe now explicitly
+accepts either known capture schema and uses `diagnose_frame_chain` to preserve
+every seed's first failing gate; five tests verify loss accounting and unchanged
+raw bounds. `runs/micro-keyframe-tracking-loss-seed202-v1` records initial direct
+survival 0.331349 versus continuous 0.509921, with adjacent-cycle losses 110 versus
+24. Later original-anchor survival still decays. Local feature recovery is not a
+map, unique motion, live success or navigation proof.
+
+`raw_keyframe_fit_probe.py` compares the original six-view seed-201 sparse tracks
+with all 66 raw images in the exact 56→121 past interval, sampled only after
+complete identity-preserving tracking. Both methods retain all four bootstrap
+candidates at the same seed/fitting gates. Eight synthetic tests verify exact
+identity/clock/gate preservation, refusal of invalid endpoints and failure of a
+middle image even when that image is not a selected keyframe.
+
+Both known-data reports `runs/micro-keyframe-raw-projection-seed201-v1` and `-v2`
+exactly replay the sparse models and pass four source/input preservation checks.
+Each freezes all executing probe/package bytes. Raw projection retains 123 IDs
+and still rejects every model. V2 additionally shows that the sparse slot-5 model
+has only 28/31 positive-depth withheld points throughout; small positive-depth ray
+errors cannot rescue its physically invalid points. V1 remains untouched. Neither
+probe opens private poses, executes controls, chooses new views or fits a future.
+The tracker/fitter change is not adopted as a successful production map estimator.
