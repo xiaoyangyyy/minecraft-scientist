@@ -106,6 +106,7 @@ def main():
     parser.add_argument("--micro-keyframes", action="store_true")
     parser.add_argument("--responsive-keyframes", action="store_true")
     parser.add_argument("--recovering-keyframes", action="store_true")
+    parser.add_argument("--safe-seed-keyframes", action="store_true")
     args = parser.parse_args()
     if args.seed < 0:
         parser.error("seed must be nonnegative")
@@ -135,6 +136,8 @@ def main():
         )
     if args.recovering_keyframes and not args.responsive_keyframes:
         parser.error("recovering keyframes require explicit --responsive-keyframes")
+    if args.safe_seed_keyframes and not args.recovering_keyframes:
+        parser.error("safe seed keyframes require explicit --recovering-keyframes")
     if args.stable_keyframes and (
         args.active_causal
         or args.acquisition_strategy is not None
@@ -315,10 +318,13 @@ def main():
             StableMicroKeyframePolicy,
             StableRecoveringKeyframePolicy,
             StableResponsiveKeyframePolicy,
+            StableSafeSeedKeyframePolicy,
         )
 
         keyframe_policy_type = (
-            StableRecoveringKeyframePolicy
+            StableSafeSeedKeyframePolicy
+            if args.safe_seed_keyframes
+            else StableRecoveringKeyframePolicy
             if args.recovering_keyframes
             else StableResponsiveKeyframePolicy
             if args.responsive_keyframes
@@ -327,7 +333,9 @@ def main():
             else StableKeyframePolicy
         )
         config.update(
-            schema="recovering-stable-keyframe-camera-projection-v1"
+            schema="safe-seed-stable-keyframe-camera-projection-v1"
+            if args.safe_seed_keyframes
+            else "recovering-stable-keyframe-camera-projection-v1"
             if args.recovering_keyframes
             else "responsive-stable-keyframe-camera-projection-v1"
             if args.responsive_keyframes
@@ -339,7 +347,9 @@ def main():
             active_seed=2000,
             keyframe_policy=keyframe_policy_type().model_dump(mode="json"),
             scope=(
-                "public novelty-response acquisition with at most two extra WAIT windows, two unconnected local epochs and eleven trials per epoch/twenty-two total; unchanged geometry/stability gates and global 288-action cap; retain exhausted windows and rejected maps; no metric/global/navigation claim"
+                "first-image-only support-masked seeds for public flow and frozen sampled maps; same recovery/geometry gates and 288-action cap; no future-based seed filtering or old namespace relabeling; no metric/global/navigation claim"
+                if args.safe_seed_keyframes
+                else "public novelty-response acquisition with at most two extra WAIT windows, two unconnected local epochs and eleven trials per epoch/twenty-two total; unchanged geometry/stability gates and global 288-action cap; retain exhausted windows and rejected maps; no metric/global/navigation claim"
                 if args.recovering_keyframes
                 else "public novelty-response one-tick acquisition and past-response distinct two-tick future validation; immutable past proposal, unchanged geometry/stability gates and 288-action cap; no continuous raw-track, metric map or navigation claim"
                 if args.responsive_keyframes
@@ -484,6 +494,7 @@ def main():
                         micro_controls=args.micro_keyframes,
                         responsive_controls=args.responsive_keyframes,
                         recovery_controls=args.recovering_keyframes,
+                        safe_seed_controls=args.safe_seed_keyframes,
                     ),
                 }
                 if keyframes["acquisition"]["failure"] is not None:

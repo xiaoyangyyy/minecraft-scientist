@@ -264,6 +264,18 @@ tested research-only safe-seed diagnostics are not covered by that earlier froze
 tree. Two fresh valid live audits still yield no map/navigation. See
 `docs/recovering-keyframe-acquisition-development.md` for exact scope and negatives.
 
+V33 adds a separately registered first-image-only safe-support detector, frozen
+past/future seeds and explicit changed-denominator failure. Windows/WSL thirty-seed
+core checks pass at `runs/core-release-seeds0-29-windows-v33` and `-wsl-v33`:
+all two repeats/eighteen exact artifacts/six checks, 115 matching source entries
+(112 package files). Focused tests pass 146 each; default-only Linux passes
+673/76 skips. Full persistent Linux passes 1349/two skips, Windows 1347/two skips,
+zero failures/errors, with all 444 declared snapshot inputs unchanged after each
+terminal run. Eighteen separately tested bridge research cases are not in that
+earlier frozen tree. Both new valid native audits still yield no supported map;
+all thirty-one public raw-bridge comparisons remain development diagnostics.
+See `docs/safe-seed-keyframe-development.md` and both V33 post-verification reports.
+
 From the repository root:
 
 ```powershell

@@ -29,11 +29,14 @@ def keyframe_capture(diagnostic, scripts, monkeypatch, request):
     _, definition = scripts
     auditor = importlib.import_module("audit_stable_keyframes")
     mode = getattr(request, "param", False)
-    recovery = mode == "recovering"
+    safe_seeds = mode == "safe-seeds"
+    recovery = safe_seeds or mode == "recovering"
     responsive = recovery or mode == "responsive"
     micro = responsive or mode is True
     policy_type = (
-        auditor.StableRecoveringKeyframePolicy
+        auditor.StableSafeSeedKeyframePolicy
+        if safe_seeds
+        else auditor.StableRecoveringKeyframePolicy
         if recovery
         else auditor.StableResponsiveKeyframePolicy
         if responsive
@@ -50,7 +53,9 @@ def keyframe_capture(diagnostic, scripts, monkeypatch, request):
     )
     config = json.loads((route / "config.json").read_bytes())
     config.update(
-        schema="recovering-stable-keyframe-camera-projection-v1"
+        schema="safe-seed-stable-keyframe-camera-projection-v1"
+        if safe_seeds
+        else "recovering-stable-keyframe-camera-projection-v1"
         if recovery
         else "responsive-stable-keyframe-camera-projection-v1"
         if responsive
@@ -109,6 +114,7 @@ def keyframe_capture(diagnostic, scripts, monkeypatch, request):
         micro_controls=micro,
         responsive_controls=responsive,
         recovery_controls=recovery,
+        safe_seed_controls=safe_seeds,
     )
     assert result["terminal"] == "initial_wait_exhausted"
     save(
@@ -485,6 +491,105 @@ def test_forged_recovery_or_epoch_ledger_cannot_reach_private_evaluator(
     ],
 )
 def test_recovery_flags_require_full_explicit_protocol_before_output(
+    scripts, tmp_path, monkeypatch, flags
+):
+    _, capture = scripts
+    output = tmp_path / "must-not-exist"
+    monkeypatch.setattr(
+        sys, "argv", [capture.__file__, *flags, "--output", str(output)]
+    )
+    with pytest.raises(SystemExit):
+        capture.main()
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("keyframe_capture", ["safe-seeds"], indirect=True)
+def test_safe_seed_registration_replays_full_detector_ledger_before_private_reads(
+    keyframe_capture, monkeypatch
+):
+    auditor, route, engine = keyframe_capture
+    with monkeypatch.context() as guards:
+        private_guard(guards)
+        public = auditor.runtime.public_data(
+            route, engine, registration=auditor.registration
+        )
+        assert public["valid"] and public["count"] == 97
+    scored = auditor.audit(route, engine)
+    assert scored["valid"] and all(scored["checks"].values())
+    assert scored["policy_terminal"] == "initial_wait_exhausted"
+    assert scored["evaluation"] is None and not scored["navigation_accepted"]
+
+
+@pytest.mark.parametrize("keyframe_capture", ["safe-seeds"], indirect=True)
+@pytest.mark.parametrize(
+    "case",
+    [
+        "schema",
+        "detector",
+        "gates",
+        "marker",
+        "seed_pixels",
+        "seed_image_hash",
+        "namespace",
+        "future_seeds",
+    ],
+)
+def test_forged_safe_detector_data_cannot_reach_private_scoring(
+    keyframe_capture, monkeypatch, case
+):
+    auditor, route, engine = keyframe_capture
+    config = json.loads((route / "config.json").read_bytes())
+    saved = json.loads((route / "keyframe-acquisition.json").read_bytes())
+    acquisition = saved["acquisition"]
+    if case == "schema":
+        config["schema"] = "recovering-stable-keyframe-camera-projection-v1"
+    elif case == "detector":
+        config["keyframe_policy"]["seed_detection"] = "future-surviving-pixels"
+    elif case == "gates":
+        config["keyframe_policy"]["temporal"]["minimum_patch_correlation"] = 0.5
+    elif case == "marker":
+        acquisition.pop("seed_detection_registration")
+    elif case == "seed_pixels":
+        acquisition["flow_prefixes"][0]["seed_pixels"] = [[224, 224]]
+    elif case == "seed_image_hash":
+        acquisition["flow_prefixes"][0]["seed_image_sha256"] = "0" * 64
+    elif case == "namespace":
+        acquisition["epochs"] = [{"namespace": "sparse-keyframes-56", "detector": {}}]
+    else:
+        acquisition["frozen"] = {"detector": {"seed_image_frame": 96}}
+    save(route / "config.json", config)
+    save(route / "keyframe-acquisition.json", saved)
+    report = json.loads((route / "report.json").read_bytes())
+    report["config_sha256"] = auditor.runtime.digest(route / "config.json")
+    report["artifact_sha256"]["keyframe-acquisition.json"] = auditor.runtime.digest(
+        route / "keyframe-acquisition.json"
+    )
+    save(route / "report.json", report)
+    private_guard(monkeypatch)
+    rejected = auditor.audit(route, engine)
+    assert not rejected["valid"] and rejected["evaluation"] is None
+    assert rejected["stability_diagnostics"] is None
+
+
+@pytest.mark.parametrize(
+    "flags",
+    [
+        ["--safe-seed-keyframes"],
+        [
+            "--safe-seed-keyframes",
+            "--stable-keyframes",
+            "--micro-keyframes",
+            "--responsive-keyframes",
+        ],
+        [
+            "--safe-seed-keyframes",
+            "--stable-keyframes",
+            "--micro-keyframes",
+            "--recovering-keyframes",
+        ],
+    ],
+)
+def test_safe_seed_flags_require_all_explicit_protocols_before_output(
     scripts, tmp_path, monkeypatch, flags
 ):
     _, capture = scripts

@@ -11,7 +11,15 @@ Fabric mod supplies resettable hidden rules, and the Python boundary replaces it
 block, and entity names with seeded opaque IDs before an agent can observe them.
 Live execution still requires the user's explicit Minecraft EULA acceptance.
 
-Latest visual development adds bounded public WAIT recovery and sealed local epochs.
+Latest visual development registers first-image-only safe seeds, freezing their
+identities and denominator before past fitting or future extension. Two fresh,
+independently audited worlds still fail to acquire a supported map (six/three
+views across unconnected epochs in one, four in the other). Complete raw-bridge
+diagnostics show mixed gains and accumulating losses, not a general mapping fix.
+Full V33 regressions pass Windows 1347/Linux 1349 cases, two skips each, with
+frozen inputs verified after completion. See the
+[`safe-seed checkpoint`](docs/safe-seed-keyframe-development.md).
+The preceding visual development adds bounded public WAIT recovery and sealed local epochs.
 One fresh audited world recovers a fall/stability abort after three extra WAITs,
 but its new local epoch still fails correspondence support; the other has no map.
 Known-image safe-detector diagnostics are research candidates, not live success.

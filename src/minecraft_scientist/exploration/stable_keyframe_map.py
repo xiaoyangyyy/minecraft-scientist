@@ -7,6 +7,7 @@ timing, block scale, endpoint rescue or navigation acceptance enter this policy.
 
 from __future__ import annotations
 
+import copy
 import hashlib
 from typing import Literal
 
@@ -24,6 +25,7 @@ from .joint_multiview_map import (
 from .map_recovery import _digest
 from .public_response_control import select_public_response
 from .public_wait_recovery import settle_with_recovery
+from .safe_track_seeds import safe_seeds
 from .second_leg_shadow import retain_tracks
 from .settled_map_control import PublicControlStep, _center
 from .shared_map_endpoint import SharedEndpointPolicy, _visible_flow
@@ -81,6 +83,14 @@ class StableRecoveringKeyframePolicy(StableResponsiveKeyframePolicy):
     maximum_total_acquisition_trials: Literal[22] = 22
 
 
+class StableSafeSeedKeyframePolicy(StableRecoveringKeyframePolicy):
+    """First-image support-masked detector with unchanged recovery/geometry gates."""
+
+    seed_detection: Literal["first-image-only-safe-support-mask-v1"] = (
+        "first-image-only-safe-support-mask-v1"
+    )
+
+
 class KeyframeIndex(BaseModel):
     """Explicit selected-image clock, not consecutive physical ticks/poses."""
 
@@ -120,6 +130,7 @@ def acquire_stable_keyframe_map(
     micro_controls=False,
     responsive_controls=False,
     recovery_controls=False,
+    safe_seed_controls=False,
 ):
     """First eligible past proposal, then a distinct control and first stable future.
 
@@ -129,9 +140,16 @@ def acquire_stable_keyframe_map(
     """
     if any(
         type(flag) is not bool
-        for flag in (micro_controls, responsive_controls, recovery_controls)
+        for flag in (
+            micro_controls,
+            responsive_controls,
+            recovery_controls,
+            safe_seed_controls,
+        )
     ):
         raise ValueError("micro control registration must be explicit boolean")
+    if safe_seed_controls and not recovery_controls:
+        raise ValueError("safe seeds require explicit recovering keyframe registration")
     if recovery_controls and not (micro_controls and responsive_controls):
         raise ValueError(
             "recovery controls require explicit responsive micro registration"
@@ -139,7 +157,9 @@ def acquire_stable_keyframe_map(
     if responsive_controls and not micro_controls:
         raise ValueError("responsive controls require explicit micro registration")
     policy_type = (
-        StableRecoveringKeyframePolicy
+        StableSafeSeedKeyframePolicy
+        if safe_seed_controls
+        else StableRecoveringKeyframePolicy
         if recovery_controls
         else StableResponsiveKeyframePolicy
         if responsive_controls
@@ -198,8 +218,11 @@ def acquire_stable_keyframe_map(
             epochs=[],
             epoch_links=[],
         )
+    if safe_seed_controls:
+        result["seed_detection_registration"] = settings.seed_detection
     shape = image.shape
     samples, ordinals = [], []
+    sample_seeds = None
     epoch_outcomes = []
     handle, same, uses = 0, 0, [0] * 4
 
@@ -238,6 +261,19 @@ def acquire_stable_keyframe_map(
             },
         )
         return finish()
+
+    def visible_flow(first, second):
+        if not safe_seed_controls:
+            return _visible_flow(first, second, settings.stability)
+        seeds = safe_seeds(first)
+        flow = _visible_flow(first, second, settings.stability, seed_pixels=seeds)
+        if flow["tracks"]["seed_count"] != len(seeds):
+            raise ValueError("safe flow changed its first-image seed denominator")
+        return flow | {
+            "seed_detection_registration": settings.seed_detection,
+            "seed_image_sha256": hashlib.sha256(first.tobytes()).hexdigest(),
+            "seed_pixels": seeds.tolist(),
+        }
 
     def step(kind, requested):
         nonlocal image
@@ -303,7 +339,7 @@ def acquire_stable_keyframe_map(
             return False
         if kind == "wait":
             try:
-                flow = _visible_flow(previous, image, settings.stability)
+                flow = visible_flow(previous, image)
                 if type(flow.get("stable")) is not bool:
                     raise ValueError(
                         "public optical stability must be an explicit boolean"
@@ -362,13 +398,20 @@ def acquire_stable_keyframe_map(
 
     def sampled_tracks(extra=None):
         frames = samples + ([extra] if extra is not None else [])
-        return track_frame_chain(frames, config=settings.temporal)
+        arguments = {"seed_pixels": sample_seeds} if safe_seed_controls else {}
+        tracked = track_frame_chain(frames, config=settings.temporal, **arguments)
+        if safe_seed_controls and tracked.seed_count != len(sample_seeds):
+            raise ValueError(
+                "sampled tracks changed the frozen first-image seed denominator"
+            )
+        return tracked
 
     def start_epoch():
+        nonlocal sample_seeds
         result["epochs"].append(
             {
                 "epoch_id": len(result["epochs"]),
-                "namespace": f"sparse-keyframes-{ordinal()}",
+                "namespace": f"{'safe-' if safe_seed_controls else ''}sparse-keyframes-{ordinal()}",
                 "anchor_frame": ordinal(),
                 "frame_ordinals": [ordinal()],
                 "trial_ids": [],
@@ -378,6 +421,15 @@ def acquire_stable_keyframe_map(
                 "global_gauge_aligned": False,
             }
         )
+        if safe_seed_controls:
+            sample_seeds = safe_seeds(samples[0]).copy()
+            sample_seeds.flags.writeable = False
+            result["epochs"][-1]["detector"] = {
+                "registration": settings.seed_detection,
+                "seed_image_frame": ordinal(),
+                "seed_image_sha256": hashlib.sha256(samples[0].tobytes()).hexdigest(),
+                "seed_pixels": sample_seeds.tolist(),
+            }
 
     def scoring_history():
         return [
@@ -397,7 +449,10 @@ def acquire_stable_keyframe_map(
         }
     )
     if recovery_controls:
-        start_epoch()
+        try:
+            start_epoch()
+        except Exception as error:  # noqa: BLE001 -- retain the completed stable prefix
+            return geometry_failed("seed_detection", error)
         result["samples"][-1]["epoch_id"] = 0
     maps, past = None, None
     total_trials = (
@@ -439,7 +494,7 @@ def acquire_stable_keyframe_map(
         if not settle("acquisition"):
             return finish()
         try:
-            novelty = _visible_flow(samples[-1], image, settings.stability)
+            novelty = visible_flow(samples[-1], image)
             supported = bool(
                 len(novelty["tracks"]["track_ids"]) >= settings.stability.minimum_tracks
                 and novelty["cells"] >= settings.stability.minimum_cells
@@ -490,7 +545,10 @@ def acquire_stable_keyframe_map(
                     }
                 )
                 samples, ordinals, epoch_outcomes = [image.copy()], [ordinal()], []
-                start_epoch()
+                try:
+                    start_epoch()
+                except Exception as error:  # noqa: BLE001 -- sealed parent stays unchanged
+                    return geometry_failed("seed_detection", error)
                 result["samples"].append(
                     {
                         "absolute_frame": ordinal(),
@@ -521,7 +579,7 @@ def acquire_stable_keyframe_map(
         try:
             past = sampled_tracks()
             index = KeyframeIndex(
-                namespace=f"sparse-keyframes-{ordinals[0]}",
+                namespace=f"{'safe-' if safe_seed_controls else ''}sparse-keyframes-{ordinals[0]}",
                 frame_ordinals=tuple(ordinals),
                 rgb_sha256=tuple(
                     hashlib.sha256(frame.tobytes()).hexdigest() for frame in samples
@@ -535,6 +593,8 @@ def acquire_stable_keyframe_map(
                 "required_bootstraps": [],
                 "frozen_at_frame": ordinal(),
             }
+            if safe_seed_controls:
+                proposal["detector"] = copy.deepcopy(result["epochs"][-1]["detector"])
             attempt = {"proposal": proposal, "sha256": None}
             result["attempts"].append(attempt)
             if recovery_controls:

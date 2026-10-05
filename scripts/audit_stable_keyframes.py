@@ -26,6 +26,7 @@ from minecraft_scientist.exploration.stable_keyframe_map import (
     StableMicroKeyframePolicy,
     StableRecoveringKeyframePolicy,
     StableResponsiveKeyframePolicy,
+    StableSafeSeedKeyframePolicy,
     acquire_stable_keyframe_map,
 )
 from minecraft_scientist.protocols import TransitionRecord
@@ -57,7 +58,13 @@ def serializable_truth(truth):
 
 
 def registration(directory, config, report, definition):
-    recovery = config.get("schema") == "recovering-stable-keyframe-camera-projection-v1"
+    safe_seeds = (
+        config.get("schema") == "safe-seed-stable-keyframe-camera-projection-v1"
+    )
+    recovery = (
+        safe_seeds
+        or config.get("schema") == "recovering-stable-keyframe-camera-projection-v1"
+    )
     responsive = (
         recovery
         or config.get("schema") == "responsive-stable-keyframe-camera-projection-v1"
@@ -67,7 +74,9 @@ def registration(directory, config, report, definition):
         or config.get("schema") == "micro-stable-keyframe-camera-projection-v1"
     )
     settings = (
-        StableRecoveringKeyframePolicy()
+        StableSafeSeedKeyframePolicy()
+        if safe_seeds
+        else StableRecoveringKeyframePolicy()
         if recovery
         else StableResponsiveKeyframePolicy()
         if responsive
@@ -91,6 +100,7 @@ def registration(directory, config, report, definition):
             "micro-stable-keyframe-camera-projection-v1",
             "responsive-stable-keyframe-camera-projection-v1",
             "recovering-stable-keyframe-camera-projection-v1",
+            "safe-seed-stable-keyframe-camera-projection-v1",
         )
         or json.dumps(config.get("keyframe_policy"), sort_keys=True, allow_nan=False)
         != json.dumps(settings.model_dump(mode="json"), sort_keys=True, allow_nan=False)
@@ -183,6 +193,7 @@ def registration(directory, config, report, definition):
             micro_controls=micro,
             responsive_controls=responsive,
             recovery_controls=recovery,
+            safe_seed_controls=safe_seeds,
         ),
     }
     result.update(

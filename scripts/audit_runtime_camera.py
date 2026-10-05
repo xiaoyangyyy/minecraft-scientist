@@ -233,6 +233,7 @@ def public_data(directory, engine, *, registration=None):
             "micro-stable-keyframe-camera-projection-v1",
             "responsive-stable-keyframe-camera-projection-v1",
             "recovering-stable-keyframe-camera-projection-v1",
+            "safe-seed-stable-keyframe-camera-projection-v1",
         )
         and registration is not None
     ):
@@ -241,10 +242,13 @@ def public_data(directory, engine, *, registration=None):
             StableMicroKeyframePolicy,
             StableRecoveringKeyframePolicy,
             StableResponsiveKeyframePolicy,
+            StableSafeSeedKeyframePolicy,
         )
 
         policy_type = (
-            StableRecoveringKeyframePolicy
+            StableSafeSeedKeyframePolicy
+            if config["schema"] == "safe-seed-stable-keyframe-camera-projection-v1"
+            else StableRecoveringKeyframePolicy
             if config["schema"] == "recovering-stable-keyframe-camera-projection-v1"
             else StableResponsiveKeyframePolicy
             if config["schema"] == "responsive-stable-keyframe-camera-projection-v1"

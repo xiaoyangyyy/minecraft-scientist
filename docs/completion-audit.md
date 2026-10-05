@@ -4,7 +4,21 @@ This audit compares the current repository with the original self-evolving symbo
 Minecraft system, not merely with the smaller offline MVP. A green unit test is not
 treated as proof of live Minecraft behavior.
 
-The latest development checkpoint is `docs/recovering-keyframe-acquisition-development.md`:
+The latest development checkpoint is `docs/safe-seed-keyframe-development.md`:
+first-image-only safe seeds are registered, frozen and independently replayed in
+two fresh development worlds. Neither supports a map: one retains four rejected
+six-view bootstrap models and a separate three-view recovered epoch; the other
+has four views and no proposal. All thirty-one actual public endpoint pairs have
+exact raw-bridge diagnostics; continuous tracking improves some but loses support
+on others. No alternate controller, navigation or held-out success is established.
+Current V33 core passes thirty seeds/two repeats/all eighteen artifacts on both
+platforms; focused tests pass 146 each, default-only Linux 673/76 skips and separate
+bridge research eighteen each. Full persistent Linux passes 1349/two skips, full
+Windows 1347/two skips, zero failures/errors, with all 444 declared frozen inputs
+verified unchanged after each terminal run. Original reliable arrival, held-out,
+long recovery, scientific/map integration and release gates remain open.
+
+The preceding development checkpoint is `docs/recovering-keyframe-acquisition-development.md`:
 one of two fresh audited worlds recovers a failed stability window after three
 extra WAITs and starts a sealed, unconnected local epoch. Neither supports a map
 or navigation. Known-public-image first-frame safe-detector diagnostics improve

@@ -54,9 +54,10 @@ class SharedEndpointPolicy(BaseModel):
         return self
 
 
-def _visible_flow(first, second, settings):
+def _visible_flow(first, second, settings, *, seed_pixels=None):
+    seed_arguments = {} if seed_pixels is None else {"seed_pixels": seed_pixels}
     tracks = track_frame_chain(
-        [first, second], config=TemporalTrackConfig(maximum_frames=3)
+        [first, second], config=TemporalTrackConfig(maximum_frames=3), **seed_arguments
     )
     if tracks.frame_count != 2 or tracks.image_shape != first.shape[:2]:
         raise ValueError(

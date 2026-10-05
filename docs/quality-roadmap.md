@@ -58,7 +58,17 @@ until each required gate has current, inspectable evidence.
 
 ## Evidence discipline
 
-The latest `docs/recovering-keyframe-acquisition-development.md` checkpoint adds
+The latest `docs/safe-seed-keyframe-development.md` checkpoint registers and freezes
+first-image support-masked detector seeds, with unchanged geometry gates. Both
+fresh independently audited worlds still lack a supported map or future prediction.
+All thirty-one original endpoint pairs replay exactly in public raw-bridge
+diagnostics, but continuous tracking gives mixed gains and accumulated losses.
+Next investigate sufficient controllable view diversity and full past-proposal
+geometry, not a wholesale tracker swap or relaxed thresholds. Completed full V33
+regressions and seed-bound audits are engineering evidence, not closure of any
+original completion requirement above.
+
+The preceding `docs/recovering-keyframe-acquisition-development.md` checkpoint adds
 bounded WAIT recovery and sealed, unconnected local epochs. One of two fresh
 audited development worlds recovers its failed stability window after three
 extra WAITs; neither acquires a supported map or future navigation evidence.
