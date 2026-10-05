@@ -12,8 +12,9 @@ endpoint support but are not a production change, fitted map or new live result.
 Current V32 core passes thirty seeds/two repeats/all eighteen artifacts on both
 platforms; focused tests pass 126 each, default-only Linux 673/75 skips and research
 tests twenty each. Full V32 persistent Linux passes 1325/two skips, zero failures/
-errors, all 437 frozen hashes unchanged after completion; full Windows is still
-running. All original reliable
+errors, all 437 frozen hashes unchanged after completion; full Windows passes
+1323/two skips, zero failures/errors, with 377 source/test/fixture inputs and 114
+core-ledger entries unchanged after completion. All original reliable
 arrival, held-out, long recovery, scientific/map integration and release gates stay
 open; the full goal remains active.
 

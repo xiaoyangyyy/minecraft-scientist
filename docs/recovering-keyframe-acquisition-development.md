@@ -118,14 +118,17 @@ Full V32 persistent Linux regression is terminal: 1325 passes/two skips, zero
 failures/errors, with all 437 frozen file hashes unchanged after completion.
 The JUnit and post-terminal verification are
 `runs/recovering-keyframe-full-persistent-tree-wsl-v1.xml` and
-`runs/v32-full-linux-post-verification-v1.json`. Full Windows regression is still
-running. The exact
+`runs/v32-full-linux-post-verification-v1.json`. Full Windows regression is also
+terminal: 1323 passes/two skips, zero failures/errors, with all 377 declared
+production/test/fixture inputs and 114 core-ledger entries unchanged after completion.
+See `runs/recovering-keyframe-full-windows-v1.xml` and
+`runs/v32-full-windows-post-verification-v1.json`. The exact
 production/test/checkpoint snapshot has 437 files/4,798,454 bytes, archive SHA-256
 `490AF25DF3923319B731E8D8816D7C8B10D56E6C7A0DAB29735226CE2B473D8D` at
 `runs/v32-frozen-test-tree-v1`; verified restoration is recorded at
 `runs/v32-persistent-frozen-test-tree-v1`. It predates this document and the separately
-tested research scripts, not the production/package/test inputs. No full Windows
-passing count is inferred from progress dots. V31 results are historical, not V32 proof.
+tested research scripts, not the production/package/test inputs. All full counts
+come from terminal JUnit reports, not progress dots. V31 results remain historical.
 
 Next validate safe first-frame detection in a fresh source-bound protocol, without
 relaxing geometry, then obtain supported camera/control motion and independently

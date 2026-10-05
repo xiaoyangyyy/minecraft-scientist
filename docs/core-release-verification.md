@@ -256,7 +256,9 @@ core verifiers pass thirty seeds/two repeats/all eighteen artifacts/all six chec
 at `runs/core-release-seeds0-29-windows-v32` and `-wsl-v32`, with 114 source entries
 (111 package files) unchanged. Focused tests pass 126 each and isolated default
 Linux passes 673/75 skips. Full V32 persistent Linux passes 1325/two skips with
-all 437 frozen hashes unchanged after completion; full Windows is still running.
+all 437 frozen hashes unchanged after completion; full Windows passes 1323/two skips,
+zero failures/errors, with 377 source/test/fixture entries and its core ledger
+unchanged after completion.
 Separately
 tested research-only safe-seed diagnostics are not covered by that earlier frozen
 tree. Two fresh valid live audits still yield no map/navigation. See
