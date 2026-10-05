@@ -23,6 +23,7 @@ from .joint_multiview_map import (
 )
 from .map_recovery import _digest
 from .public_response_control import select_public_response
+from .public_wait_recovery import settle_with_recovery
 from .second_leg_shadow import retain_tracks
 from .settled_map_control import PublicControlStep, _center
 from .shared_map_endpoint import SharedEndpointPolicy, _visible_flow
@@ -72,6 +73,14 @@ class StableResponsiveKeyframePolicy(StableMicroKeyframePolicy):
     action_selection: Literal["public-beta-novelty-v1"] = "public-beta-novelty-v1"
 
 
+class StableRecoveringKeyframePolicy(StableResponsiveKeyframePolicy):
+    """Explicit extra wait/local-epoch budgets; unchanged global/pixel gates."""
+
+    maximum_recovery_windows: Literal[2] = 2
+    maximum_local_epochs: Literal[2] = 2
+    maximum_total_acquisition_trials: Literal[22] = 22
+
+
 class KeyframeIndex(BaseModel):
     """Explicit selected-image clock, not consecutive physical ticks/poses."""
 
@@ -110,6 +119,7 @@ def acquire_stable_keyframe_map(
     policy=None,
     micro_controls=False,
     responsive_controls=False,
+    recovery_controls=False,
 ):
     """First eligible past proposal, then a distinct control and first stable future.
 
@@ -117,12 +127,21 @@ def acquire_stable_keyframe_map(
     Only training landmarks fit poses; every supported frozen map must pass future
     withheld rays and consensus. Optical stability alone never asserts body rest.
     """
-    if type(micro_controls) is not bool or type(responsive_controls) is not bool:
+    if any(
+        type(flag) is not bool
+        for flag in (micro_controls, responsive_controls, recovery_controls)
+    ):
         raise ValueError("micro control registration must be explicit boolean")
+    if recovery_controls and not (micro_controls and responsive_controls):
+        raise ValueError(
+            "recovery controls require explicit responsive micro registration"
+        )
     if responsive_controls and not micro_controls:
         raise ValueError("responsive controls require explicit micro registration")
     policy_type = (
-        StableResponsiveKeyframePolicy
+        StableRecoveringKeyframePolicy
+        if recovery_controls
+        else StableResponsiveKeyframePolicy
         if responsive_controls
         else StableMicroKeyframePolicy
         if micro_controls
@@ -171,8 +190,17 @@ def acquire_stable_keyframe_map(
             control_choices=[],
             future_control_choice=None,
         )
+    if recovery_controls:
+        result.update(
+            recovery_control_registration="bounded-public-wait-and-local-epochs-v1",
+            failed_wait_windows=[],
+            recovery_wait_windows=[],
+            epochs=[],
+            epoch_links=[],
+        )
     shape = image.shape
     samples, ordinals = [], []
+    epoch_outcomes = []
     handle, same, uses = 0, 0, [0] * 4
 
     def ordinal():
@@ -184,6 +212,20 @@ def acquire_stable_keyframe_map(
             and _digest(result["frozen"]) != result["frozen_sha256"]
         ):
             raise ValueError("later controls changed the immutable keyframe proposal")
+        if recovery_controls:
+            for link in result["epoch_links"]:
+                if (
+                    _digest(result["epochs"][link["parent_epoch"]])
+                    != link["parent_sha256"]
+                ):
+                    raise ValueError("later controls changed a sealed local epoch")
+            for attempt in result["attempts"]:
+                if _digest(attempt["proposal"]) != attempt["sha256"]:
+                    raise ValueError("later controls changed a retained map proposal")
+            if result["epochs"]:
+                result["epochs"][-1].update(
+                    status=result["terminal"], termination_frame=ordinal()
+                )
         return result
 
     def geometry_failed(stage, error):
@@ -279,6 +321,21 @@ def acquire_stable_keyframe_map(
         return True
 
     def settle(phase):
+        if recovery_controls:
+            starts = (
+                len(result["failed_wait_windows"]),
+                len(result["recovery_wait_windows"]),
+            )
+            settled = settle_with_recovery(
+                result, phase, step, ordinal, settings.stability
+            )
+            epoch_id = len(result["epochs"]) - 1 if result["epochs"] else None
+            for name, start in zip(
+                ("failed_wait_windows", "recovery_wait_windows"), starts, strict=True
+            ):
+                for entry in result[name][start:]:
+                    entry["epoch_id"] = epoch_id
+            return settled
         start, streak = ordinal(), 0
         for tick in range(1, settings.stability.maximum_wait_ticks + 1):
             if not step("wait", None):
@@ -307,6 +364,27 @@ def acquire_stable_keyframe_map(
         frames = samples + ([extra] if extra is not None else [])
         return track_frame_chain(frames, config=settings.temporal)
 
+    def start_epoch():
+        result["epochs"].append(
+            {
+                "epoch_id": len(result["epochs"]),
+                "namespace": f"sparse-keyframes-{ordinal()}",
+                "anchor_frame": ordinal(),
+                "frame_ordinals": [ordinal()],
+                "trial_ids": [],
+                "attempt_indices": [],
+                "status": "acquiring",
+                "termination_frame": None,
+                "global_gauge_aligned": False,
+            }
+        )
+
+    def scoring_history():
+        return [
+            {"trial": local, "handle": item["handle"], "selected": item["selected"]}
+            for local, item in enumerate(epoch_outcomes)
+        ]
+
     if not settle("initial"):
         return finish()
     samples.append(image.copy())
@@ -318,16 +396,39 @@ def acquire_stable_keyframe_map(
             "reason": "first public stable prefix",
         }
     )
+    if recovery_controls:
+        start_epoch()
+        result["samples"][-1]["epoch_id"] = 0
     maps, past = None, None
-    for trial in range(settings.maximum_acquisition_trials):
+    total_trials = (
+        settings.maximum_total_acquisition_trials
+        if recovery_controls
+        else settings.maximum_acquisition_trials
+    )
+    for trial in range(total_trials):
+        if (
+            recovery_controls
+            and len(epoch_outcomes) >= settings.maximum_acquisition_trials
+        ):
+            break
         if responsive_controls:
-            decision = select_public_response(result["samples"][1:])
+            decision = select_public_response(
+                scoring_history() if recovery_controls else result["samples"][1:],
+                required_distinct_from=handle
+                if recovery_controls and same >= settings.maximum_same_handle_trials
+                else None,
+            )
             if decision["handle"] != handle:
                 same = 0
             handle = decision["handle"]
             result["control_choices"].append(
                 decision | {"trial": trial, "at_frame": ordinal()}
             )
+            if recovery_controls:
+                result["control_choices"][-1].update(
+                    epoch_id=result["epochs"][-1]["epoch_id"],
+                    scoring_trial_ids=[item["trial"] for item in epoch_outcomes],
+                )
         elif same >= settings.maximum_same_handle_trials:
             handle, same = min(range(4), key=lambda value: (uses[value], value)), 0
         for _ in range(settings.move_ticks):
@@ -339,12 +440,15 @@ def acquire_stable_keyframe_map(
             return finish()
         try:
             novelty = _visible_flow(samples[-1], image, settings.stability)
-            novel = bool(
+            supported = bool(
                 len(novelty["tracks"]["track_ids"]) >= settings.stability.minimum_tracks
                 and novelty["cells"] >= settings.stability.minimum_cells
                 and len(novelty["tracks"]["track_ids"])
                 / max(novelty["tracks"]["seed_count"], 1)
                 >= settings.stability.minimum_survival
+            )
+            novel = bool(
+                supported
                 and novelty["median_flow_pixels"] is not None
                 and novelty["median_flow_pixels"] >= settings.novelty_median_pixels
             )
@@ -359,6 +463,43 @@ def acquire_stable_keyframe_map(
                 "trial": trial,
             }
         )
+        if recovery_controls:
+            epoch = result["epochs"][-1]
+            result["samples"][-1].update(
+                epoch_id=epoch["epoch_id"], correspondence_supported=supported
+            )
+            epoch_outcomes.append(result["samples"][-1])
+            epoch["trial_ids"].append(trial)
+            if (
+                not supported
+                and result["settles"][-1]["recovery_windows"] > 0
+                and len(result["epochs"]) < settings.maximum_local_epochs
+            ):
+                epoch.update(
+                    status="connection_lost_after_recovery", termination_frame=ordinal()
+                )
+                result["epoch_links"].append(
+                    {
+                        "parent_epoch": epoch["epoch_id"],
+                        "child_epoch": len(result["epochs"]),
+                        "parent_sha256": _digest(epoch),
+                        "at_frame": ordinal(),
+                        "reason": "public_support_lost_after_recovery",
+                        "supported": False,
+                        "metric_scale_known": False,
+                    }
+                )
+                samples, ordinals, epoch_outcomes = [image.copy()], [ordinal()], []
+                start_epoch()
+                result["samples"].append(
+                    {
+                        "absolute_frame": ordinal(),
+                        "selected": True,
+                        "reason": "new_local_anchor_after_public_recovery",
+                        "epoch_id": result["epochs"][-1]["epoch_id"],
+                    }
+                )
+                continue
         if not novel:
             if not responsive_controls:
                 handle, same = (
@@ -371,6 +512,8 @@ def acquire_stable_keyframe_map(
             continue
         samples.append(image.copy())
         ordinals.append(ordinal())
+        if recovery_controls:
+            result["epochs"][-1]["frame_ordinals"].append(ordinal())
         if len(samples) < settings.minimum_keyframes:
             continue
         attempt = None
@@ -394,6 +537,11 @@ def acquire_stable_keyframe_map(
             }
             attempt = {"proposal": proposal, "sha256": None}
             result["attempts"].append(attempt)
+            if recovery_controls:
+                attempt["epoch_id"] = result["epochs"][-1]["epoch_id"]
+                result["epochs"][-1]["attempt_indices"].append(
+                    len(result["attempts"]) - 1
+                )
             maps = []
             for slot in range(2, past.frame_count):
                 model = fit_joint_map(
@@ -417,15 +565,21 @@ def acquire_stable_keyframe_map(
         if sum(model.supported for model in maps) >= settings.consensus.minimum_models:
             result["frozen"], result["frozen_sha256"] = proposal, _digest(proposal)
             break
-    else:
+    if result["frozen"] is None:
         result["terminal"] = "map_unavailable"
         return finish()
     frozen_handle = handle
     if responsive_controls:
         decision = select_public_response(
-            result["samples"][1:], required_distinct_from=frozen_handle
+            scoring_history() if recovery_controls else result["samples"][1:],
+            required_distinct_from=frozen_handle,
         )
         result["future_control_choice"] = decision | {"at_frame": ordinal()}
+        if recovery_controls:
+            result["future_control_choice"].update(
+                epoch_id=result["epochs"][-1]["epoch_id"],
+                scoring_trial_ids=[item["trial"] for item in epoch_outcomes],
+            )
         handle = decision["handle"]
     else:
         handle = min(

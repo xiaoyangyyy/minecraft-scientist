@@ -4,14 +4,30 @@ This audit compares the current repository with the original self-evolving symbo
 Minecraft system, not merely with the smaller offline MVP. A green unit test is not
 treated as proof of live Minecraft behavior.
 
-The latest development checkpoint is `docs/responsive-keyframe-acquisition-development.md`:
+The latest development checkpoint is `docs/recovering-keyframe-acquisition-development.md`:
+one of two fresh audited worlds recovers a failed stability window after three
+extra WAITs and starts a sealed, unconnected local epoch. Neither supports a map
+or navigation. Known-public-image first-frame safe-detector diagnostics improve
+endpoint support but are not a production change, fitted map or new live result.
+Current V32 core passes thirty seeds/two repeats/all eighteen artifacts on both
+platforms; focused tests pass 126 each, default-only Linux 673/75 skips and research
+tests twenty each. Full V32 persistent Linux passes 1325/two skips, zero failures/
+errors, all 437 frozen hashes unchanged after completion; full Windows is still
+running. All original reliable
+arrival, held-out, long recovery, scientific/map integration and release gates stay
+open; the full goal remains active.
+
+The preceding development checkpoint is `docs/responsive-keyframe-acquisition-development.md`:
 public novelty-response control selection is independently replayed in two fresh
 worlds, but neither produces a supported map. One returns to a useful control then
 exhausts its sixteen-tick stability window during a verified five-block fall;
 the other acquires only one view. Ninety focused tests pass on each platform and
 the current V31 core passes thirty seeds/two repeats/all eighteen artifacts on
-both platforms. Default-only Linux passes 665/74 skips; full regressions are still
-running. Recovery/persistent mapping/scientific-loop/held-out gates remain open.
+both platforms. Default-only Linux passes 665/74 skips; V31 full regressions are
+terminal with Windows 1287/Linux 1289 passes, two skips each, zero failures/errors.
+All 433 frozen Linux file hashes were unchanged after completion. These are
+historical V31 checks, not verification of subsequent recovery edits.
+Recovery/persistent mapping/scientific-loop/held-out gates remain open.
 
 The preceding development checkpoint is `docs/micro-keyframe-acquisition-development.md`:
 one-tick acquisition in two fresh audited worlds produces one/six keyframes.

@@ -29,10 +29,13 @@ def keyframe_capture(diagnostic, scripts, monkeypatch, request):
     _, definition = scripts
     auditor = importlib.import_module("audit_stable_keyframes")
     mode = getattr(request, "param", False)
-    responsive = mode == "responsive"
+    recovery = mode == "recovering"
+    responsive = recovery or mode == "responsive"
     micro = responsive or mode is True
     policy_type = (
-        auditor.StableResponsiveKeyframePolicy
+        auditor.StableRecoveringKeyframePolicy
+        if recovery
+        else auditor.StableResponsiveKeyframePolicy
         if responsive
         else auditor.StableMicroKeyframePolicy
         if micro
@@ -47,7 +50,9 @@ def keyframe_capture(diagnostic, scripts, monkeypatch, request):
     )
     config = json.loads((route / "config.json").read_bytes())
     config.update(
-        schema="responsive-stable-keyframe-camera-projection-v1"
+        schema="recovering-stable-keyframe-camera-projection-v1"
+        if recovery
+        else "responsive-stable-keyframe-camera-projection-v1"
         if responsive
         else "micro-stable-keyframe-camera-projection-v1"
         if micro
@@ -58,11 +63,12 @@ def keyframe_capture(diagnostic, scripts, monkeypatch, request):
         keyframe_policy=policy_type().model_dump(mode="json"),
     )
     save(route / "config.json", config)
+    action_count = 96 if recovery else 64
     events = [
         TransitionRecord.model_validate_json(line)
         for line in (route / "events.jsonl").read_text(encoding="utf-8").splitlines()
-    ][:64]
-    for index in range(48, 64):
+    ][:action_count]
+    for index in range(48, action_count):
         events[index] = events[index].model_copy(
             update={"executed_action": PrimitiveAction(kind=ActionKind.WAIT, ticks=1)}
         )
@@ -71,16 +77,16 @@ def keyframe_capture(diagnostic, scripts, monkeypatch, request):
     )
     for folder in ("frames", "evaluator-native"):
         for path in (route / folder).glob("*.png"):
-            if int(path.stem.split("-")[-1]) >= 65:
+            if int(path.stem.split("-")[-1]) >= action_count + 1:
                 path.unlink()  # only newly created pytest-owned mock data
     private = json.loads((route / "evaluator-positions.json").read_bytes())
     save(
         route / "evaluator-positions.json",
-        {key: value[:65] for key, value in private.items()},
+        {key: value[: action_count + 1] for key, value in private.items()},
     )
     rows = (route / "evaluator-camera.jsonl").read_text(encoding="utf-8").splitlines()
     (route / "evaluator-camera.jsonl").write_text(
-        "\n".join(rows[:67]) + "\n", encoding="utf-8"
+        "\n".join(rows[: action_count + 3]) + "\n", encoding="utf-8"
     )
     cursor = 48
 
@@ -102,6 +108,7 @@ def keyframe_capture(diagnostic, scripts, monkeypatch, request):
         anchor_frame=48,
         micro_controls=micro,
         responsive_controls=responsive,
+        recovery_controls=recovery,
     )
     assert result["terminal"] == "initial_wait_exhausted"
     save(
@@ -109,7 +116,10 @@ def keyframe_capture(diagnostic, scripts, monkeypatch, request):
         {"calibration": calibration, "acquisition": result},
     )
     report = json.loads((route / "report.json").read_bytes())
-    report.update(frame_count=65, config_sha256=runtime.digest(route / "config.json"))
+    report.update(
+        frame_count=action_count + 1,
+        config_sha256=runtime.digest(route / "config.json"),
+    )
     report["checks"]["keyframe_policy_completed"] = True
     report["artifact_sha256"] = {
         name: runtime.digest(route / name)
@@ -376,6 +386,105 @@ def test_forged_response_history_rejects_before_private_reads(
     [["--responsive-keyframes"], ["--responsive-keyframes", "--stable-keyframes"]],
 )
 def test_response_flag_requires_both_explicit_protocol_flags(
+    scripts, tmp_path, monkeypatch, flags
+):
+    _, capture = scripts
+    output = tmp_path / "must-not-exist"
+    monkeypatch.setattr(
+        sys, "argv", [capture.__file__, *flags, "--output", str(output)]
+    )
+    with pytest.raises(SystemExit):
+        capture.main()
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("keyframe_capture", ["recovering"], indirect=True)
+def test_recovery_ledger_independently_replays_before_private_reads(
+    keyframe_capture, monkeypatch
+):
+    auditor, route, engine = keyframe_capture
+    with monkeypatch.context() as guards:
+        private_guard(guards)
+        result = auditor.runtime.public_data(
+            route, engine, registration=auditor.registration
+        )
+        assert result["valid"] and result["count"] == 97
+    result = auditor.audit(route, engine)
+    assert result["valid"] and all(result["checks"].values())
+    assert result["policy_terminal"] == "initial_wait_exhausted"
+    assert result["evaluation"] is None and not result["navigation_accepted"]
+
+
+@pytest.mark.parametrize("keyframe_capture", ["recovering"], indirect=True)
+@pytest.mark.parametrize(
+    "case",
+    [
+        "schema",
+        "window_budget",
+        "epoch_budget",
+        "trial_budget",
+        "drop_failure",
+        "window_clock",
+        "window_status",
+        "parent_hash",
+        "namespace",
+        "scoped_history",
+    ],
+)
+def test_forged_recovery_or_epoch_ledger_cannot_reach_private_evaluator(
+    keyframe_capture, monkeypatch, case
+):
+    auditor, route, engine = keyframe_capture
+    config = json.loads((route / "config.json").read_bytes())
+    saved = json.loads((route / "keyframe-acquisition.json").read_bytes())
+    acquisition = saved["acquisition"]
+    if case == "schema":
+        config["schema"] = "responsive-stable-keyframe-camera-projection-v1"
+    elif case in ("window_budget", "epoch_budget", "trial_budget"):
+        field = {
+            "window_budget": "maximum_recovery_windows",
+            "epoch_budget": "maximum_local_epochs",
+            "trial_budget": "maximum_total_acquisition_trials",
+        }[case]
+        config["keyframe_policy"][field] += 1
+    elif case == "drop_failure":
+        acquisition["failed_wait_windows"].pop(0)
+    elif case == "window_clock":
+        acquisition["recovery_wait_windows"][0]["interval"][0] += 1
+    elif case == "window_status":
+        acquisition["recovery_wait_windows"][0]["status"] = "stable"
+    elif case == "parent_hash":
+        acquisition["epoch_links"] = [{"parent_epoch": 0, "parent_sha256": "0" * 64}]
+    elif case == "namespace":
+        acquisition["epochs"] = [{"namespace": "invented-stitched-map"}]
+    else:
+        acquisition["control_choices"] = [
+            {"handle": 0, "epoch_id": 1, "scoring_trial_ids": [0]}
+        ]
+    save(route / "config.json", config)
+    save(route / "keyframe-acquisition.json", saved)
+    report = json.loads((route / "report.json").read_bytes())
+    report["config_sha256"] = auditor.runtime.digest(route / "config.json")
+    report["artifact_sha256"]["keyframe-acquisition.json"] = auditor.runtime.digest(
+        route / "keyframe-acquisition.json"
+    )
+    save(route / "report.json", report)
+    private_guard(monkeypatch)
+    result = auditor.audit(route, engine)
+    assert not result["valid"] and result["evaluation"] is None
+    assert result["stability_diagnostics"] is None
+
+
+@pytest.mark.parametrize(
+    "flags",
+    [
+        ["--recovering-keyframes"],
+        ["--recovering-keyframes", "--stable-keyframes"],
+        ["--recovering-keyframes", "--stable-keyframes", "--micro-keyframes"],
+        ["--recovering-keyframes", "--responsive-keyframes", "--micro-keyframes"],
+    ],
+)
+def test_recovery_flags_require_full_explicit_protocol_before_output(
     scripts, tmp_path, monkeypatch, flags
 ):
     _, capture = scripts

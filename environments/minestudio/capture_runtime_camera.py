@@ -105,6 +105,7 @@ def main():
     parser.add_argument("--stable-keyframes", action="store_true")
     parser.add_argument("--micro-keyframes", action="store_true")
     parser.add_argument("--responsive-keyframes", action="store_true")
+    parser.add_argument("--recovering-keyframes", action="store_true")
     args = parser.parse_args()
     if args.seed < 0:
         parser.error("seed must be nonnegative")
@@ -132,6 +133,8 @@ def main():
         parser.error(
             "responsive keyframes require explicit --stable-keyframes --micro-keyframes"
         )
+    if args.recovering_keyframes and not args.responsive_keyframes:
+        parser.error("recovering keyframes require explicit --responsive-keyframes")
     if args.stable_keyframes and (
         args.active_causal
         or args.acquisition_strategy is not None
@@ -310,18 +313,23 @@ def main():
         from minecraft_scientist.exploration.stable_keyframe_map import (
             StableKeyframePolicy,
             StableMicroKeyframePolicy,
+            StableRecoveringKeyframePolicy,
             StableResponsiveKeyframePolicy,
         )
 
         keyframe_policy_type = (
-            StableResponsiveKeyframePolicy
+            StableRecoveringKeyframePolicy
+            if args.recovering_keyframes
+            else StableResponsiveKeyframePolicy
             if args.responsive_keyframes
             else StableMicroKeyframePolicy
             if args.micro_keyframes
             else StableKeyframePolicy
         )
         config.update(
-            schema="responsive-stable-keyframe-camera-projection-v1"
+            schema="recovering-stable-keyframe-camera-projection-v1"
+            if args.recovering_keyframes
+            else "responsive-stable-keyframe-camera-projection-v1"
             if args.responsive_keyframes
             else "micro-stable-keyframe-camera-projection-v1"
             if args.micro_keyframes
@@ -331,7 +339,9 @@ def main():
             active_seed=2000,
             keyframe_policy=keyframe_policy_type().model_dump(mode="json"),
             scope=(
-                "public novelty-response one-tick acquisition and past-response distinct two-tick future validation; immutable past proposal, unchanged geometry/stability gates and 288-action cap; no continuous raw-track, metric map or navigation claim"
+                "public novelty-response acquisition with at most two extra WAIT windows, two unconnected local epochs and eleven trials per epoch/twenty-two total; unchanged geometry/stability gates and global 288-action cap; retain exhausted windows and rejected maps; no metric/global/navigation claim"
+                if args.recovering_keyframes
+                else "public novelty-response one-tick acquisition and past-response distinct two-tick future validation; immutable past proposal, unchanged geometry/stability gates and 288-action cap; no continuous raw-track, metric map or navigation claim"
                 if args.responsive_keyframes
                 else "public stable and novel one-tick sampled-keyframe acquisition, immutable past proposal and distinct two-tick future validation; explicit 288-action cap; no continuous raw-track, metric map or navigation claim"
                 if args.micro_keyframes
@@ -473,6 +483,7 @@ def main():
                         policy=config["keyframe_policy"],
                         micro_controls=args.micro_keyframes,
                         responsive_controls=args.responsive_keyframes,
+                        recovery_controls=args.recovering_keyframes,
                     ),
                 }
                 if keyframes["acquisition"]["failure"] is not None:

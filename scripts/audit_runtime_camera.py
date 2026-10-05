@@ -232,17 +232,21 @@ def public_data(directory, engine, *, registration=None):
             "stable-keyframe-camera-projection-v1",
             "micro-stable-keyframe-camera-projection-v1",
             "responsive-stable-keyframe-camera-projection-v1",
+            "recovering-stable-keyframe-camera-projection-v1",
         )
         and registration is not None
     ):
         from minecraft_scientist.exploration.stable_keyframe_map import (
             StableKeyframePolicy,
             StableMicroKeyframePolicy,
+            StableRecoveringKeyframePolicy,
             StableResponsiveKeyframePolicy,
         )
 
         policy_type = (
-            StableResponsiveKeyframePolicy
+            StableRecoveringKeyframePolicy
+            if config["schema"] == "recovering-stable-keyframe-camera-projection-v1"
+            else StableResponsiveKeyframePolicy
             if config["schema"] == "responsive-stable-keyframe-camera-projection-v1"
             else StableMicroKeyframePolicy
             if config["schema"] == "micro-stable-keyframe-camera-projection-v1"

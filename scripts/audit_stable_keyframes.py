@@ -24,6 +24,7 @@ from minecraft_scientist.exploration.settled_map_control import PublicControlSte
 from minecraft_scientist.exploration.stable_keyframe_map import (
     StableKeyframePolicy,
     StableMicroKeyframePolicy,
+    StableRecoveringKeyframePolicy,
     StableResponsiveKeyframePolicy,
     acquire_stable_keyframe_map,
 )
@@ -56,15 +57,19 @@ def serializable_truth(truth):
 
 
 def registration(directory, config, report, definition):
+    recovery = config.get("schema") == "recovering-stable-keyframe-camera-projection-v1"
     responsive = (
-        config.get("schema") == "responsive-stable-keyframe-camera-projection-v1"
+        recovery
+        or config.get("schema") == "responsive-stable-keyframe-camera-projection-v1"
     )
     micro = (
         responsive
         or config.get("schema") == "micro-stable-keyframe-camera-projection-v1"
     )
     settings = (
-        StableResponsiveKeyframePolicy()
+        StableRecoveringKeyframePolicy()
+        if recovery
+        else StableResponsiveKeyframePolicy()
         if responsive
         else StableMicroKeyframePolicy()
         if micro
@@ -85,6 +90,7 @@ def registration(directory, config, report, definition):
             "stable-keyframe-camera-projection-v1",
             "micro-stable-keyframe-camera-projection-v1",
             "responsive-stable-keyframe-camera-projection-v1",
+            "recovering-stable-keyframe-camera-projection-v1",
         )
         or json.dumps(config.get("keyframe_policy"), sort_keys=True, allow_nan=False)
         != json.dumps(settings.model_dump(mode="json"), sort_keys=True, allow_nan=False)
@@ -176,6 +182,7 @@ def registration(directory, config, report, definition):
             policy=settings,
             micro_controls=micro,
             responsive_controls=responsive,
+            recovery_controls=recovery,
         ),
     }
     result.update(

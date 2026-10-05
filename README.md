@@ -11,7 +11,12 @@ Fabric mod supplies resettable hidden rules, and the Python boundary replaces it
 block, and entity names with seeded opaque IDs before an agent can observe them.
 Live execution still requires the user's explicit Minecraft EULA acceptance.
 
-Latest visual development adapts opaque control choices from prior public novelty
+Latest visual development adds bounded public WAIT recovery and sealed local epochs.
+One fresh audited world recovers a fall/stability abort after three extra WAITs,
+but its new local epoch still fails correspondence support; the other has no map.
+Known-image safe-detector diagnostics are research candidates, not live success.
+See [`recovery checkpoint`](docs/recovering-keyframe-acquisition-development.md).
+The preceding checkpoint adapts opaque control choices from prior public novelty
 responses. Two fresh audited development worlds still acquire only one/six views
 and no supported map; one encounters an actual fall and exhausts its public
 stability window. See

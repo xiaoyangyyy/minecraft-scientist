@@ -231,7 +231,10 @@ stability-error retention. Both current core verifiers pass thirty seeds/two
 repeats/all eighteen artifacts at `runs/core-release-seeds0-29-windows-v31` and
 `-wsl-v31`; their 113 entries cover 110 package files. Both platforms pass 90
 focused cases, Windows old runtime-audit regression passes 86, default-only Linux
-passes 665/74 skips. Full Windows/persistent Linux regressions are running.
+passes 665/74 skips. Full V31 Windows/persistent Linux regressions are terminal:
+1287/1289 passes respectively, two skips each, zero failures/errors. All 433
+frozen Linux file hashes were unchanged after completion. These historical V31
+results do not verify subsequent bounded-recovery changes.
 Fresh live failures are recorded in `docs/responsive-keyframe-acquisition-development.md`;
 core verification does not establish reliable mapping, goal navigation or arrival.
 
@@ -246,6 +249,18 @@ ledger unchanged after completion. These do not verify later response-control
 changes. Do not
 attribute historical V29 counts to the changed source. Fresh live and known-data
 failures are documented in `docs/micro-keyframe-acquisition-development.md`.
+
+V32 adds separately registered bounded WAIT recovery and at most two unconnected
+local epochs, retaining the global 288-action cap and all geometry gates. Both
+core verifiers pass thirty seeds/two repeats/all eighteen artifacts/all six checks
+at `runs/core-release-seeds0-29-windows-v32` and `-wsl-v32`, with 114 source entries
+(111 package files) unchanged. Focused tests pass 126 each and isolated default
+Linux passes 673/75 skips. Full V32 persistent Linux passes 1325/two skips with
+all 437 frozen hashes unchanged after completion; full Windows is still running.
+Separately
+tested research-only safe-seed diagnostics are not covered by that earlier frozen
+tree. Two fresh valid live audits still yield no map/navigation. See
+`docs/recovering-keyframe-acquisition-development.md` for exact scope and negatives.
 
 From the repository root:
 

@@ -99,7 +99,12 @@ minimum equation transfer savings one. The original seed-zero MVP CLI report
 retains SHA-256 `B95AF2E5C152B9F06EDC63004EA87FB183C37E6A5A13BFF53F21A39A4F48AEB8`.
 Both package builds pass without additional runtime dependencies. Default-only
 Linux completes 665 passes/74 optional or platform skips, zero errors/failures in
-35.125 seconds. Full Windows and persistent Linux regressions are still running.
+35.125 seconds. Full V31 regressions are terminal: Windows 1287 passes/two skips
+and persistent Linux 1289 passes/two skips, zero failures/errors. Their JUnit
+reports are `runs/responsive-keyframe-full-windows-v1.xml` and
+`runs/responsive-keyframe-full-persistent-tree-wsl-v1.xml`; the frozen Linux tree's
+433 file hashes were unchanged after completion. These verify V31, not subsequent
+recovery-control edits.
 
 The exact V31 test/checkpoint snapshot contains 433 files/4,754,260 bytes; archive
 SHA-256 is `F1DE37007720992DF550617EB34CB0BDC55BED9AFAC6D4975DA2B8F8236324BF` at

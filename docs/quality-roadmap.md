@@ -58,7 +58,18 @@ until each required gate has current, inspectable evidence.
 
 ## Evidence discipline
 
-The latest `docs/responsive-keyframe-acquisition-development.md` checkpoint learns
+The latest `docs/recovering-keyframe-acquisition-development.md` checkpoint adds
+bounded WAIT recovery and sealed, unconnected local epochs. One of two fresh
+audited development worlds recovers its failed stability window after three
+extra WAITs; neither acquires a supported map or future navigation evidence.
+An exact public rejection ledger identifies invalid first-frame detector seeds
+and additional correspondence losses. A research-only first-image safe-mask
+detector improves support on known image pairs, without replacing old records
+or changing tracking gates. Next preregister that detector for fresh controller
+and geometry validation; do not promote known-data support to live map/arrival
+success or close any original completion requirement above.
+
+The preceding `docs/responsive-keyframe-acquisition-development.md` checkpoint learns
 opaque-control novelty responses and freezes future choices from public past
 only. Neither fresh development world supports a map; one returns to a useful
 control then exhausts a stability wait during a verified five-block fall. Next
