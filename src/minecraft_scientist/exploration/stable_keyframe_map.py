@@ -22,6 +22,7 @@ from .joint_multiview_map import (
     validate_joint_future,
 )
 from .map_recovery import _digest
+from .public_response_control import select_public_response
 from .second_leg_shadow import retain_tracks
 from .settled_map_control import PublicControlStep, _center
 from .shared_map_endpoint import SharedEndpointPolicy, _visible_flow
@@ -65,6 +66,12 @@ class StableMicroKeyframePolicy(StableKeyframePolicy):
     validation_move_ticks: Literal[2] = 2
 
 
+class StableResponsiveKeyframePolicy(StableMicroKeyframePolicy):
+    """Adapt opaque controls to observed public novelty, without changed gates."""
+
+    action_selection: Literal["public-beta-novelty-v1"] = "public-beta-novelty-v1"
+
+
 class KeyframeIndex(BaseModel):
     """Explicit selected-image clock, not consecutive physical ticks/poses."""
 
@@ -102,6 +109,7 @@ def acquire_stable_keyframe_map(
     seed=2000,
     policy=None,
     micro_controls=False,
+    responsive_controls=False,
 ):
     """First eligible past proposal, then a distinct control and first stable future.
 
@@ -109,9 +117,17 @@ def acquire_stable_keyframe_map(
     Only training landmarks fit poses; every supported frozen map must pass future
     withheld rays and consensus. Optical stability alone never asserts body rest.
     """
-    if type(micro_controls) is not bool:
+    if type(micro_controls) is not bool or type(responsive_controls) is not bool:
         raise ValueError("micro control registration must be explicit boolean")
-    policy_type = StableMicroKeyframePolicy if micro_controls else StableKeyframePolicy
+    if responsive_controls and not micro_controls:
+        raise ValueError("responsive controls require explicit micro registration")
+    policy_type = (
+        StableResponsiveKeyframePolicy
+        if responsive_controls
+        else StableMicroKeyframePolicy
+        if micro_controls
+        else StableKeyframePolicy
+    )
     settings = policy_type.model_validate(
         policy.model_dump()
         if isinstance(policy, StableKeyframePolicy)
@@ -149,6 +165,12 @@ def acquire_stable_keyframe_map(
     }
     if micro_controls:
         result["micro_control_registration"] = "one-tick-acquisition-two-tick-future-v1"
+    if responsive_controls:
+        result.update(
+            response_control_registration="chronological-public-novelty-only-v1",
+            control_choices=[],
+            future_control_choice=None,
+        )
     shape = image.shape
     samples, ordinals = [], []
     handle, same, uses = 0, 0, [0] * 4
@@ -231,21 +253,30 @@ def acquire_stable_keyframe_map(
                     "keyframe action is not an exact compliant one-tick control"
                 )
             previous, image = image, current
-            if kind == "wait":
-                result["flow_prefixes"].append(
-                    _visible_flow(previous, image, settings.stability)
-                    | {
-                        "interval": [ordinal() - 1, ordinal()],
-                        "namespace": f"wait-pair-{ordinal()}",
-                    }
-                )
-            return True
         except Exception as error:  # noqa: BLE001 -- completed actions remain recorded
             result.update(
                 terminal="execution_failed",
                 failure={"type": type(error).__name__, "message": str(error)},
             )
             return False
+        if kind == "wait":
+            try:
+                flow = _visible_flow(previous, image, settings.stability)
+                if type(flow.get("stable")) is not bool:
+                    raise ValueError(
+                        "public optical stability must be an explicit boolean"
+                    )
+                result["flow_prefixes"].append(
+                    flow
+                    | {
+                        "interval": [ordinal() - 1, ordinal()],
+                        "namespace": f"wait-pair-{ordinal()}",
+                    }
+                )
+            except Exception as error:  # noqa: BLE001 -- a solver error is not control failure
+                geometry_failed("stability", error)
+                return False
+        return True
 
     def settle(phase):
         start, streak = ordinal(), 0
@@ -289,7 +320,15 @@ def acquire_stable_keyframe_map(
     )
     maps, past = None, None
     for trial in range(settings.maximum_acquisition_trials):
-        if same >= settings.maximum_same_handle_trials:
+        if responsive_controls:
+            decision = select_public_response(result["samples"][1:])
+            if decision["handle"] != handle:
+                same = 0
+            handle = decision["handle"]
+            result["control_choices"].append(
+                decision | {"trial": trial, "at_frame": ordinal()}
+            )
+        elif same >= settings.maximum_same_handle_trials:
             handle, same = min(range(4), key=lambda value: (uses[value], value)), 0
         for _ in range(settings.move_ticks):
             if not step("move", handle):
@@ -321,13 +360,14 @@ def acquire_stable_keyframe_map(
             }
         )
         if not novel:
-            handle, same = (
-                min(
-                    (value for value in range(4) if value != handle),
-                    key=lambda value: (uses[value], value),
-                ),
-                0,
-            )
+            if not responsive_controls:
+                handle, same = (
+                    min(
+                        (value for value in range(4) if value != handle),
+                        key=lambda value: (uses[value], value),
+                    ),
+                    0,
+                )
             continue
         samples.append(image.copy())
         ordinals.append(ordinal())
@@ -381,10 +421,17 @@ def acquire_stable_keyframe_map(
         result["terminal"] = "map_unavailable"
         return finish()
     frozen_handle = handle
-    handle = min(
-        (value for value in range(4) if value != frozen_handle),
-        key=lambda value: (uses[value], value),
-    )
+    if responsive_controls:
+        decision = select_public_response(
+            result["samples"][1:], required_distinct_from=frozen_handle
+        )
+        result["future_control_choice"] = decision | {"at_frame": ordinal()}
+        handle = decision["handle"]
+    else:
+        handle = min(
+            (value for value in range(4) if value != frozen_handle),
+            key=lambda value: (uses[value], value),
+        )
     future_ticks = (
         settings.validation_move_ticks if micro_controls else settings.move_ticks
     )

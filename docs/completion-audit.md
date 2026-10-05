@@ -4,14 +4,26 @@ This audit compares the current repository with the original self-evolving symbo
 Minecraft system, not merely with the smaller offline MVP. A green unit test is not
 treated as proof of live Minecraft behavior.
 
-The latest development checkpoint is `docs/micro-keyframe-acquisition-development.md`:
+The latest development checkpoint is `docs/responsive-keyframe-acquisition-development.md`:
+public novelty-response control selection is independently replayed in two fresh
+worlds, but neither produces a supported map. One returns to a useful control then
+exhausts its sixteen-tick stability window during a verified five-block fall;
+the other acquires only one view. Ninety focused tests pass on each platform and
+the current V31 core passes thirty seeds/two repeats/all eighteen artifacts on
+both platforms. Default-only Linux passes 665/74 skips; full regressions are still
+running. Recovery/persistent mapping/scientific-loop/held-out gates remain open.
+
+The preceding development checkpoint is `docs/micro-keyframe-acquisition-development.md`:
 one-tick acquisition in two fresh audited worlds produces one/six keyframes.
 The six-view proposal retains four rejected bootstrap candidates, including a
 low-ray-error model with three negative-depth withheld landmarks. Neither world
 supports a map or future motion. Current V30 core releases pass thirty seeds/two
 repeats on both platforms; 47 keyframe/audit tests pass on each platform, Windows
 runtime-audit regression passes 86 and default-only Linux passes 640/74 skips.
-V30 full Windows/persistent Linux suites are still running. Raw-frame projection
+V30 persistent Linux completes 1246 passes/two skips, zero failures/errors, with
+all 430 frozen file hashes unchanged after completion; full Windows completes
+1244 passes/two skips with its core ledger unchanged. These V30 results do not
+validate later public-response selection changes. Raw-frame projection
 of known past data also rejects every candidate. No full-project gate is closed.
 
 The preceding development checkpoint is `docs/stable-keyframe-acquisition-development.md`:

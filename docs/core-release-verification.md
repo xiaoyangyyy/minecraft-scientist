@@ -226,12 +226,24 @@ not substituted by these offline jobs.
 
 ## Commands
 
+V31 adds deterministic public novelty-response control selection and strict
+stability-error retention. Both current core verifiers pass thirty seeds/two
+repeats/all eighteen artifacts at `runs/core-release-seeds0-29-windows-v31` and
+`-wsl-v31`; their 113 entries cover 110 package files. Both platforms pass 90
+focused cases, Windows old runtime-audit regression passes 86, default-only Linux
+passes 665/74 skips. Full Windows/persistent Linux regressions are running.
+Fresh live failures are recorded in `docs/responsive-keyframe-acquisition-development.md`;
+core verification does not establish reliable mapping, goal navigation or arrival.
+
 V30 adds a separately registered one-tick acquisition/two-tick future variant,
 strict protocol replay and partial numerical-failure retention. Both platform
 core verifiers pass thirty seeds/two repeats/all eighteen artifacts at
 `runs/core-release-seeds0-29-windows-v30` and `-wsl-v30`. Keyframe/audit tests pass
 47 on each platform, Windows runtime-audit regression passes 86, and default-only
-Linux passes 640/74 skips. Both full V30 regressions are still running; do not
+Linux passes 640/74 skips. Full persistent Linux passes 1246/two skips, with all
+430 frozen hashes unchanged; full Windows passes 1244/two skips with its core
+ledger unchanged after completion. These do not verify later response-control
+changes. Do not
 attribute historical V29 counts to the changed source. Fresh live and known-data
 failures are documented in `docs/micro-keyframe-acquisition-development.md`.
 

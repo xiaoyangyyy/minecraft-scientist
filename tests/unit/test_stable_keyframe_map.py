@@ -358,3 +358,197 @@ def test_future_numerical_failure_keeps_prior_candidate_and_all_controls(
     assert result["future"]["candidates"][0]["bootstrap_slot"] == 2
     assert stable._digest(result["frozen"]) == result["frozen_sha256"]
     assert result["motion"] is None and not result["navigation_accepted"]
+
+
+def test_responsive_choices_freeze_before_distinct_larger_future(public_scene):
+    first, execute, calls = public_scene
+    result = stable.acquire_stable_keyframe_map(
+        first,
+        execute,
+        CAMERA,
+        anchor_frame=48,
+        seed=13,
+        micro_controls=True,
+        responsive_controls=True,
+    )
+    assert result["terminal"] == "validated"
+    assert (
+        result["response_control_registration"]
+        == "chronological-public-novelty-only-v1"
+    )
+    assert [choice["handle"] for choice in result["control_choices"]] == [0, 0, 0, 0, 1]
+    assert [choice["observed_trials"] for choice in result["control_choices"]] == list(
+        range(5)
+    )
+    assert result["control_choices"][4]["excluded_handle"] == 0
+    future = result["future_control_choice"]
+    assert future["handle"] == 0 and future["required_distinct_from"] == 1
+    assert future["observed_trials"] == 5 and future["at_frame"] == 101
+    assert calls[53:55] == [("move", 0)] * 2
+    assert len(calls) == 63 and result["motion"]["frame_ordinals"] == [101, 111]
+    assert stable._digest(result["frozen"]) == result["frozen_sha256"]
+    assert not result["navigation_accepted"]
+
+
+@pytest.fixture
+def one_useful_control(public_scene, monkeypatch):
+    first, execute, calls = public_scene
+    flow = stable._visible_flow
+
+    def measured(first, last, settings):
+        result = flow(first, last, settings)
+        if result["median_flow_pixels"] > 1:
+            handle = next(handle for kind, handle in reversed(calls) if kind == "move")
+            if handle != 2:
+                return result | {"median_flow_pixels": 0.0}
+        return result
+
+    monkeypatch.setattr(stable, "_visible_flow", measured)
+    return first, execute, calls
+
+
+def test_responsive_policy_returns_to_useful_control_after_exploring_stall(
+    one_useful_control,
+):
+    first, execute, calls = one_useful_control
+    result = stable.acquire_stable_keyframe_map(
+        first,
+        execute,
+        CAMERA,
+        anchor_frame=48,
+        seed=13,
+        micro_controls=True,
+        responsive_controls=True,
+    )
+    assert result["terminal"] == "validated"
+    assert [choice["handle"] for choice in result["control_choices"]] == [
+        0,
+        1,
+        2,
+        2,
+        2,
+        2,
+        3,
+        2,
+    ]
+    assert result["frozen"]["index"]["frame_ordinals"] == [56, 83, 92, 101, 110, 128]
+    assert len(calls) == 90
+    assert result["future_control_choice"]["observed_trials"] == 8
+    assert result["future"]["handle"] != 2
+
+
+def test_rejected_past_models_prompt_more_views_without_budget_or_gate_change(
+    one_useful_control, monkeypatch
+):
+    first, execute, calls = one_useful_control
+    tracks, _, _ = fixture_tracks(frames=13, noise=0.02)
+    monkeypatch.setattr(
+        stable,
+        "track_frame_chain",
+        lambda frames, **kwargs: prefix(tracks, len(frames)),
+    )
+    from minecraft_scientist.exploration.joint_multiview_map import JointMapEvidence
+
+    def unsupported(tracks, camera, **kwargs):
+        return JointMapEvidence(
+            supported=False,
+            reason="injected insufficient past support",
+            config=kwargs["config"],
+            seed=kwargs["seed"],
+            camera=camera,
+            bootstrap_slot=kwargs["bootstrap_slot"],
+            fitting_frames=tracks.frame_count,
+            input_sha256="0" * 64,
+        )
+
+    monkeypatch.setattr(stable, "fit_joint_map", unsupported)
+    result = stable.acquire_stable_keyframe_map(
+        first,
+        execute,
+        CAMERA,
+        anchor_frame=48,
+        seed=13,
+        micro_controls=True,
+        responsive_controls=True,
+    )
+    assert result["terminal"] == "map_unavailable"
+    assert len(result["control_choices"]) == 11
+    assert sum(sample["selected"] for sample in result["samples"]) == 9
+    assert len(result["attempts"]) == 4
+    assert [len(attempt["proposal"]["maps"]) for attempt in result["attempts"]] == [
+        4,
+        5,
+        6,
+        7,
+    ]
+    assert all(
+        attempt["sha256"] == stable._digest(attempt["proposal"])
+        for attempt in result["attempts"]
+    )
+    assert len(calls) == 107 and result["frozen"] is None
+    assert result["future_control_choice"] is None and result["future"] is None
+    assert result["policy"][
+        "fitting"
+    ] == stable.StableKeyframePolicy().fitting.model_dump(mode="json")
+
+
+@pytest.mark.parametrize("flag", [1, "true"])
+def test_responsive_registration_cannot_be_inferred_from_untyped_flag(
+    public_scene, flag
+):
+    first, execute, calls = public_scene
+    with pytest.raises(ValueError, match="explicit boolean"):
+        stable.acquire_stable_keyframe_map(
+            first,
+            execute,
+            CAMERA,
+            anchor_frame=48,
+            micro_controls=True,
+            responsive_controls=flag,
+        )
+    assert calls == []
+
+
+def test_responsive_policy_cannot_masquerade_as_micro_or_base(public_scene):
+    first, execute, calls = public_scene
+    with pytest.raises(ValueError, match="micro registration"):
+        stable.acquire_stable_keyframe_map(
+            first, execute, CAMERA, anchor_frame=48, responsive_controls=True
+        )
+    with pytest.raises(ValidationError):
+        stable.acquire_stable_keyframe_map(
+            first,
+            execute,
+            CAMERA,
+            anchor_frame=48,
+            micro_controls=True,
+            policy=stable.StableResponsiveKeyframePolicy(),
+        )
+    assert calls == []
+
+
+@pytest.mark.parametrize("bad", [None, "true", 1])
+def test_malformed_optical_stability_keeps_actual_controls(
+    public_scene, monkeypatch, bad
+):
+    first, execute, calls = public_scene
+    monkeypatch.setattr(stable, "_visible_flow", lambda *args: {"stable": bad})
+    result = stable.acquire_stable_keyframe_map(first, execute, CAMERA, anchor_frame=48)
+    assert result["terminal"] == "geometry_failed"
+    assert result["failure"]["stage"] == "stability"
+    assert len(calls) == len(result["steps"]) == 1
+    assert result["flow_prefixes"] == [] and result["samples"] == []
+
+
+def test_native_stability_error_is_not_a_control_failure(public_scene, monkeypatch):
+    first, execute, calls = public_scene
+
+    def fail(*args):
+        raise np.linalg.LinAlgError("injected stability solver failure")
+
+    monkeypatch.setattr(stable, "_visible_flow", fail)
+    result = stable.acquire_stable_keyframe_map(first, execute, CAMERA, anchor_frame=48)
+    assert result["failure"]["type"] == "LinAlgError"
+    assert result["failure"]["stage"] == "stability"
+    assert result["terminal"] == "geometry_failed"
+    assert len(calls) == 1 and result["steps"][0]["compliant"] is True

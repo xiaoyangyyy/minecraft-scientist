@@ -58,7 +58,14 @@ until each required gate has current, inspectable evidence.
 
 ## Evidence discipline
 
-The latest `docs/micro-keyframe-acquisition-development.md` checkpoint uses
+The latest `docs/responsive-keyframe-acquisition-development.md` checkpoint learns
+opaque-control novelty responses and freezes future choices from public past
+only. Neither fresh development world supports a map; one returns to a useful
+control then exhausts a stability wait during a verified five-block fall. Next
+test separately registered bounded public recovery and explicit local-map lineage,
+without altering geometric gates or consuming evaluator coordinates online.
+
+The preceding `docs/micro-keyframe-acquisition-development.md` checkpoint uses
 one-tick acquisition and an unchanged two-tick future control. Two independently
 audited development worlds acquire one/six keyframes, but neither supports a map.
 The six-view proposal records every rejected bootstrap, including a small-ray-error

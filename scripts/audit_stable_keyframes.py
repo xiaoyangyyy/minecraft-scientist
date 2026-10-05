@@ -24,6 +24,7 @@ from minecraft_scientist.exploration.settled_map_control import PublicControlSte
 from minecraft_scientist.exploration.stable_keyframe_map import (
     StableKeyframePolicy,
     StableMicroKeyframePolicy,
+    StableResponsiveKeyframePolicy,
     acquire_stable_keyframe_map,
 )
 from minecraft_scientist.protocols import TransitionRecord
@@ -55,8 +56,20 @@ def serializable_truth(truth):
 
 
 def registration(directory, config, report, definition):
-    micro = config.get("schema") == "micro-stable-keyframe-camera-projection-v1"
-    settings = StableMicroKeyframePolicy() if micro else StableKeyframePolicy()
+    responsive = (
+        config.get("schema") == "responsive-stable-keyframe-camera-projection-v1"
+    )
+    micro = (
+        responsive
+        or config.get("schema") == "micro-stable-keyframe-camera-projection-v1"
+    )
+    settings = (
+        StableResponsiveKeyframePolicy()
+        if responsive
+        else StableMicroKeyframePolicy()
+        if micro
+        else StableKeyframePolicy()
+    )
     baseline = [list(item) for item in definition.SCHEDULE[:48]]
     result = {
         "valid": False,
@@ -71,6 +84,7 @@ def registration(directory, config, report, definition):
         not in (
             "stable-keyframe-camera-projection-v1",
             "micro-stable-keyframe-camera-projection-v1",
+            "responsive-stable-keyframe-camera-projection-v1",
         )
         or json.dumps(config.get("keyframe_policy"), sort_keys=True, allow_nan=False)
         != json.dumps(settings.model_dump(mode="json"), sort_keys=True, allow_nan=False)
@@ -161,6 +175,7 @@ def registration(directory, config, report, definition):
             seed=config["active_seed"],
             policy=settings,
             micro_controls=micro,
+            responsive_controls=responsive,
         ),
     }
     result.update(

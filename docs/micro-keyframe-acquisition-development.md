@@ -105,8 +105,14 @@ remain 53.933333; minimum equation-transfer savings remain one. The seed-zero CL
 MVP report preserves SHA-256
 `B95AF2E5C152B9F06EDC63004EA87FB183C37E6A5A13BFF53F21A39A4F48AEB8`.
 Default-only Linux passes 640 cases/74 optional or platform skips, zero errors or
-failures in 30.480 seconds. Full Windows and persistent-snapshot Linux regressions
-are running and must not yet be counted as completed V30 verification.
+failures in 30.480 seconds. Persistent-snapshot Linux regression now completes
+1246 passes/two skips, zero failures/errors in 838.496 seconds at
+`runs/micro-keyframe-full-persistent-tree-wsl-v1.xml`. All 430 frozen file hashes
+remain unchanged after terminal completion. Full Windows regression completes
+1244 passes/two skips, zero failures/errors in 1196.011 seconds at
+`runs/micro-keyframe-full-windows-v1.xml`. Its 112-entry core source ledger is
+independently rechecked unchanged after completion. These verify V30, not later
+public-response selection changes.
 
 A 430-file/4,720,387-byte exact source/test/checkpoint snapshot is archived at
 `runs/v30-frozen-test-tree-v1`; SHA-256

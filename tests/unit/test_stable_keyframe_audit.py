@@ -28,9 +28,15 @@ def keyframe_capture(diagnostic, scripts, monkeypatch, request):
     runtime, route, engine = diagnostic
     _, definition = scripts
     auditor = importlib.import_module("audit_stable_keyframes")
-    micro = getattr(request, "param", False)
+    mode = getattr(request, "param", False)
+    responsive = mode == "responsive"
+    micro = responsive or mode is True
     policy_type = (
-        auditor.StableMicroKeyframePolicy if micro else auditor.StableKeyframePolicy
+        auditor.StableResponsiveKeyframePolicy
+        if responsive
+        else auditor.StableMicroKeyframePolicy
+        if micro
+        else auditor.StableKeyframePolicy
     )
     calibration = {
         "camera_intrinsics": [[180, 0, 224], [0, 320, 224], [0, 0, 1]],
@@ -41,7 +47,9 @@ def keyframe_capture(diagnostic, scripts, monkeypatch, request):
     )
     config = json.loads((route / "config.json").read_bytes())
     config.update(
-        schema="micro-stable-keyframe-camera-projection-v1"
+        schema="responsive-stable-keyframe-camera-projection-v1"
+        if responsive
+        else "micro-stable-keyframe-camera-projection-v1"
         if micro
         else "stable-keyframe-camera-projection-v1",
         schedule=[list(item) for item in definition.SCHEDULE[:48]],
@@ -93,6 +101,7 @@ def keyframe_capture(diagnostic, scripts, monkeypatch, request):
         calibration["camera_intrinsics"],
         anchor_frame=48,
         micro_controls=micro,
+        responsive_controls=responsive,
     )
     assert result["terminal"] == "initial_wait_exhausted"
     save(
@@ -306,6 +315,73 @@ def test_micro_flag_requires_stable_protocol_before_output(
     output = tmp_path / "must-not-exist"
     monkeypatch.setattr(
         sys, "argv", [capture.__file__, "--micro-keyframes", "--output", str(output)]
+    )
+    with pytest.raises(SystemExit):
+        capture.main()
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("keyframe_capture", ["responsive"], indirect=True)
+def test_response_registration_replays_before_private_reads(
+    keyframe_capture, monkeypatch
+):
+    auditor, route, engine = keyframe_capture
+    with monkeypatch.context() as guards:
+        private_guard(guards)
+        result = auditor.runtime.public_data(
+            route, engine, registration=auditor.registration
+        )
+        assert result["valid"] and result["count"] == 65
+    result = auditor.audit(route, engine)
+    assert result["valid"] and all(result["checks"].values())
+    assert result["policy_terminal"] == "initial_wait_exhausted"
+    assert not result["navigation_accepted"]
+
+
+@pytest.mark.parametrize("keyframe_capture", ["responsive"], indirect=True)
+@pytest.mark.parametrize(
+    "case", ["schema", "selector", "marker", "choice", "future_choice"]
+)
+def test_forged_response_history_rejects_before_private_reads(
+    keyframe_capture, monkeypatch, case
+):
+    auditor, route, engine = keyframe_capture
+    config = json.loads((route / "config.json").read_bytes())
+    saved = json.loads((route / "keyframe-acquisition.json").read_bytes())
+    if case == "schema":
+        config["schema"] = "micro-stable-keyframe-camera-projection-v1"
+    elif case == "selector":
+        config["keyframe_policy"]["action_selection"] = "private-heading"
+    elif case == "marker":
+        saved["acquisition"].pop("response_control_registration")
+    elif case == "choice":
+        saved["acquisition"]["control_choices"] = [{"handle": 2, "observed_trials": 0}]
+    else:
+        saved["acquisition"]["future_control_choice"] = {"handle": 0}
+    save(route / "config.json", config)
+    save(route / "keyframe-acquisition.json", saved)
+    report = json.loads((route / "report.json").read_bytes())
+    report["config_sha256"] = auditor.runtime.digest(route / "config.json")
+    report["artifact_sha256"]["keyframe-acquisition.json"] = auditor.runtime.digest(
+        route / "keyframe-acquisition.json"
+    )
+    save(route / "report.json", report)
+    private_guard(monkeypatch)
+    result = auditor.audit(route, engine)
+    assert not result["valid"] and result["evaluation"] is None
+
+
+@pytest.mark.parametrize(
+    "flags",
+    [["--responsive-keyframes"], ["--responsive-keyframes", "--stable-keyframes"]],
+)
+def test_response_flag_requires_both_explicit_protocol_flags(
+    scripts, tmp_path, monkeypatch, flags
+):
+    _, capture = scripts
+    output = tmp_path / "must-not-exist"
+    monkeypatch.setattr(
+        sys, "argv", [capture.__file__, *flags, "--output", str(output)]
     )
     with pytest.raises(SystemExit):
         capture.main()

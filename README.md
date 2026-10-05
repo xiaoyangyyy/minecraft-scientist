@@ -11,11 +11,14 @@ Fabric mod supplies resettable hidden rules, and the Python boundary replaces it
 block, and entity names with seeded opaque IDs before an agent can observe them.
 Live execution still requires the user's explicit Minecraft EULA acceptance.
 
-Latest visual development tests one-tick acquisition with an unchanged two-tick
-future control. Two fresh independently audited development worlds acquire one/six
-eligible views; the latter starts fitting but all candidates reject. No supported
-map or reliable goal arrival is established. See
-[`micro-keyframe checkpoint`](docs/micro-keyframe-acquisition-development.md).
+Latest visual development adapts opaque control choices from prior public novelty
+responses. Two fresh audited development worlds still acquire only one/six views
+and no supported map; one encounters an actual fall and exhausts its public
+stability window. See
+[`response-control checkpoint`](docs/responsive-keyframe-acquisition-development.md).
+The preceding
+[`micro-keyframe checkpoint`](docs/micro-keyframe-acquisition-development.md)
+retains its rejected six-view proposal and completed frozen V30 regression.
 The preceding
 [`stable-keyframe checkpoint`](docs/stable-keyframe-acquisition-development.md)
 retains its one/two-view failures and completed frozen V29 regression.

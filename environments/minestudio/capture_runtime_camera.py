@@ -104,6 +104,7 @@ def main():
     parser.add_argument("--endpoint-controls", action="store_true")
     parser.add_argument("--stable-keyframes", action="store_true")
     parser.add_argument("--micro-keyframes", action="store_true")
+    parser.add_argument("--responsive-keyframes", action="store_true")
     args = parser.parse_args()
     if args.seed < 0:
         parser.error("seed must be nonnegative")
@@ -126,6 +127,10 @@ def main():
     if args.micro_keyframes and not args.stable_keyframes:
         parser.error(
             "micro keyframes require the separate --stable-keyframes registration"
+        )
+    if args.responsive_keyframes and not args.micro_keyframes:
+        parser.error(
+            "responsive keyframes require explicit --stable-keyframes --micro-keyframes"
         )
     if args.stable_keyframes and (
         args.active_causal
@@ -305,13 +310,20 @@ def main():
         from minecraft_scientist.exploration.stable_keyframe_map import (
             StableKeyframePolicy,
             StableMicroKeyframePolicy,
+            StableResponsiveKeyframePolicy,
         )
 
         keyframe_policy_type = (
-            StableMicroKeyframePolicy if args.micro_keyframes else StableKeyframePolicy
+            StableResponsiveKeyframePolicy
+            if args.responsive_keyframes
+            else StableMicroKeyframePolicy
+            if args.micro_keyframes
+            else StableKeyframePolicy
         )
         config.update(
-            schema="micro-stable-keyframe-camera-projection-v1"
+            schema="responsive-stable-keyframe-camera-projection-v1"
+            if args.responsive_keyframes
+            else "micro-stable-keyframe-camera-projection-v1"
             if args.micro_keyframes
             else "stable-keyframe-camera-projection-v1",
             schedule=SCHEDULE[:48],
@@ -319,7 +331,9 @@ def main():
             active_seed=2000,
             keyframe_policy=keyframe_policy_type().model_dump(mode="json"),
             scope=(
-                "public stable and novel one-tick sampled-keyframe acquisition, immutable past proposal and distinct two-tick future validation; explicit 288-action cap; no continuous raw-track, metric map or navigation claim"
+                "public novelty-response one-tick acquisition and past-response distinct two-tick future validation; immutable past proposal, unchanged geometry/stability gates and 288-action cap; no continuous raw-track, metric map or navigation claim"
+                if args.responsive_keyframes
+                else "public stable and novel one-tick sampled-keyframe acquisition, immutable past proposal and distinct two-tick future validation; explicit 288-action cap; no continuous raw-track, metric map or navigation claim"
                 if args.micro_keyframes
                 else "public stable and novel two-tick sampled-keyframe acquisition, immutable past proposal and new-control validation; explicit 288-action cap; no continuous raw-track, metric map or navigation claim"
             ),
@@ -458,6 +472,7 @@ def main():
                         seed=config["active_seed"],
                         policy=config["keyframe_policy"],
                         micro_controls=args.micro_keyframes,
+                        responsive_controls=args.responsive_keyframes,
                     ),
                 }
                 if keyframes["acquisition"]["failure"] is not None:

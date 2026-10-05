@@ -231,16 +231,20 @@ def public_data(directory, engine, *, registration=None):
         in (
             "stable-keyframe-camera-projection-v1",
             "micro-stable-keyframe-camera-projection-v1",
+            "responsive-stable-keyframe-camera-projection-v1",
         )
         and registration is not None
     ):
         from minecraft_scientist.exploration.stable_keyframe_map import (
             StableKeyframePolicy,
             StableMicroKeyframePolicy,
+            StableResponsiveKeyframePolicy,
         )
 
         policy_type = (
-            StableMicroKeyframePolicy
+            StableResponsiveKeyframePolicy
+            if config["schema"] == "responsive-stable-keyframe-camera-projection-v1"
+            else StableMicroKeyframePolicy
             if config["schema"] == "micro-stable-keyframe-camera-projection-v1"
             else StableKeyframePolicy
         )
