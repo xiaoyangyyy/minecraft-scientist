@@ -69,10 +69,14 @@ transfer savings is one. Seed-zero MVP still has 47 experiments, three symbols,
 thirteen reuses and byte hash
 `B95AF2E5C152B9F06EDC63004EA87FB183C37E6A5A13BFF53F21A39A4F48AEB8`.
 Main builds without new dependencies; default-only Linux passes 673/78 optional/
-platform skips, zero failures/errors. New full Windows/persistent-Linux verification
-is required separately at `runs/long-window-full-windows-v1.xml` and
-`runs/long-window-full-persistent-tree-wsl-v1.xml`; no passing full result is claimed
-without terminal process status, JUnit and after-terminal input verification.
+platform skips, zero failures/errors. Full Windows/persistent-Linux verification
+is terminal: Windows passes 1418/two skips, Linux 1420/two skips, zero failures/
+errors, at `runs/long-window-full-windows-v1.xml` and
+`runs/long-window-full-persistent-tree-wsl-v1.xml`. All 456 declared input hashes
+match after both terminal runs; main's 116 core entries also match. The separate
+attestation is `runs/v35-full-post-verification-v1.json`. The later isolated
+public-support-loss candidate and its new document/patch are outside these frozen
+inputs, not validated by these V35 full counts.
 
 ## Fresh native evidence
 

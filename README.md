@@ -16,8 +16,10 @@ without changing pixel/geometry gates or the global action cap. Two fresh audite
 sessions now complete all eleven acquisition attempts without wait exhaustion,
 but each retains only two views and no map/navigation. Candidate focused tests
 pass 236 per platform, thirty-seed exact core repeats pass on both, and main
-default-only Linux passes 673/78 skips. New full verification is required; the
-earlier V34 full counts below do not cover this changed source. See the
+default-only Linux passes 673/78 skips. Terminal V35 full tests pass Windows 1418/
+Linux 1420, two skips each, with all 456 frozen inputs verified after completion.
+The later public-support-loss epoch candidate remains separate research, not
+covered by those V35 full counts and not a successful map/navigation method. See the
 [`long-wait checkpoint`](docs/long-wait-keyframe-development.md).
 The preceding main-source visual development registers four anonymous cardinal-plus-jump
 motor programs with unchanged pixel/geometry gates. Both fresh independently

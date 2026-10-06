@@ -10,8 +10,11 @@ global action gates. Both fresh independently audited sessions complete eleven
 acquisition attempts without wait exhaustion, but each still has only two views
 and no map, future motion or arrival. Focused candidate tests pass 236 on each
 platform, thirty-seed exact core checks pass with 116 source entries (113 package
-files) matching main, and main default-only Linux passes 673/78 skips. Changed-
-source full regression requires separate terminal verification. Old V34 full
+files) matching main, and main default-only Linux passes 673/78 skips. Terminal
+full V35 Windows passes 1418/two skips and Linux 1420/two skips, zero failures/
+errors; all 456 frozen hashes match after both terminal runs. The separately
+tested/audited public-support-loss epoch candidate still has no native map and
+is not covered by those V35 full counts. Old V34 full
 counts below are historical, not evidence for this new protocol. Next investigate
 public support-loss epoch boundaries independently of wait-window recovery;
 all original completion requirements remain open.

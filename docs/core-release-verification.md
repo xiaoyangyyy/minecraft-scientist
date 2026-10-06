@@ -293,8 +293,11 @@ passes both thirty-seed/two-repeat/eighteen-artifact/six-check verifiers at
 main after the isolated development merge. Focused candidate tests pass 236 per
 platform; main default-only Linux passes 673/78 skips and package build/MVP bytes
 remain unchanged. Two fresh native captures pass source-bound independent replay
-but have no map/navigation. New full regression must be separately verified;
-historical V34 counts do not cover the changed code. See
+but have no map/navigation. Terminal V35 full Windows passes 1418/two skips and
+Linux 1420/two skips, zero failures/errors; all 456 declared inputs match after
+both terminal runs, recorded in `runs/v35-full-post-verification-v1.json`.
+Historical V34 counts do not cover the changed code. The subsequent isolated
+public-support-loss candidate needs separate full verification. See
 `docs/long-wait-keyframe-development.md` for controls, original failures and scope.
 
 From the repository root:

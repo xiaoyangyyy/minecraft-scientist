@@ -61,8 +61,12 @@ until each required gate has current, inspectable evidence.
 The latest `docs/long-wait-keyframe-development.md` checkpoint registers longer
 post-motor WAIT windows with unchanged geometry/global budgets. Both fresh audited
 sessions complete eleven acquisition trials with no failed/extra windows, but
-each retains two views and no map/navigation. Candidate focused/core repeat gates
-pass independently; changed-source full verification remains separate. Public
+each retains two views and no map/navigation. Focused/core repeat gates pass
+independently; terminal full V35 Windows passes 1418/Linux 1420 cases, two skips
+each, with all 456 frozen inputs unchanged after termination. A later isolated
+public-support-loss epoch candidate passes 277 focused tests per platform and
+fresh public-first audits, but still has no native map; its results do not replace
+its own required full verification or establish goal completion. Public
 support can now fail without wait recovery, while the original epoch boundary
 explicitly requires recovery. Next preregister public-support-loss local epochs,
 without gauge stitching or weaker track/fitting gates. This diagnoses another

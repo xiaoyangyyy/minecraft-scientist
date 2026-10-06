@@ -2,9 +2,11 @@
 
 This protocol remains an isolated research candidate. Main contains the registered
 longer-WAIT protocol, not this epoch change. Windows and persistent Linux full V35
-regressions continue against their unchanged 456 declared inputs. This new document
+regressions are terminal: Windows 1418/Linux 1420 passes, two skips each, zero
+failures/errors; all 456 declared hashes match after termination. This new document
 and `research/settled_keyframes/support_loss_candidate.patch` are outside that
-manifest, and do not change its source/test inputs or justify new full pass counts.
+manifest, and do not change its source/test inputs or justify candidate full pass
+counts. See `runs/v35-full-post-verification-v1.json` for exact terminal evidence.
 
 The six-file candidate patch is preserved against main `3defbb9` and passes
 `git apply --check --whitespace=error`. Executing candidate sources remain at
@@ -66,7 +68,8 @@ two repetitions, eighteen exact artifacts and six checks. They freeze 116 entrie
 (113 package sources), preserve sources through execution, and retain the same
 53.933333 mean reported experiments/minimum one equation-transfer saving. These
 prove offline core compatibility and repeatability, not actual Minecraft mapping,
-nor completion of the separately running main V35 full suites.
+nor a full regression of this changed candidate. Main V35 full suites verify the
+preceding longer-WAIT source separately.
 
 ## Fresh native evidence
 
