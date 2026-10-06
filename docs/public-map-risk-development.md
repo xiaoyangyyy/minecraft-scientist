@@ -141,8 +141,17 @@ superiority, reliable goal arrival or the requested excellent completed system.
 
 ## Required next evidence
 
-Close the remaining full auditor/full candidate regressions without editing this
-source-bound candidate. Implement genuine new-epoch map acquisition from the recovered actual anchor
+The original monitored parent now also closes its FULL auditor batch on Windows
+and Linux: 218 cases each, zero failures/errors/skips. Both runs terminate zero;
+all fourteen prospectively registered source hashes still match. See
+`runs/monitored-walk-full-audit-post-verification-v1.json`. Distinct focused package
+coverage is 526/platform (153 controller + 155 compatibility + 218 auditor); the
+fourteen previously reported new audits are included within 218, not counted twice.
+Eight research-driver cases remain separate. This is not full candidate regression
+or proof of map recovery/navigation.
+
+Close the remaining full candidate regression without editing this source-bound
+parent. Implement genuine new-epoch map acquisition from the recovered actual anchor
 (which may exceed the old startup-only 48..81 range), with explicit parent lineage
 and no implicit gauge connection. A ready observation alone is not map recovery.
 Reliable movement, arrival, disjoint terrain/condition heldouts, natural science/map

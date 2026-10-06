@@ -17,8 +17,11 @@ fresh native captures/audits now terminate zero: seed 201 actually challenges it
 map at 133/prepares an unconnected observation anchor at 145, while seed 202 still
 has only four views/no map. Each passes eight capture/three outer/eighteen nested
 checks with all 123 snapshots, 121 current project sources and 296/376 artifacts
-intact. Neither has future/motion validation or arrival. Full-auditor/full-candidate
-regression and actual new-map acquisition remain open. These counts
+intact. Neither has future/motion validation or arrival. The original parent's
+full auditor subsequently closes with 218 cases each on Windows/Linux, zero
+failures/errors/skips and all fourteen registered source hashes intact, yielding
+526 distinct package-focused cases/platform plus eight separate driver cases.
+Full-candidate regression and actual new-map acquisition remain open. These counts
 do not replace the preceding main V35 evidence or close any excellence requirement.
 
 The latest main-source checkpoint is `docs/long-wait-keyframe-development.md`:

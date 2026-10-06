@@ -27,8 +27,12 @@ platform, plus eight research-driver cases. Fresh source-bound seed 201 actually
 challenges its original map at 133/prepares an unconnected anchor at 145. Fresh
 seed 202 still has only four usable views/no map. Both capture/independent audit
 sequences pass with all source/artifact hashes intact; no recovered map, body
-motion, navigation, arrival or held-out superiority is claimed. Full auditor and
-full candidate regressions remain separate and open. Next acquire a genuinely new
+motion, navigation, arrival or held-out superiority is claimed. The original
+parent's full auditor subsequently passes 218 cases on each platform, zero
+failures/errors/skips and all fourteen source hashes intact. Distinct focused
+package coverage is 526/platform, excluding the eight research-driver cases;
+the previous fourteen new audits are already inside 218. Full candidate
+regression remains separate and open. Next acquire a genuinely new
 local map at the recovered actual anchor, and address terrain-sensitive acquisition,
 without relaxing geometry gates or retrospectively choosing successful endpoints. The
 preceding main V35 full release remains separate; none of the required outcomes
