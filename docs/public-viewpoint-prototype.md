@@ -81,7 +81,10 @@ executes no new LOOK. No eligible view abstains before dispatch, not an automati
 fallback into movement. Failed, malformed, wrong-target or partially dispatched
 controls retain the actual prefix and stop, with no invented completion.
 
-This helper is not yet integrated into native capture or independent replay.
+At this original research checkpoint the helper was not yet integrated into
+native capture or independent replay. The later isolated implementation and
+separate verification are in `docs/oriented-keyframe-development.md`; they do not
+change the original prototype results or main V35 production.
 Existing acquisition permits anchors only through frame 48; simply hiding LOOKs
 outside that clock or resetting its action count would violate the contract.
 The next registered native variant must explicitly allow the actual bounded
@@ -94,8 +97,8 @@ this altered observation chronology. No new native result is claimed here.
 The exact V35 source starting point for that integration is restored at
 `runs/development-trees/verified-source-2iu7r67h`; its restoration evidence is
 `runs/public-survey-development-tree-v1/report.json`. All 456 archived inputs
-were verified before allocation. No candidate integration changes or native
-executions have yet been made in that tree; the restoration is not a test pass.
+were verified before allocation. The later candidate intentionally edits that
+tree; restoration proves its starting point, not current identity or a test pass.
 
 ## Verification
 

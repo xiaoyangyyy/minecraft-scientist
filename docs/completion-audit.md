@@ -25,6 +25,18 @@ audits do not make these successful maps. See
 `docs/sustained-motor-keyframe-development.md`; main V35 full tests do not cover
 the isolated candidate. All original completion requirements remain open.
 
+The subsequent isolated public-orientation candidate executes and independently
+replays a real counted LOOK/WAIT prefix. Fresh seed 201 consumes 21 orientation
+actions and acquires four eligible views; seed 202 keeps the original heading and
+acquires two. Both stop at `map_unavailable`, with zero proposals/future validation/
+actual arrival. Each passes eight capture, three outer and eighteen nested audit
+checks with all 122 snapshots/120 current project sources/544 artifacts intact.
+Controller/new-audit/compatibility suites pass 91/13/155 on each platform and
+thirty-seed core checks pass, binding 118 sources (115 package). Complete 220-case
+auditor batches remain running, not terminal passes; no full candidate regression
+or main promotion is claimed. See `docs/oriented-keyframe-development.md`.
+Observation steering is executable, not yet sufficient for reliable mapping.
+
 The preceding main-source development checkpoint is
 `docs/compound-motor-keyframe-development.md`: four opaque cardinal-plus-jump
 programs preserve the original control/geometry gates. Both fresh independently
