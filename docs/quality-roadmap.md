@@ -77,7 +77,13 @@ worlds, retaining only the initial view, and remains unpromoted. See
 `docs/sustained-motor-keyframe-development.md`. Next investigate first-image
 texture ambiguity, large-perspective correspondence initialization and public
 active viewpoint selection, without gauge stitching or weaker track/fitting
-gates. This diagnoses another
+gates. The research-only public startup quality/orientation prototype now passes
+58 cases per platform and source-bound known-survey diagnostics, but has not
+executed a native observation intervention. Its seed-202 ranking retains the
+previous failed initial heading; proxy quality is not future support. See
+`docs/public-viewpoint-prototype.md`. Next register complete bounded LOOK/WAIT
+chronology and actual post-orientation acquisition anchors before fresh public-
+first validation. This diagnoses another
 mapping failure; it does not close actual arrival, held-out, integrated-science,
 long-operation, comparison or release requirements.
 

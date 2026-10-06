@@ -1,5 +1,12 @@
 # Stable-keyframe geometry research
 
+The next public observation prototype is described in
+`docs/public-viewpoint-prototype.md`. First-image-only patch-quality ranking,
+source-bound first-48-image diagnosis and bounded actual LOOK receipts pass 58
+research cases on each platform. Four known development surveys choose frame 33
+for seed 201 and the original frame 48 for seed 202. No new orientation/native map
+has been validated; capture/auditor integration with honest global clocks remains.
+
 Latest complete public-image bridge diagnosis is recorded in
 `docs/long-wait-public-bridge-diagnostic.md`. The safe-seed bridge probe explicitly
 binds four registered capture schemas and all five used module snapshots, retains

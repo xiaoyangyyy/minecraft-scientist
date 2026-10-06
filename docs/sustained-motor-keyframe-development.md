@@ -64,10 +64,12 @@ terminal corrected reports are `runs/sustained-controller-windows-v3.xml` and
 Changed six Python files pass Ruff. Compatibility suites pass 91 plus 80 on each
 platform. The complete auditor suites collect 121 keyframe plus 86 runtime cases.
 Windows terminates zero with **207 passes** in 916.63 seconds; its JUnit is
-`runs/sustained-audit-windows-v1.xml`. Linux's specifically live session remains
-running, not a passing result, until its terminal status and JUnit at
-`runs/sustained-audit-wsl-v1.xml` are inspected. Total completed focused checks are
-**395 on Windows**, **188 on Linux with 207 additional cases still running**.
+`runs/sustained-audit-windows-v1.xml`. Linux subsequently terminates zero with
+**207 passes** in 1266.76 seconds; its JUnit is
+`runs/sustained-audit-wsl-v1.xml`, SHA-256
+`5c760e997bde598f4ba0584aa70e6c198086bd845df770a206757b4f875b6f32`.
+Both contain zero failures/errors/skips. Total completed focused checks are
+**395 on Windows and 395 on Linux**.
 These are not full candidate regressions; historical V35 full counts remain
 evidence only for the unchanged main production version.
 
