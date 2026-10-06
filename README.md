@@ -24,7 +24,8 @@ The subsequent isolated [`four-MOVE candidate`](docs/four-move-map-epoch-develop
 changes only the child future stimulus length, preserving original gates/budgets
 and the insufficient-motion/no-map negatives. Current focused component/mock-audit
 batches pass 273 cases/platform with twenty frozen source hashes intact; fresh
-native effects remain unverified.
+captures/audits now close, but the larger stimulus still yields insufficient body
+motion in one world and no map in the other. No reliable navigation is claimed.
 
 Latest main-source visual development separately registers longer post-motor WAIT windows,
 without changing pixel/geometry gates or the global action cap. Two fresh audited

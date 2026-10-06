@@ -10,9 +10,14 @@ startup, all image/geometry gates, shared budgets and the physical evaluator sta
 unchanged. Twenty source paths are frozen; current Windows/Linux combined batches
 each pass 273 cases with zero failures/errors/skips and all hashes intact. The
 thirty new narrow cases are subsets, not extra distinct cases. Its native inputs
-and two absent development outputs are prospectively registered; the seed-201 JVM
-has launched but terminal effects/independent audit remain unverified. Compatibility,
-full auditor/package and parent coverage/native results are not borrowed.
+and two absent development outputs are prospectively registered. Both fresh
+capture/audit sequences now close with all source/artifact hashes intact. Seed 201
+genuinely acquires a child map and executes four monitored MOVEs/eight WAITs, but
+body/rendered displacement remains about 0.103 blocks: BOTH false_translation.
+The extra third/fourth MOVEs add zero body motion in the separate evaluator
+diagnostic, without proving a latent cause. Seed 202 still selects only one view
+and forms no map/child/motion. Compatibility/full auditor/package and parent
+coverage/native results are not borrowed; no navigation/arrival/held-out success.
 
 The preceding isolated candidate is `docs/map-epoch-reacquisition-development.md`:
 one genuinely new map acquisition at the actual recovered public endpoint, with

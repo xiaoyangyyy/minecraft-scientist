@@ -70,7 +70,7 @@ with explicitly documented flow/model/producer doubles; audit fixtures are mock
 captures and their positive cases do not create a native child map. They test
 chronology, registration and rejection boundaries, not native geometry or useful
 body motion. The Windows/XML and Linux/XML hashes are preserved in the
-source-bound receipts; native effects remain unverified at this checkpoint.
+source-bound receipts; native effects were unverified at that narrow-test checkpoint.
 
 The broader current-source Windows AND Linux batches now terminate zero with 273
 passes/platform, zero failures/errors/skips, and all twenty source hashes intact.
@@ -89,12 +89,60 @@ The seed-201 fresh JVM has launched with its own 1200-second timeout; see
 `runs/excited-epoch-seed201-launch-v1.json`. Launch does not prove terminal capture,
 successful geometry, useful body motion, independent audit or arrival.
 
+## Terminal fresh-native results
+
+Both prospectively registered captures AND independent audits now terminate zero.
+Seed 201 uses 211 actions/212 RGB frames. The original map freezes at 123,
+challenges and recovers its actual ready observation at 145. A genuine new child
+selects `[153,162,171,180,189,199]`, freezes at 199 and checks every actual future
+receipt: four MOVEs and eight WAITs, ending at 211. Public replay and original
+fitting/withheld/consensus/final gates pass, with terminal `child_validated`.
+
+Nevertheless BOTH independent physical scores are `false_translation` under the
+unchanged 0.15-block gate: body distance is 0.1026865922694924 and rendered distance
+is 0.102712460419704. Direction errors stay null, not zero/success. Body/rendered
+rotation errors are approximately 0.031063/0.031575 degrees. Four MOVEs have not
+solved the insufficient-motion problem. The actual sampled endpoint differs from
+the parent's, so these two native runs are not a paired causal superiority test.
+All nine capture checks, three outer/eighteen nested audit checks, 124 snapshots,
+122 preregistered current project sources, 428 artifacts and twenty changed source
+hashes match after terminal audit. See
+`runs/excited-epoch-seed201-post-native-verification-v1.json`.
+
+Seed 202 uses 194 actions/195 images, selects only frame 56 and forms zero
+proposals/maps/children/future motion scores: `startup_map_unavailable`. Its
+capture/audit checks, 124 snapshots, 122 current project sources, 394 artifacts and
+twenty hashes also match. See
+`runs/excited-epoch-seed202-post-native-verification-v1.json`. Valid provenance is
+not a successful acquisition. Both familiar clear/noon worlds remain development
+negatives for useful motion/general navigation, not disjoint held-out successes.
+
+After independent public-first audit and artifact hash verification, the separate
+evaluator-only `runs/excited-epoch-step-response-diagnostic-v2.json` shows body
+increments of 0.0848720564, 0.01781453585, 0 and 0 for the four MOVEs, followed by
+zero body displacement throughout the eight WAITs. This proves no added body
+response in the extra MOVEs, not the specific latent cause or collision geometry.
+No private positions enter control, endpoint selection or hypothesis generation.
+The producer stores WAIT optical-flow summaries, not MOVE flow: missing MOVE flow
+is null, not measured zero. The v1 diagnostic's erroneous PowerShell null-array
+track count is retained and explicitly corrected in v2.
+
+The separate public-only `runs/excited-epoch-public-increment-diagnostic-v1.json`
+uses only the original frozen models and their public future poses. It shows
+delayed/transient gauge-relative pose changes, including after body movement has
+stopped. Instant camera increments therefore cannot be promoted to physical
+motion/rest or stall labels. Compare genuinely settled public intervention
+endpoints, retaining unknown metric scale and all original geometry gates.
+
 ## Next gates and unchanged full objective
 
-Close the current-source regression batches and freeze the complete native source,
-engine, policies and absent output paths before fresh familiar-development seeds
-201 and 202. Preserve every failed capture and independently audit both. Do not
-call these two clear/noon worlds disjoint held-outs, paired superiority or arrival.
+Keep this entire frozen candidate/evidence intact; compatibility/full auditor/full
+package regressions remain separate. Investigate bounded, public-only repeated
+control-response experiments and alternative opaque actions after a genuinely
+settled unproductive response. Repeating a pulse must not reset maps/budgets,
+resurrect failed IDs, select a privileged endpoint/direction or relax the evaluator.
+Any new adaptive protocol requires a new explicit profile, independent replay and
+fresh native registration; it is not implemented by this four-MOVE candidate.
 Feature-support-sensitive acquisition for the difficult world remains separate.
 
 The preserved public-only diagnostic is

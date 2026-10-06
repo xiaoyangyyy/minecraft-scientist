@@ -56,10 +56,15 @@ The newest isolated candidate is `docs/four-move-map-epoch-development.md`: a fi
 four-MOVE child future stimulus, with unchanged startup, gates, shared budgets and
 private physical evaluator. Twenty source paths are frozen; current combined
 batches pass 273 cases/platform with all hashes intact. Its complete native inputs
-and two absent development outputs are prospectively frozen; the seed-201 JVM has
-launched, but terminal native effects/independent audit remain unverified.
-Compatibility/full auditor/package and the parent/native counts remain separate. This one-factor
-experiment does not address difficult-world acquisition or narrow the full goal.
+and two absent development outputs are prospectively frozen. Both fresh capture/
+audit sequences close with all source/artifact hashes intact: seed 201 creates a
+new child and checks four MOVEs/eight WAITs, yet both physical scores remain
+false_translation at about 0.103 blocks; seed 202 still has only one view/no map.
+The extra MOVEs add zero body displacement in evaluator-only diagnostics, not a
+proven collision/latent cause. Next investigate publicly settled repeated control
+responses and bounded alternative actions, not simply longer identical pulses.
+Compatibility/full auditor/package and parent/native counts remain separate.
+This experiment does not address difficult-world acquisition or narrow the goal.
 
 1. Repair the visual navigation evidence. Evaluate correspondence/geometry signals
    from existing RGB scans without supplying evaluator coordinates to the policy.
