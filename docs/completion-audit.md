@@ -4,7 +4,14 @@ This audit compares the current repository with the original self-evolving symbo
 Minecraft system, not merely with the smaller offline MVP. A green unit test is not
 treated as proof of live Minecraft behavior.
 
-The newest isolated candidate is `docs/map-epoch-reacquisition-development.md`:
+The newest isolated candidate is `docs/four-move-map-epoch-development.md`:
+only the child future stimulus grows from two to four actual monitored MOVEs;
+startup, all image/geometry gates, shared budgets and the physical evaluator stay
+unchanged. Twenty source paths are frozen; thirty new Windows/Linux cases pass
+per platform, but native effects and broader current-source regressions are not
+yet verified. Parent coverage/native results are not borrowed for this candidate.
+
+The preceding isolated candidate is `docs/map-epoch-reacquisition-development.md`:
 one genuinely new map acquisition at the actual recovered public endpoint, with
 immutable parent history, fresh unconnected track namespaces and shared budgets.
 Eighteen source paths are frozen; current Windows/Linux combined batches each
@@ -19,8 +26,11 @@ under the unchanged 0.15-block threshold. All 124 snapshots/122 current project
 sources/422 artifacts/eighteen changed hashes match after audit. Seed 202 capture/
 audit also terminate zero but select only one view, no proposals/map/child/motion,
 with 124 snapshots/122 current sources/394 artifacts/eighteen hashes intact.
-Valid capture/audit execution does not make this an acquisition success. Full auditor/full candidate
-regression, reliable body motion, connected gauge and arrival remain open.
+Valid capture/audit execution does not make seed 202 an acquisition success. The
+frozen candidate's full Windows auditor subsequently passes 258 cases with all
+eighteen hashes intact, giving 608 distinct focused Windows cases without counting
+the forty new audits twice. Linux remains at 390; its full auditor and both full
+candidate regressions, reliable body motion, connected gauge and arrival remain open.
 
 The latest native-verified isolated checkpoint is `docs/public-map-risk-development.md`.
 The original-map monitor has 34 Windows/34 Linux component passes, with 49 foundation

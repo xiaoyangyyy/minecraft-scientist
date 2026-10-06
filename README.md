@@ -20,6 +20,11 @@ registered and under verification, not promoted main-source navigation. See the
 [`new-map candidate`](docs/map-epoch-reacquisition-development.md). No actual goal
 arrival or broad held-out navigation success is claimed.
 
+The subsequent isolated [`four-MOVE candidate`](docs/four-move-map-epoch-development.md)
+changes only the child future stimulus length, preserving original gates/budgets
+and the insufficient-motion/no-map negatives. Thirty new component/mock-audit
+cases pass on each platform; fresh native effects remain unverified.
+
 Latest main-source visual development separately registers longer post-motor WAIT windows,
 without changing pixel/geometry gates or the global action cap. Two fresh audited
 sessions now complete all eleven acquisition attempts without wait exhaustion,

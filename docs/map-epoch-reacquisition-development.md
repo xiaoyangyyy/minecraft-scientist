@@ -126,6 +126,21 @@ disjoint held-outs or superiority.
 
 ## Next actual evidence
 
+The frozen candidate's full Windows auditor now terminates zero: 258 passes,
+zero failures/errors/skips, with all eighteen source hashes unchanged. See
+`runs/risk-epoch-full-audit-windows-post-verification-v1.json`. Distinct Windows
+focused coverage is 608 (203 controller + 147 compatibility + 258 auditor); the
+previous forty new audits are included in 258, not counted twice. Linux still has
+390 focused cases; its full auditor and both full-package runs remain open. These
+are mock/component regressions, not additional native successes.
+
+The next isolated candidate is `docs/four-move-map-epoch-development.md`. It keeps
+this entire frozen source/evidence intact and changes only the child future
+stimulus length from two to four actual monitored MOVEs, without changing any
+original gates/shared budgets or private evaluator thresholds. Its own source
+registration and verification are separate; do not apply this parent's coverage
+or native results to it.
+
 Preserve this entire source-bound candidate while closing full auditor/candidate
 regressions. Then prospectively investigate sufficiently informative public
 control excitation and feature-support-sensitive acquisition. Seed 201's small
@@ -135,9 +150,9 @@ hidden behind seed 201's new local map. Any new control policy must retain both
 negatives, all actual receipts, original map/withheld/consensus gates, independent
 public-first replay and the original global budget.
 
-Full current-source auditor/candidate regression, prospectively registered fresh
-native child acquisition and independent physical evaluation are required before
-claiming that this path actually recovers a map.
+Full current-source auditor/candidate regression and independently verified useful
+body motion remain required before promoting this research path as navigation.
+The seed-201 actual new local map is verified; useful physical motion is not.
 Even a successful local child will not close goal arrival, disjoint held-out
 terrains/conditions, natural science-map integration, 100-attempt operation and
 recovery, paired comparisons or consolidated release/hosted CI.

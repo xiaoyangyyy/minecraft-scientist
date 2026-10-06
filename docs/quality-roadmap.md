@@ -46,9 +46,18 @@ giving 390 distinct focused cases/platform. Fresh seed-201 capture/audit now pro
 real new local acquisition and public future consistency, but BOTH rendered/body
 scores are false_translation at about 0.103 blocks under unchanged 0.15-block
 threshold. Seed 202 capture/audit also close but only acquire one view/no map/child
-or motion score; all source/artifact hashes match. Full regressions, useful
+or motion score; all source/artifact hashes match. Its full Windows auditor then
+passes 258 cases with all eighteen hashes intact, giving 608 distinct focused
+Windows cases; Linux still has 390. Linux full auditor/full package, useful
 body motion and arrival remain open. This candidate is not covered by main V35 or
 the preceding parent's full auditor counts, and does not close any outcome above.
+
+The newest isolated candidate is `docs/four-move-map-epoch-development.md`: a fixed
+four-MOVE child future stimulus, with unchanged startup, gates, shared budgets and
+private physical evaluator. Twenty source paths are frozen; thirty new cases pass
+on each platform. Broader current-source regression and fresh native effects are
+not yet verified; the parent/native counts remain separate. This one-factor
+experiment does not address difficult-world acquisition or narrow the full goal.
 
 1. Repair the visual navigation evidence. Evaluate correspondence/geometry signals
    from existing RGB scans without supplying evaluator coordinates to the policy.
