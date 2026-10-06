@@ -28,12 +28,18 @@ os.environ.setdefault("MINESTUDIO_DIR", "/opt/minecraft-scientist-engine")
 
 
 class ProbeRecorder:
-    def __init__(self):
+    def __init__(self, *, jump_controls=False):
+        if type(jump_controls) is not bool:
+            raise ValueError("compound movement registration requires explicit boolean")
+        cardinal = ("forward", "back", "left", "right")
         self.grid = GridVisualController(
             rows=3,
             columns=3,
             hotbar_slots=1,
-            movement_controls=("forward", "back", "left", "right"),
+            movement_controls=() if jump_controls else cardinal,
+            movement_programs=tuple((control, "jump") for control in cardinal)
+            if jump_controls
+            else (),
         )
 
     def perceive(self, frame, info, *, seed):

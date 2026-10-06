@@ -22,6 +22,7 @@ from minecraft_scientist.exploration.online_landmark_probe import (
 )
 from minecraft_scientist.exploration.settled_map_control import PublicControlStep
 from minecraft_scientist.exploration.stable_keyframe_map import (
+    StableJumpSafeSeedKeyframePolicy,
     StableKeyframePolicy,
     StableMicroKeyframePolicy,
     StableRecoveringKeyframePolicy,
@@ -58,8 +59,9 @@ def serializable_truth(truth):
 
 
 def registration(directory, config, report, definition):
+    jump = config.get("schema") == "jump-safe-seed-stable-keyframe-camera-projection-v1"
     safe_seeds = (
-        config.get("schema") == "safe-seed-stable-keyframe-camera-projection-v1"
+        jump or config.get("schema") == "safe-seed-stable-keyframe-camera-projection-v1"
     )
     recovery = (
         safe_seeds
@@ -74,7 +76,9 @@ def registration(directory, config, report, definition):
         or config.get("schema") == "micro-stable-keyframe-camera-projection-v1"
     )
     settings = (
-        StableSafeSeedKeyframePolicy()
+        StableJumpSafeSeedKeyframePolicy()
+        if jump
+        else StableSafeSeedKeyframePolicy()
         if safe_seeds
         else StableRecoveringKeyframePolicy()
         if recovery
@@ -101,6 +105,7 @@ def registration(directory, config, report, definition):
             "responsive-stable-keyframe-camera-projection-v1",
             "recovering-stable-keyframe-camera-projection-v1",
             "safe-seed-stable-keyframe-camera-projection-v1",
+            "jump-safe-seed-stable-keyframe-camera-projection-v1",
         )
         or json.dumps(config.get("keyframe_policy"), sort_keys=True, allow_nan=False)
         != json.dumps(settings.model_dump(mode="json"), sort_keys=True, allow_nan=False)
@@ -194,6 +199,7 @@ def registration(directory, config, report, definition):
             responsive_controls=responsive,
             recovery_controls=recovery,
             safe_seed_controls=safe_seeds,
+            jump_controls=jump,
         ),
     }
     result.update(

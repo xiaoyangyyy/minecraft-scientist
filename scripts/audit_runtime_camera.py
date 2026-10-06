@@ -234,10 +234,12 @@ def public_data(directory, engine, *, registration=None):
             "responsive-stable-keyframe-camera-projection-v1",
             "recovering-stable-keyframe-camera-projection-v1",
             "safe-seed-stable-keyframe-camera-projection-v1",
+            "jump-safe-seed-stable-keyframe-camera-projection-v1",
         )
         and registration is not None
     ):
         from minecraft_scientist.exploration.stable_keyframe_map import (
+            StableJumpSafeSeedKeyframePolicy,
             StableKeyframePolicy,
             StableMicroKeyframePolicy,
             StableRecoveringKeyframePolicy,
@@ -246,7 +248,9 @@ def public_data(directory, engine, *, registration=None):
         )
 
         policy_type = (
-            StableSafeSeedKeyframePolicy
+            StableJumpSafeSeedKeyframePolicy
+            if config["schema"] == "jump-safe-seed-stable-keyframe-camera-projection-v1"
+            else StableSafeSeedKeyframePolicy
             if config["schema"] == "safe-seed-stable-keyframe-camera-projection-v1"
             else StableRecoveringKeyframePolicy
             if config["schema"] == "recovering-stable-keyframe-camera-projection-v1"

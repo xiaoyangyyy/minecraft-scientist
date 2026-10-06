@@ -91,6 +91,14 @@ class StableSafeSeedKeyframePolicy(StableRecoveringKeyframePolicy):
     )
 
 
+class StableJumpSafeSeedKeyframePolicy(StableSafeSeedKeyframePolicy):
+    """Separate four opaque compound-control registration, unchanged pixel gates."""
+
+    movement_program: Literal["opaque-four-cardinal-jump-v1"] = (
+        "opaque-four-cardinal-jump-v1"
+    )
+
+
 class KeyframeIndex(BaseModel):
     """Explicit selected-image clock, not consecutive physical ticks/poses."""
 
@@ -131,6 +139,7 @@ def acquire_stable_keyframe_map(
     responsive_controls=False,
     recovery_controls=False,
     safe_seed_controls=False,
+    jump_controls=False,
 ):
     """First eligible past proposal, then a distinct control and first stable future.
 
@@ -145,9 +154,12 @@ def acquire_stable_keyframe_map(
             responsive_controls,
             recovery_controls,
             safe_seed_controls,
+            jump_controls,
         )
     ):
         raise ValueError("micro control registration must be explicit boolean")
+    if jump_controls and not safe_seed_controls:
+        raise ValueError("compound controls require explicit safe-seed registration")
     if safe_seed_controls and not recovery_controls:
         raise ValueError("safe seeds require explicit recovering keyframe registration")
     if recovery_controls and not (micro_controls and responsive_controls):
@@ -157,7 +169,9 @@ def acquire_stable_keyframe_map(
     if responsive_controls and not micro_controls:
         raise ValueError("responsive controls require explicit micro registration")
     policy_type = (
-        StableSafeSeedKeyframePolicy
+        StableJumpSafeSeedKeyframePolicy
+        if jump_controls
+        else StableSafeSeedKeyframePolicy
         if safe_seed_controls
         else StableRecoveringKeyframePolicy
         if recovery_controls
@@ -220,6 +234,8 @@ def acquire_stable_keyframe_map(
         )
     if safe_seed_controls:
         result["seed_detection_registration"] = settings.seed_detection
+    if jump_controls:
+        result["movement_program_registration"] = settings.movement_program
     shape = image.shape
     samples, ordinals = [], []
     sample_seeds = None
