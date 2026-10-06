@@ -1,5 +1,13 @@
 # Stable-keyframe geometry research
 
+Latest complete public-image bridge diagnosis is recorded in
+`docs/long-wait-public-bridge-diagnostic.md`. The safe-seed bridge probe explicitly
+binds four registered capture schemas and all five used module snapshots, retains
+partial terminal controls, and compares only complete bounded intervals. Windows
+and Linux each pass 31 research tests. Four actual known-development reports retain
+46 original trials and compare 38 raw bridges; none reaches continuous support.
+This does not promote a tracker or establish navigation.
+
 This directory is an unreleased development probe outside the package/default
 test discovery. It does not change the frozen V28 source, policies, captured
 failures, default dependencies or navigation acceptance.

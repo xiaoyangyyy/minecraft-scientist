@@ -68,8 +68,12 @@ public-support-loss epoch candidate passes 277 focused tests per platform and
 fresh public-first audits, but still has no native map; its results do not replace
 its own required full verification or establish goal completion. Public
 support can now fail without wait recovery, while the original epoch boundary
-explicitly requires recovery. Next preregister public-support-loss local epochs,
-without gauge stitching or weaker track/fitting gates. This diagnoses another
+explicitly requires recovery. The subsequent complete public bridge diagnostic
+retains 46 completed trials across four known development captures; none of its
+38 bounded continuous comparisons reaches correspondence support. See
+`docs/long-wait-public-bridge-diagnostic.md`. Next investigate separately registered
+sustained anonymous compound controls, without gauge stitching or weaker
+track/fitting gates. This diagnoses another
 mapping failure; it does not close actual arrival, held-out, integrated-science,
 long-operation, comparison or release requirements.
 

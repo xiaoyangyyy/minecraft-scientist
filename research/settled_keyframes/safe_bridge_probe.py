@@ -16,6 +16,7 @@ import numpy as np
 
 from minecraft_scientist.exploration import (
     correspondence_refinement,
+    dense_correspondence,
     safe_track_seeds,
     temporal_tracks,
     visual_geometry,
@@ -28,6 +29,31 @@ from minecraft_scientist.exploration.temporal_tracks import (
 from minecraft_scientist.exploration.visual_geometry import _cells
 
 REGISTRATION = "first-image-only-safe-support-mask-v1"
+SCHEMAS = {
+    "safe-seed-stable-keyframe-camera-projection-v1": {},
+    "jump-safe-seed-stable-keyframe-camera-projection-v1": {
+        "movement_program_registration": "opaque-four-cardinal-jump-v1"
+    },
+    "long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1": {
+        "movement_program_registration": "opaque-four-cardinal-jump-v1",
+        "settling_window_registration": "compound-post-motor-24-frame-windows-v1",
+    },
+    "support-loss-long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1": {
+        "movement_program_registration": "opaque-four-cardinal-jump-v1",
+        "settling_window_registration": "compound-post-motor-24-frame-windows-v1",
+        "epoch_boundary_registration": "public-support-loss-after-stable-control-v1",
+    },
+}
+DEPENDENCIES = {
+    "safe-seed.source.py": ("safe_track_seeds.py", safe_track_seeds),
+    "temporal-tracks.source.py": ("temporal_tracks.py", temporal_tracks),
+    "correspondence-refinement.source.py": (
+        "correspondence_refinement.py",
+        correspondence_refinement,
+    ),
+    "visual-geometry.source.py": ("visual_geometry.py", visual_geometry),
+    "dense-correspondence.source.py": ("dense_correspondence.py", dense_correspondence),
+}
 
 
 def digest(path):
@@ -67,6 +93,14 @@ def summarize(diagnosis):
                 ).items()
             )
         ),
+        "loss_by_image_index": {
+            index: sum(
+                len(event.track_ids)
+                for event in diagnosis.rejections
+                if event.image_index == index
+            )
+            for index in sorted({event.image_index for event in diagnosis.rejections})
+        },
     }
 
 
@@ -129,43 +163,66 @@ def probe(route, output):
             "keyframe-acquisition.json",
             "audit.json",
             "audit.source.py",
+            "events.jsonl",
         )
     ]
+    if any(
+        path.is_symlink() or not path.resolve().is_relative_to(route) for path in paths
+    ):
+        raise ValueError("diagnostic public input cannot escape capture directory")
     before = {path: digest(path) for path in paths}
     config, capture, public, audit = [
         json.loads(path.read_bytes()) for path in paths[:4]
     ]
     if (
-        config["schema"] != "safe-seed-stable-keyframe-camera-projection-v1"
+        config.get("schema") not in SCHEMAS
         or capture["completed"] is not True
         or capture["failure"] is not None
         or not capture["checks"]
         or not all(value is True for value in capture["checks"].values())
         or capture["config_sha256"] != before[paths[0]]
         or capture["artifact_sha256"][paths[2].name] != before[paths[2]]
+        or capture["artifact_sha256"].get("events.jsonl") != before[paths[5]]
         or audit["valid"] is not True
         or not audit["checks"]
         or not all(value is True for value in audit["checks"].values())
         or audit["audit_snapshot_sha256"] != before[paths[4]]
         or public["acquisition"]["seed_detection_registration"] != REGISTRATION
+        or any(
+            public["acquisition"].get(name) != value
+            for name, value in SCHEMAS.get(config.get("schema"), {}).items()
+        )
     ):
         raise ValueError("requires an intact independently audited safe-seed capture")
 
     sources = {
         "probe.source.py": Path(__file__),
-        "safe-seed.source.py": Path(safe_track_seeds.__file__),
-        "temporal-tracks.source.py": Path(temporal_tracks.__file__),
-        "correspondence-refinement.source.py": Path(correspondence_refinement.__file__),
-        "visual-geometry.source.py": Path(visual_geometry.__file__),
+        **{name: Path(module.__file__) for name, (_, module) in DEPENDENCIES.items()},
     }
     source_hashes = {name: digest(path) for name, path in sources.items()}
+    for name, (relative, _) in DEPENDENCIES.items():
+        key = "package/exploration/" + relative
+        snapshot = route / "source-snapshot" / key
+        if snapshot.is_symlink() or not snapshot.resolve().is_relative_to(route):
+            raise ValueError("diagnostic dependency snapshot cannot escape capture")
+        expected = config.get("source_sha256", {}).get(key)
+        if expected != source_hashes[name] or not snapshot.is_file():
+            raise ValueError(
+                "diagnostic dependency differs from capture source binding"
+            )
+        before[snapshot] = digest(snapshot)
+        if before[snapshot] != expected:
+            raise ValueError(
+                "diagnostic dependency snapshot differs from capture binding"
+            )
     inputs = {
-        "schema": "known-safe-seed-raw-bridge-diagnostic-v1",
+        "schema": "known-safe-seed-raw-bridge-diagnostic-v2",
+        "capture_schema": config["schema"],
         "capture_inputs_sha256": {path.name: value for path, value in before.items()},
         "sources_sha256": source_hashes,
         "tracking": TemporalTrackConfig(maximum_frames=128).model_dump(mode="json"),
         "detector_registration": REGISTRATION,
-        "scope": "All actual original selected-anchor pairs, complete raw intervals, frozen first-image seeds and unchanged gates. No private inputs, new controls, view reselection, fitted map, future validation or navigation claim.",
+        "scope": "All actual completed original selected-anchor pairs, complete bounded raw intervals, frozen first-image seeds and unchanged gates. Preserve the original public control journal and partial terminal controls without completing a trial. Saved audit is used only for attestation fields. No private numerical inputs, new controls, view reselection, fitted map, future validation or navigation claim.",
         "navigation_accepted": False,
     }
     output.mkdir(parents=True, exist_ok=False)
@@ -181,6 +238,8 @@ def probe(route, output):
         if slot not in frames:
             name = f"frames/frame-{slot:05d}.png"
             path = route / name
+            if path.is_symlink() or not path.resolve().is_relative_to(route):
+                raise ValueError("diagnostic public image cannot escape capture")
             before[path] = digest(path)
             if before[path] != capture["artifact_sha256"][name]:
                 raise ValueError("public RGB differs from capture ledger")
@@ -194,6 +253,22 @@ def probe(route, output):
 
     records = []
     acquisition = public["acquisition"]
+    anchor = acquisition["anchor_frame"]
+    steps = acquisition["steps"]
+    if (
+        type(anchor) is not int
+        or not 0 <= anchor <= 48
+        or type(steps) is not list
+        or anchor + len(steps) > 288
+        or any(
+            type(step) is not dict or type(step.get("absolute_frame")) is not int
+            for step in steps
+        )
+        or [step["absolute_frame"] for step in steps]
+        != list(range(anchor + 1, anchor + len(steps) + 1))
+    ):
+        raise ValueError("original control journal is not contiguous")
+    final = anchor + len(steps)
     consumed = []
     for epoch in acquisition["epochs"]:
         selected = epoch["anchor_frame"]
@@ -204,7 +279,11 @@ def probe(route, output):
         ]
         for sample in samples:
             end = sample["absolute_frame"]
-            if type(end) is not int or type(selected) is not int or end <= selected:
+            if (
+                type(end) is not int
+                or type(selected) is not int
+                or not anchor <= selected < end <= final
+            ):
                 raise ValueError("original sample interval is not chronological")
             first = frame(selected)
             seeds = safe_seeds(first)
@@ -276,6 +355,12 @@ def probe(route, output):
     expected = [item["trial"] for item in acquisition["samples"] if "trial" in item]
     if consumed != expected or len(consumed) != len(set(consumed)):
         raise ValueError("diagnosis omitted or reordered original trials")
+    last_completed = max(
+        (sample["absolute_frame"] for sample in acquisition["samples"]), default=anchor
+    )
+    partial = [step for step in steps if step["absolute_frame"] > last_completed]
+    for step in partial:
+        frame(step["absolute_frame"])
     if any(digest(path) != value for path, value in before.items()):
         raise ValueError("diagnostic input bytes changed during analysis")
     if any(digest(sources[name]) != value for name, value in source_hashes.items()):
@@ -283,6 +368,20 @@ def probe(route, output):
     result = {
         "config": inputs,
         "records": records,
+        "original_control_journal": {
+            "terminal": acquisition["terminal"],
+            "anchor_frame": anchor,
+            "steps": steps,
+            "failed_wait_windows": acquisition.get("failed_wait_windows", []),
+            "recovery_wait_windows": acquisition.get("recovery_wait_windows", []),
+            "epoch_links": acquisition.get("epoch_links", []),
+        },
+        "trailing_partial_controls": {
+            "interval": [last_completed, final],
+            "steps": partial,
+            "completed_trial": False,
+            "original_terminal": acquisition["terminal"],
+        },
         "public_inputs_sha256": {
             path.relative_to(route).as_posix(): value for path, value in before.items()
         },
@@ -291,6 +390,8 @@ def probe(route, output):
             "all_sources_unchanged": True,
             "all_original_direct_tracks_replayed": True,
             "every_original_trial_retained": True,
+            "diagnostic_dependencies_match_capture_snapshots": True,
+            "original_control_journal_retained": True,
         },
         "navigation_accepted": False,
     }

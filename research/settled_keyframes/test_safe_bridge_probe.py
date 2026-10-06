@@ -28,6 +28,7 @@ def bind_public(route):
         path.relative_to(route).as_posix(): probe.digest(path)
         for path in [
             route / "keyframe-acquisition.json",
+            route / "events.jsonl",
             *(route / "frames").glob("*.png"),
         ]
     }
@@ -78,15 +79,29 @@ def public_capture(tmp_path):
                 "novelty": novelty,
             }
         )
+    bindings = {}
+    for relative, module in probe.DEPENDENCIES.values():
+        key = "package/exploration/" + relative
+        source = Path(module.__file__)
+        target = route / "source-snapshot" / key
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(source.read_bytes())
+        bindings[key] = probe.digest(source)
     save(
         route / "config.json",
-        {"schema": "safe-seed-stable-keyframe-camera-projection-v1"},
+        {
+            "schema": "safe-seed-stable-keyframe-camera-projection-v1",
+            "source_sha256": bindings,
+        },
     )
     save(
         route / "keyframe-acquisition.json",
         {
             "acquisition": {
                 "seed_detection_registration": probe.REGISTRATION,
+                "anchor_frame": 0,
+                "steps": [{"absolute_frame": slot} for slot in range(1, 5)],
+                "terminal": "map_unavailable",
                 "epochs": [
                     {"epoch_id": 0, "anchor_frame": 0, "frame_ordinals": [0, 1, 2]},
                     {"epoch_id": 1, "anchor_frame": 3, "frame_ordinals": [3]},
@@ -98,6 +113,9 @@ def public_capture(tmp_path):
     save(
         route / "report.json",
         {"completed": True, "failure": None, "checks": {"mock_only": True}},
+    )
+    (route / "events.jsonl").write_bytes(
+        b"synthetic public ledger, not native evidence\n"
     )
     bind_public(route)
     (route / "audit.source.py").write_bytes(b"mock audit only, not native evidence")
@@ -275,6 +293,9 @@ def test_overbudget_pair_keeps_direct_failure_without_shorter_bridge(
     sample = public["acquisition"]["samples"][0]
     sample["absolute_frame"] = 129
     public["acquisition"]["samples"] = [sample]
+    public["acquisition"]["steps"] = [
+        {"absolute_frame": slot} for slot in range(1, 130)
+    ]
     public["acquisition"]["epochs"] = [
         {"epoch_id": 0, "anchor_frame": 0, "frame_ordinals": [0, 129]}
     ]
@@ -291,3 +312,92 @@ def test_overbudget_pair_keeps_direct_failure_without_shorter_bridge(
     record = probe.probe(public_capture, tmp_path / "bounded")["records"][0]
     assert record["status"] == "raw_interval_exceeds_registered_tracking_budget"
     assert record["comparison"] is None and record["direct_tracks_replayed"]
+
+
+@pytest.mark.parametrize("schema", list(probe.SCHEMAS))
+def test_known_protocols_require_explicit_markers_but_do_not_change_tracking(
+    public_capture, tmp_path, schema
+):
+    config = json.loads((public_capture / "config.json").read_bytes())
+    config["schema"] = schema
+    save(public_capture / "config.json", config)
+    public = json.loads((public_capture / "keyframe-acquisition.json").read_bytes())
+    public["acquisition"].update(probe.SCHEMAS[schema])
+    save(public_capture / "keyframe-acquisition.json", public)
+    bind_public(public_capture)
+    result = probe.probe(public_capture, tmp_path / "registered")
+    assert result["config"]["capture_schema"] == schema
+    assert len(result["records"]) == 3
+    assert all(result["checks"].values())
+
+
+@pytest.mark.parametrize("case", ["source_hash", "snapshot", "marker", "events"])
+def test_new_provenance_failures_reject_before_allocating_output(
+    public_capture, tmp_path, case
+):
+    config = json.loads((public_capture / "config.json").read_bytes())
+    key = next(iter(config["source_sha256"]))
+    if case == "source_hash":
+        config["source_sha256"][key] = "0" * 64
+    elif case == "snapshot":
+        (public_capture / "source-snapshot" / key).write_bytes(b"changed snapshot")
+    elif case == "marker":
+        config["schema"] = (
+            "support-loss-long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
+        )
+    else:
+        (public_capture / "events.jsonl").write_bytes(b"changed events")
+    save(public_capture / "config.json", config)
+    if case != "events":
+        bind_public(public_capture)
+    output = tmp_path / "must-not-exist"
+    with pytest.raises(ValueError, match="dependency|intact independently"):
+        probe.probe(public_capture, output)
+    assert not output.exists()
+
+
+def test_terminal_partial_actions_are_kept_without_inventing_a_completed_trial(
+    public_capture, tmp_path
+):
+    path = public_capture / "keyframe-acquisition.json"
+    public = json.loads(path.read_bytes())
+    public["acquisition"]["steps"].append(
+        {"absolute_frame": 5, "requested_kind": "wait"}
+    )
+    public["acquisition"]["terminal"] = "budget_exhausted"
+    frame = public_capture / "frames/frame-00005.png"
+    frame.write_bytes((public_capture / "frames/frame-00004.png").read_bytes())
+    save(path, public)
+    bind_public(public_capture)
+    result = probe.probe(public_capture, tmp_path / "partial")
+    assert len(result["records"]) == 3
+    partial = result["trailing_partial_controls"]
+    assert partial["interval"] == [4, 5]
+    assert partial["completed_trial"] is False
+    assert partial["steps"] == [{"absolute_frame": 5, "requested_kind": "wait"}]
+    assert result["original_control_journal"]["terminal"] == "budget_exhausted"
+    assert result["public_inputs_sha256"]["frames/frame-00005.png"] == probe.digest(
+        frame
+    )
+
+
+@pytest.mark.parametrize("case", ["jump", "float", "bool", "episode_budget"])
+def test_partial_or_complete_control_ordinals_cannot_be_retimed(
+    public_capture, tmp_path, case
+):
+    path = public_capture / "keyframe-acquisition.json"
+    public = json.loads(path.read_bytes())
+    if case == "episode_budget":
+        public["acquisition"]["steps"] = [
+            {"absolute_frame": slot} for slot in range(1, 290)
+        ]
+    else:
+        public["acquisition"]["steps"][1]["absolute_frame"] = {
+            "jump": 5,
+            "float": 2.0,
+            "bool": True,
+        }[case]
+    save(path, public)
+    bind_public(public_capture)
+    with pytest.raises(ValueError, match="control journal"):
+        probe.probe(public_capture, tmp_path / "bad-clock")
