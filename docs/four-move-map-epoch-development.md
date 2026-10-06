@@ -85,6 +85,25 @@ engine, policies and absent output paths before fresh familiar-development seeds
 call these two clear/noon worlds disjoint held-outs, paired superiority or arrival.
 Feature-support-sensitive acquisition for the difficult world remains separate.
 
+The preserved public-only diagnostic is
+`runs/public-acquisition-negative-diagnostic-v1.json`. In parent seed 202, handles
+0/1/2 repeatedly produce approximately 14/21/14 pixels median flow, but only
+150-213 of 462 original first-image seeds survive (below the unchanged 0.5 gate).
+Handle 3 retains 457/460 seeds but median flow is only about 0.9 pixels (below the
+unchanged 2-pixel novelty gate). All eleven trials fail selection. All twelve
+settling records consume zero extra recovery windows, so the existing acquisition
+epoch restart, which additionally requires an extra WAIT recovery, never fires.
+This diagnosis uses no private pose/score inputs and confirms unchanged public
+artifact bytes; it is not proof that any proposed acquisition repair works.
+
+A later candidate should investigate a bounded support-loss reanchor **before any
+map is frozen**, at an actual settled public endpoint, with an explicitly new
+first-image detector namespace and the same episode-wide local-epoch/trial/action
+budgets. It must retain failed samples and independently validate new geometry;
+it must not reinstate a challenged map, retrospectively filter survivors, silently
+lower support thresholds or choose a private-score-favored endpoint. This is not
+implemented by the four-MOVE candidate and must receive its own registration.
+
 Even useful local body motion will leave reliable goal arrival, at least five
 disjoint held-outs across terrains/three conditions, sufficient samples and
 uncertainty, natural science/map integration, one hundred exploration/experiment
