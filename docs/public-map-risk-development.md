@@ -87,9 +87,29 @@ public-first audit cases, zero failures/errors/skips. These 167 distinct cases p
 platform exercise real RGB tracking/receipt chronology with explicitly marked
 model/flow doubles and mock native captures, not successful native geometry.
 All fourteen source hashes still match the source registration after these runs:
-`runs/monitored-walk-prelaunch-focused-verification-v1.json`. Wider compatibility
-and full auditor regressions are still being verified; do not borrow the walking
-parent's 466-per-platform count for this implementation.
+`runs/monitored-walk-prelaunch-focused-verification-v1.json`. Subsequently, all
+155 compatibility cases pass on EACH platform, bringing current package-focused
+coverage to 322 distinct cases/platform (153 + 155 + fourteen new audits). The
+separate research replay driver also passes eight cases/platform on the current
+tree. Full auditor and full candidate regressions remain open; do not borrow the
+walking parent's 466-per-platform count for this implementation.
+
+## Prospective fresh-native registration
+
+`runs/monitored-walk-live-registration-v1.json` freezes fourteen source hashes,
+the complete candidate patch, all eight current JUnit receipts, engine identity,
+finite action/recovery budgets and the two development output paths BEFORE launch.
+Registration SHA-256:
+`b6059a39e0fa1f46620bdf4446d58e77f696e37a643b998aefdbb5aa74cd2567`.
+Package-focused coverage is 322/platform, research-driver coverage eight/platform;
+full auditor/full candidate regression explicitly remain not run.
+
+Seed 201 has now started a fresh serial native process, with 123 saved source
+snapshots. `runs/monitored-walk-live-seed201-launch-v1.json` describes that launch
+only. It is not a terminal result or independent audit. Seed 202 is registered
+but not launched. Outputs remain in the C-drive spill area; original failed,
+partial and known-public replay runs are untouched. Do not infer new performance
+from process startup or the preceding known replay.
 
 ## Required next evidence
 
