@@ -1,0 +1,650 @@
+diff --git a/src/minecraft_scientist/exploration/stable_keyframe_map.py b/src/minecraft_scientist/exploration/stable_keyframe_map.py
+index e6657c8..3a1bcd2 100644
+--- a/src/minecraft_scientist/exploration/stable_keyframe_map.py
++++ b/src/minecraft_scientist/exploration/stable_keyframe_map.py
+@@ -109,6 +109,26 @@ class StableLongWaitJumpKeyframePolicy(StableJumpSafeSeedKeyframePolicy):
+     post_motor_wait_ticks: Literal[24] = 24
+ 
+ 
++class StableSustainedJumpKeyframePolicy(StableLongWaitJumpKeyframePolicy):
++    """Eight explicit one-tick compound receipts; unchanged image/geometry gates."""
++
++    motor_duration: Literal["eight-tick-acquisition-and-future-v1"] = (
++        "eight-tick-acquisition-and-future-v1"
++    )
++    move_ticks: Literal[8] = 8
++    validation_move_ticks: Literal[8] = 8
++
++    @model_validator(mode="before")
++    @classmethod
++    def _exact_motor_ticks(cls, values):
++        if isinstance(values, dict) and any(
++            type(values.get(name, 8)) is not int or values.get(name, 8) != 8
++            for name in ("move_ticks", "validation_move_ticks")
++        ):
++            raise ValueError("sustained motor duration requires exact integer eight")
++        return values
++
++
+ class KeyframeIndex(BaseModel):
+     """Explicit selected-image clock, not consecutive physical ticks/poses."""
+ 
+@@ -151,6 +171,7 @@ def acquire_stable_keyframe_map(
+     safe_seed_controls=False,
+     jump_controls=False,
+     long_wait_controls=False,
++    sustained_controls=False,
+ ):
+     """First eligible past proposal, then a distinct control and first stable future.
+ 
+@@ -167,9 +188,12 @@ def acquire_stable_keyframe_map(
+             safe_seed_controls,
+             jump_controls,
+             long_wait_controls,
++            sustained_controls,
+         )
+     ):
+         raise ValueError("micro control registration must be explicit boolean")
++    if sustained_controls and not long_wait_controls:
++        raise ValueError("sustained motors require explicit long-wait registration")
+     if long_wait_controls and not jump_controls:
+         raise ValueError("long waits require explicit compound motor registration")
+     if jump_controls and not safe_seed_controls:
+@@ -183,7 +207,9 @@ def acquire_stable_keyframe_map(
+     if responsive_controls and not micro_controls:
+         raise ValueError("responsive controls require explicit micro registration")
+     policy_type = (
+-        StableLongWaitJumpKeyframePolicy
++        StableSustainedJumpKeyframePolicy
++        if sustained_controls
++        else StableLongWaitJumpKeyframePolicy
+         if long_wait_controls
+         else StableJumpSafeSeedKeyframePolicy
+         if jump_controls
+@@ -233,7 +259,11 @@ def acquire_stable_keyframe_map(
+         "continuous_raw_identity": False,
+     }
+     if micro_controls:
+-        result["micro_control_registration"] = "one-tick-acquisition-two-tick-future-v1"
++        result["micro_control_registration"] = (
++            "eight-tick-acquisition-eight-tick-future-v1"
++            if sustained_controls
++            else "one-tick-acquisition-two-tick-future-v1"
++        )
+     if responsive_controls:
+         result.update(
+             response_control_registration="chronological-public-novelty-only-v1",
+@@ -254,6 +284,8 @@ def acquire_stable_keyframe_map(
+         result["movement_program_registration"] = settings.movement_program
+     if long_wait_controls:
+         result["settling_window_registration"] = settings.settling_profile
++    if sustained_controls:
++        result["motor_duration_registration"] = settings.motor_duration
+     shape = image.shape
+     samples, ordinals = [], []
+     sample_seeds = None
+diff --git a/environments/minestudio/capture_runtime_camera.py b/environments/minestudio/capture_runtime_camera.py
+index ffa20ea..6133f4c 100644
+--- a/environments/minestudio/capture_runtime_camera.py
++++ b/environments/minestudio/capture_runtime_camera.py
+@@ -109,6 +109,7 @@ def main():
+     parser.add_argument("--safe-seed-keyframes", action="store_true")
+     parser.add_argument("--jump-keyframes", action="store_true")
+     parser.add_argument("--long-wait-keyframes", action="store_true")
++    parser.add_argument("--sustained-keyframes", action="store_true")
+     args = parser.parse_args()
+     if args.seed < 0:
+         parser.error("seed must be nonnegative")
+@@ -144,6 +145,8 @@ def main():
+         parser.error("jump keyframes require explicit --safe-seed-keyframes")
+     if args.long_wait_keyframes and not args.jump_keyframes:
+         parser.error("long wait keyframes require explicit --jump-keyframes")
++    if args.sustained_keyframes and not args.long_wait_keyframes:
++        parser.error("sustained keyframes require explicit --long-wait-keyframes")
+     if args.stable_keyframes and (
+         args.active_causal
+         or args.acquisition_strategy is not None
+@@ -327,10 +330,13 @@ def main():
+             StableRecoveringKeyframePolicy,
+             StableResponsiveKeyframePolicy,
+             StableSafeSeedKeyframePolicy,
++            StableSustainedJumpKeyframePolicy,
+         )
+ 
+         keyframe_policy_type = (
+-            StableLongWaitJumpKeyframePolicy
++            StableSustainedJumpKeyframePolicy
++            if args.sustained_keyframes
++            else StableLongWaitJumpKeyframePolicy
+             if args.long_wait_keyframes
+             else StableJumpSafeSeedKeyframePolicy
+             if args.jump_keyframes
+@@ -345,7 +351,9 @@ def main():
+             else StableKeyframePolicy
+         )
+         config.update(
+-            schema="long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
++            schema="sustained-long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
++            if args.sustained_keyframes
++            else "long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
+             if args.long_wait_keyframes
+             else "jump-safe-seed-stable-keyframe-camera-projection-v1"
+             if args.jump_keyframes
+@@ -363,7 +371,9 @@ def main():
+             active_seed=2000,
+             keyframe_policy=keyframe_policy_type().model_dump(mode="json"),
+             scope=(
+-                "four anonymous cardinal-plus-jump programs with separate 24-frame post-motor WAIT windows; initial windows stay 16; original pixel/geometry gates and two episode-wide recovery windows/288-action cap; no private rest selection, raw-track promotion or navigation claim"
++                "four anonymous compound handles held for eight exact one-tick receipts in acquisition and future; original 24-frame post-motor WAIT windows and first-image seeds/geometry/future gates; unchanged 288-action cap and retained partial controls; no private movement selection, connected gauge or navigation claim"
++                if args.sustained_keyframes
++                else "four anonymous cardinal-plus-jump programs with separate 24-frame post-motor WAIT windows; initial windows stay 16; original pixel/geometry gates and two episode-wide recovery windows/288-action cap; no private rest selection, raw-track promotion or navigation claim"
+                 if args.long_wait_keyframes
+                 else "four anonymous cardinal-plus-jump motor programs chosen from public novelty only; first-image safe seeds, unchanged recovery/geometry gates and 288-action cap; no private movement labels, new action kinds, metric/global/navigation claim"
+                 if args.jump_keyframes
+@@ -517,6 +527,7 @@ def main():
+                         safe_seed_controls=args.safe_seed_keyframes,
+                         jump_controls=args.jump_keyframes,
+                         long_wait_controls=args.long_wait_keyframes,
++                        sustained_controls=args.sustained_keyframes,
+                     ),
+                 }
+                 if keyframes["acquisition"]["failure"] is not None:
+diff --git a/scripts/audit_stable_keyframes.py b/scripts/audit_stable_keyframes.py
+index d681f91..7b52e5b 100644
+--- a/scripts/audit_stable_keyframes.py
++++ b/scripts/audit_stable_keyframes.py
+@@ -29,6 +29,7 @@ from minecraft_scientist.exploration.stable_keyframe_map import (
+     StableRecoveringKeyframePolicy,
+     StableResponsiveKeyframePolicy,
+     StableSafeSeedKeyframePolicy,
++    StableSustainedJumpKeyframePolicy,
+     acquire_stable_keyframe_map,
+ )
+ from minecraft_scientist.protocols import TransitionRecord
+@@ -60,8 +61,13 @@ def serializable_truth(truth):
+ 
+ 
+ def registration(directory, config, report, definition):
+-    long_wait = (
++    sustained = (
+         config.get("schema")
++        == "sustained-long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
++    )
++    long_wait = (
++        sustained
++        or config.get("schema")
+         == "long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
+     )
+     jump = (
+@@ -84,7 +90,9 @@ def registration(directory, config, report, definition):
+         or config.get("schema") == "micro-stable-keyframe-camera-projection-v1"
+     )
+     settings = (
+-        StableLongWaitJumpKeyframePolicy()
++        StableSustainedJumpKeyframePolicy()
++        if sustained
++        else StableLongWaitJumpKeyframePolicy()
+         if long_wait
+         else StableJumpSafeSeedKeyframePolicy()
+         if jump
+@@ -117,6 +125,7 @@ def registration(directory, config, report, definition):
+             "safe-seed-stable-keyframe-camera-projection-v1",
+             "jump-safe-seed-stable-keyframe-camera-projection-v1",
+             "long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1",
++            "sustained-long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1",
+         )
+         or json.dumps(config.get("keyframe_policy"), sort_keys=True, allow_nan=False)
+         != json.dumps(settings.model_dump(mode="json"), sort_keys=True, allow_nan=False)
+@@ -212,6 +221,7 @@ def registration(directory, config, report, definition):
+             safe_seed_controls=safe_seeds,
+             jump_controls=jump,
+             long_wait_controls=long_wait,
++            sustained_controls=sustained,
+         ),
+     }
+     result.update(
+diff --git a/scripts/audit_runtime_camera.py b/scripts/audit_runtime_camera.py
+index e395135..8961c4f 100644
+--- a/scripts/audit_runtime_camera.py
++++ b/scripts/audit_runtime_camera.py
+@@ -236,6 +236,7 @@ def public_data(directory, engine, *, registration=None):
+             "safe-seed-stable-keyframe-camera-projection-v1",
+             "jump-safe-seed-stable-keyframe-camera-projection-v1",
+             "long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1",
++            "sustained-long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1",
+         )
+         and registration is not None
+     ):
+@@ -247,10 +248,14 @@ def public_data(directory, engine, *, registration=None):
+             StableRecoveringKeyframePolicy,
+             StableResponsiveKeyframePolicy,
+             StableSafeSeedKeyframePolicy,
++            StableSustainedJumpKeyframePolicy,
+         )
+ 
+         policy_type = (
+-            StableLongWaitJumpKeyframePolicy
++            StableSustainedJumpKeyframePolicy
++            if config["schema"]
++            == "sustained-long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
++            else StableLongWaitJumpKeyframePolicy
+             if config["schema"]
+             == "long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
+             else StableJumpSafeSeedKeyframePolicy
+diff --git a/tests/unit/test_stable_keyframe_audit.py b/tests/unit/test_stable_keyframe_audit.py
+index 90d9f96..ceeed57 100644
+--- a/tests/unit/test_stable_keyframe_audit.py
++++ b/tests/unit/test_stable_keyframe_audit.py
+@@ -29,14 +29,17 @@ def keyframe_capture(diagnostic, scripts, monkeypatch, request):
+     _, definition = scripts
+     auditor = importlib.import_module("audit_stable_keyframes")
+     mode = getattr(request, "param", False)
+-    long_wait = mode == "long-jump-seeds"
++    sustained = mode == "sustained"
++    long_wait = sustained or mode == "long-jump-seeds"
+     jump = long_wait or mode == "jump-seeds"
+     safe_seeds = jump or mode == "safe-seeds"
+     recovery = safe_seeds or mode == "recovering"
+     responsive = recovery or mode == "responsive"
+     micro = responsive or mode is True
+     policy_type = (
+-        auditor.StableLongWaitJumpKeyframePolicy
++        auditor.StableSustainedJumpKeyframePolicy
++        if sustained
++        else auditor.StableLongWaitJumpKeyframePolicy
+         if long_wait
+         else auditor.StableJumpSafeSeedKeyframePolicy
+         if jump
+@@ -59,7 +62,9 @@ def keyframe_capture(diagnostic, scripts, monkeypatch, request):
+     )
+     config = json.loads((route / "config.json").read_bytes())
+     config.update(
+-        schema="long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
++        schema="sustained-long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
++        if sustained
++        else "long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
+         if long_wait
+         else "jump-safe-seed-stable-keyframe-camera-projection-v1"
+         if jump
+@@ -127,6 +132,7 @@ def keyframe_capture(diagnostic, scripts, monkeypatch, request):
+         safe_seed_controls=safe_seeds,
+         jump_controls=jump,
+         long_wait_controls=long_wait,
++        sustained_controls=sustained,
+     )
+     assert result["terminal"] == "initial_wait_exhausted"
+     save(
+@@ -151,6 +157,7 @@ def keyframe_capture(diagnostic, scripts, monkeypatch, request):
+     return auditor, route, engine
+ 
+ 
++@pytest.mark.parametrize("keyframe_capture", [False, "sustained"], indirect=True)
+ def test_nonempty_public_replay_precedes_any_private_reads(
+     keyframe_capture, monkeypatch
+ ):
+@@ -160,7 +167,7 @@ def test_nonempty_public_replay_precedes_any_private_reads(
+         result = auditor.runtime.public_data(
+             route, engine, registration=auditor.registration
+         )
+-        assert result["valid"] and result["count"] == 65
++        assert result["valid"] and result["count"] in (65, 97)
+     result = auditor.audit(route, engine)
+     assert result["valid"] and all(result["checks"].values())
+     assert result["evaluation"] is None and result["selected_keyframes"] == 0
+@@ -516,7 +523,9 @@ def test_recovery_flags_require_full_explicit_protocol_before_output(
+ 
+ 
+ @pytest.mark.parametrize(
+-    "keyframe_capture", ["safe-seeds", "jump-seeds", "long-jump-seeds"], indirect=True
++    "keyframe_capture",
++    ["safe-seeds", "jump-seeds", "long-jump-seeds", "sustained"],
++    indirect=True,
+ )
+ def test_safe_seed_registration_replays_full_detector_ledger_before_private_reads(
+     keyframe_capture, monkeypatch
+@@ -535,7 +544,9 @@ def test_safe_seed_registration_replays_full_detector_ledger_before_private_read
+ 
+ 
+ @pytest.mark.parametrize(
+-    "keyframe_capture", ["safe-seeds", "jump-seeds", "long-jump-seeds"], indirect=True
++    "keyframe_capture",
++    ["safe-seeds", "jump-seeds", "long-jump-seeds", "sustained"],
++    indirect=True,
+ )
+ @pytest.mark.parametrize(
+     "case",
+@@ -619,7 +630,7 @@ def test_safe_seed_flags_require_all_explicit_protocols_before_output(
+ 
+ 
+ @pytest.mark.parametrize(
+-    "keyframe_capture", ["jump-seeds", "long-jump-seeds"], indirect=True
++    "keyframe_capture", ["jump-seeds", "long-jump-seeds", "sustained"], indirect=True
+ )
+ @pytest.mark.parametrize("case", ["schema", "policy", "marker", "drop_marker"])
+ def test_compound_program_claim_is_not_interchangeable_with_parent(
+@@ -677,7 +688,9 @@ def test_jump_flag_requires_full_explicit_protocol_before_output(
+     assert not output.exists()
+ 
+ 
+-@pytest.mark.parametrize("keyframe_capture", ["long-jump-seeds"], indirect=True)
++@pytest.mark.parametrize(
++    "keyframe_capture", ["long-jump-seeds", "sustained"], indirect=True
++)
+ @pytest.mark.parametrize(
+     "case", ["schema", "budget", "profile", "marker", "window_ticks", "drop_ticks"]
+ )
+@@ -740,3 +753,80 @@ def test_long_wait_flag_requires_full_explicit_protocol_before_output(
+     with pytest.raises(SystemExit):
+         capture.main()
+     assert not output.exists()
++
++
++@pytest.mark.parametrize("keyframe_capture", ["sustained"], indirect=True)
++@pytest.mark.parametrize(
++    "case",
++    [
++        "schema",
++        "move_ticks",
++        "future_ticks",
++        "profile",
++        "marker",
++        "micro_marker",
++    ],
++)
++def test_sustained_claim_requires_exact_cost_and_public_replay(
++    keyframe_capture, monkeypatch, case
++):
++    auditor, route, engine = keyframe_capture
++    config = json.loads((route / "config.json").read_bytes())
++    saved = json.loads((route / "keyframe-acquisition.json").read_bytes())
++    if case == "schema":
++        config["schema"] = (
++            "long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
++        )
++    elif case == "move_ticks":
++        config["keyframe_policy"]["move_ticks"] = 1
++    elif case == "future_ticks":
++        config["keyframe_policy"]["validation_move_ticks"] = 2
++    elif case == "profile":
++        config["keyframe_policy"]["motor_duration"] = "unregistered"
++    elif case == "marker":
++        saved["acquisition"].pop("motor_duration_registration")
++    else:
++        saved["acquisition"]["micro_control_registration"] = (
++            "one-tick-acquisition-two-tick-future-v1"
++        )
++    save(route / "config.json", config)
++    save(route / "keyframe-acquisition.json", saved)
++    report = json.loads((route / "report.json").read_bytes())
++    report["config_sha256"] = auditor.runtime.digest(route / "config.json")
++    report["artifact_sha256"]["keyframe-acquisition.json"] = auditor.runtime.digest(
++        route / "keyframe-acquisition.json"
++    )
++    save(route / "report.json", report)
++    private_guard(monkeypatch)
++    result = auditor.audit(route, engine)
++    assert not result["valid"] and result["evaluation"] is None
++    assert result["stability_diagnostics"] is None
++
++
++@pytest.mark.parametrize(
++    "flags",
++    [
++        ["--sustained-keyframes"],
++        ["--sustained-keyframes", "--long-wait-keyframes"],
++        [
++            "--sustained-keyframes",
++            "--stable-keyframes",
++            "--micro-keyframes",
++            "--responsive-keyframes",
++            "--recovering-keyframes",
++            "--safe-seed-keyframes",
++            "--jump-keyframes",
++        ],
++    ],
++)
++def test_sustained_flag_requires_full_protocol_before_output(
++    scripts, tmp_path, monkeypatch, flags
++):
++    _, capture = scripts
++    output = tmp_path / "must-not-exist"
++    monkeypatch.setattr(
++        sys, "argv", [capture.__file__, *flags, "--output", str(output)]
++    )
++    with pytest.raises(SystemExit):
++        capture.main()
++    assert not output.exists()
+diff --git a/tests/unit/test_sustained_keyframes.py b/tests/unit/test_sustained_keyframes.py
+new file mode 100644
+--- /dev/null
++++ b/tests/unit/test_sustained_keyframes.py
+@@ -0,0 +1,229 @@
++import numpy as np
++import pytest
++from pydantic import ValidationError
++
++pytest.importorskip("cv2", reason="optional public keyframe geometry")
++
++from test_joint_multiview_map import CAMERA
++from test_long_wait_keyframes import textured
++from test_stable_keyframe_map import public_scene as public_scene  # noqa: PLC0414
++
++from minecraft_scientist.exploration import stable_keyframe_map as stable
++from minecraft_scientist.exploration.settled_map_control import PublicControlStep
++
++
++def acquire(first, execute, **kwargs):
++    return stable.acquire_stable_keyframe_map(
++        first,
++        execute,
++        ((100, 0, 112), (0, 100, 112), (0, 0, 1)),
++        anchor_frame=48,
++        micro_controls=True,
++        responsive_controls=True,
++        recovery_controls=True,
++        safe_seed_controls=True,
++        jump_controls=True,
++        long_wait_controls=True,
++        sustained_controls=True,
++        **kwargs,
++    )
++
++
++def test_real_static_pixels_record_eight_receipts_per_trial_not_invented_motion():
++    first, calls = textured(), []
++
++    def execute(kind, handle):
++        calls.append((kind, handle))
++        return PublicControlStep(first.copy(), kind, handle, True, 1)
++
++    result = acquire(first, execute)
++    assert result["terminal"] == "map_unavailable"
++    assert (
++        result["motor_duration_registration"] == "eight-tick-acquisition-and-future-v1"
++    )
++    assert (
++        result["micro_control_registration"]
++        == "eight-tick-acquisition-eight-tick-future-v1"
++    )
++    assert result["frozen"] is None and result["future"] is None
++    assert not result["navigation_accepted"]
++    assert len(result["samples"]) == 12 and len(calls) == 184
++    assert calls[:8] == [("wait", None)] * 8
++    handles = []
++    for slot in range(11):
++        controls = calls[8 + 16 * slot : 8 + 16 * (slot + 1)]
++        handle = controls[0][1]
++        handles.append(handle)
++        assert controls[:8] == [("move", handle)] * 8
++        assert controls[8:] == [("wait", None)] * 8
++    assert set(handles) == set(range(4))
++    assert all(step["ticks"] == 1 and step["compliant"] for step in result["steps"])
++    assert not result["failed_wait_windows"] and not result["recovery_wait_windows"]
++
++
++@pytest.mark.parametrize("failure_tick", [1, 4, 8])
++def test_failed_mid_motor_receipt_cannot_become_a_completed_trial(failure_tick):
++    first, moves = textured(), 0
++
++    def execute(kind, handle):
++        nonlocal moves
++        if kind == "move":
++            moves += 1
++        return PublicControlStep(first.copy(), kind, handle, moves != failure_tick, 1)
++
++    result = acquire(first, execute)
++    assert result["terminal"] == "execution_failed"
++    assert len(result["steps"]) == 8 + failure_tick
++    assert len(result["samples"]) == 1
++    assert result["steps"][-1]["compliant"] is False
++    assert result["frozen"] is None and result["future"] is None
++
++
++@pytest.mark.parametrize(
++    "initial_waits,post_waits,partial_moves,partial_waits",
++    [
++        (8, 22, 8, 14),
++        (9, 24, 7, 0),
++    ],
++)
++def test_global_cap_keeps_partial_wait_or_motor_without_extra_dispatch(
++    monkeypatch, initial_waits, post_waits, partial_moves, partial_waits
++):
++    first, calls, moved, waits = textured(), [], False, 0
++
++    def execute(kind, handle):
++        nonlocal moved, waits
++        calls.append((kind, handle))
++        if kind == "move":
++            moved, waits = True, 0
++        else:
++            waits += 1
++        return PublicControlStep(first.copy(), kind, handle, True, 1)
++
++    original = stable._visible_flow
++
++    def flow(*args, **kwargs):
++        value = original(*args, **kwargs)
++        value["stable"] = waits >= (post_waits if moved else initial_waits) - 2
++        return value  # synthetic timing budget only, not native success
++
++    monkeypatch.setattr(stable, "_visible_flow", flow)
++    result = acquire(first, execute)
++    assert result["terminal"] == "budget_exhausted"
++    assert len(calls) + 48 == 288
++    assert len(result["samples"]) == 8
++    partial = result["steps"][result["samples"][-1]["absolute_frame"] - 48 :]
++    assert sum(step["requested_kind"] == "move" for step in partial) == partial_moves
++    assert sum(step["requested_kind"] == "wait" for step in partial) == partial_waits
++    assert not result["recovery_wait_windows"]
++    assert result["frozen"] is None
++
++
++@pytest.mark.parametrize("flag", [1, None, "true"])
++def test_sustained_flag_must_be_boolean_before_dispatch(flag):
++    def forbidden(*args):
++        raise AssertionError("invalid flag dispatched")
++
++    with pytest.raises(ValueError, match="explicit boolean"):
++        stable.acquire_stable_keyframe_map(
++            textured(), forbidden, np.eye(3), anchor_frame=48, sustained_controls=flag
++        )
++
++
++def test_sustained_requires_full_long_wait_protocol_before_dispatch():
++    def forbidden(*args):
++        raise AssertionError("incomplete registration dispatched")
++
++    with pytest.raises(ValueError, match="explicit long-wait"):
++        stable.acquire_stable_keyframe_map(
++            textured(), forbidden, np.eye(3), anchor_frame=48, sustained_controls=True
++        )
++
++
++@pytest.mark.parametrize("failed_future_tick", [None, 4])
++def test_past_is_frozen_before_eight_distinct_future_receipts(
++    public_scene, monkeypatch, failed_future_tick
++):
++    first, execute, calls = public_scene
++    flow = stable._visible_flow
++    # Mock perception, real synthetic 3-D fitting. Do not claim native pixels.
++    monkeypatch.setattr(stable, "safe_seeds", lambda first: np.full((150, 2), 100.0))
++
++    def aligned_flow(*args, **kwargs):
++        value = flow(*args)
++        value["tracks"] = {"track_ids": list(range(150)), "seed_count": 150}
++        return value
++
++    monkeypatch.setattr(stable, "_visible_flow", aligned_flow)
++    fitted_at = []
++    fitter = stable.fit_joint_map
++
++    def recording(*args, **kwargs):
++        fitted_at.append(len(calls))
++        return fitter(*args, **kwargs)
++
++    def future_execute(kind, handle):
++        step = execute(kind, handle)
++        if failed_future_tick and len(calls) == 88 + failed_future_tick:
++            return PublicControlStep(step.frame, kind, handle, False, 1)
++        return step
++
++    monkeypatch.setattr(stable, "fit_joint_map", recording)
++    result = stable.acquire_stable_keyframe_map(
++        first,
++        future_execute,
++        CAMERA,
++        anchor_frame=48,
++        seed=13,
++        micro_controls=True,
++        responsive_controls=True,
++        recovery_controls=True,
++        safe_seed_controls=True,
++        jump_controls=True,
++        long_wait_controls=True,
++        sustained_controls=True,
++    )
++    assert fitted_at == [88] * 4
++    assert result["frozen"]["index"]["frame_ordinals"] == [56, 72, 88, 104, 120, 136]
++    assert stable._digest(result["frozen"]) == result["frozen_sha256"]
++    future_handle = result["future_control_choice"]["handle"]
++    assert future_handle != calls[72][1]
++    assert result["future_control_choice"]["at_frame"] == 136
++    assert calls[88 : 88 + (failed_future_tick or 8)] == [("move", future_handle)] * (
++        failed_future_tick or 8
++    )
++    assert result["terminal"] == (
++        "execution_failed" if failed_future_tick else "validated"
++    )
++    assert len(calls) == (88 + failed_future_tick if failed_future_tick else 104)
++    if failed_future_tick:
++        assert result["future"] is None and result["motion"] is None
++    else:
++        assert result["future"]["absolute_frame"] == 152
++        assert len(result["future"]["candidates"]) == 4
++    assert not result["navigation_accepted"]
++
++
++@pytest.mark.parametrize(
++    "field,value",
++    [
++        ("move_ticks", 7),
++        ("move_ticks", 8.0),
++        ("validation_move_ticks", 2),
++        ("validation_move_ticks", True),
++        ("motor_duration", "unregistered"),
++    ],
++)
++def test_sustained_policy_has_exact_duration_and_cannot_disguise_as_parent(
++    field, value
++):
++    new = stable.StableSustainedJumpKeyframePolicy()
++    with pytest.raises(ValidationError):
++        stable.StableLongWaitJumpKeyframePolicy.model_validate(new.model_dump())
++    with pytest.raises(ValidationError):
++        stable.StableSustainedJumpKeyframePolicy.model_validate(
++            new.model_dump() | {field: value}
++        )
++    old = stable.StableLongWaitJumpKeyframePolicy()
++    for name in ("stability", "fitting", "consensus", "temporal"):
++        assert getattr(new, name) == getattr(old, name)

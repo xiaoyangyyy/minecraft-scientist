@@ -71,9 +71,13 @@ support can now fail without wait recovery, while the original epoch boundary
 explicitly requires recovery. The subsequent complete public bridge diagnostic
 retains 46 completed trials across four known development captures; none of its
 38 bounded continuous comparisons reaches correspondence support. See
-`docs/long-wait-public-bridge-diagnostic.md`. Next investigate separately registered
-sustained anonymous compound controls, without gauge stitching or weaker
-track/fitting gates. This diagnoses another
+`docs/long-wait-public-bridge-diagnostic.md`. The next separately registered
+eight-tick sustained-motor candidate also fails both fresh audited development
+worlds, retaining only the initial view, and remains unpromoted. See
+`docs/sustained-motor-keyframe-development.md`. Next investigate first-image
+texture ambiguity, large-perspective correspondence initialization and public
+active viewpoint selection, without gauge stitching or weaker track/fitting
+gates. This diagnoses another
 mapping failure; it does not close actual arrival, held-out, integrated-science,
 long-operation, comparison or release requirements.
 

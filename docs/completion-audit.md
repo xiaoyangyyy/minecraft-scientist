@@ -16,8 +16,14 @@ errors; all 456 frozen hashes match after both terminal runs. The separately
 tested/audited public-support-loss epoch candidate still has no native map and
 is not covered by those V35 full counts. Old V34 full
 counts below are historical, not evidence for this new protocol. Next investigate
-public support-loss epoch boundaries independently of wait-window recovery;
-all original completion requirements remain open.
+correspondence identity and usable observation geometry. Subsequent public bridge
+diagnosis retains 46 completed trials/38 bounded comparisons with no continuous
+support; a separately registered eight-tick sustained-motor candidate also fails
+both fresh native worlds, retaining only their initial view. Valid source-bound
+audits do not make these successful maps. See
+`docs/long-wait-public-bridge-diagnostic.md` and
+`docs/sustained-motor-keyframe-development.md`; main V35 full tests do not cover
+the isolated candidate. All original completion requirements remain open.
 
 The preceding main-source development checkpoint is
 `docs/compound-motor-keyframe-development.md`: four opaque cardinal-plus-jump

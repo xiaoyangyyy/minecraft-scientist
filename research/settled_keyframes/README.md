@@ -8,6 +8,13 @@ and Linux each pass 31 research tests. Four actual known-development reports ret
 46 original trials and compare 38 raw bridges; none reaches continuous support.
 This does not promote a tracker or establish navigation.
 
+The next sustained-motor candidate is preserved, not applied, in
+`sustained_motor_candidate.patch`. Its registered eight one-tick receipts in
+acquisition/future retain all prior geometry/global gates. Both fresh independently
+audited development captures still acquire only their initial view and no map.
+See `docs/sustained-motor-keyframe-development.md` for source separation, retained
+partial controls and exact verification scope; main V35 full counts do not cover it.
+
 This directory is an unreleased development probe outside the package/default
 test discovery. It does not change the frozen V28 source, policies, captured
 failures, default dependencies or navigation acceptance.
