@@ -24,6 +24,7 @@ from .joint_multiview_map import (
 )
 from .map_recovery import _digest
 from .public_response_control import select_public_response
+from .public_wait_profile import PostMotorWaitWindow
 from .public_wait_recovery import settle_with_recovery
 from .safe_track_seeds import safe_seeds
 from .second_leg_shadow import retain_tracks
@@ -99,6 +100,15 @@ class StableJumpSafeSeedKeyframePolicy(StableSafeSeedKeyframePolicy):
     )
 
 
+class StableLongWaitJumpKeyframePolicy(StableJumpSafeSeedKeyframePolicy):
+    """Distinct control-time budget; original image/geometry acceptance gates."""
+
+    settling_profile: Literal["compound-post-motor-24-frame-windows-v1"] = (
+        "compound-post-motor-24-frame-windows-v1"
+    )
+    post_motor_wait_ticks: Literal[24] = 24
+
+
 class KeyframeIndex(BaseModel):
     """Explicit selected-image clock, not consecutive physical ticks/poses."""
 
@@ -140,6 +150,7 @@ def acquire_stable_keyframe_map(
     recovery_controls=False,
     safe_seed_controls=False,
     jump_controls=False,
+    long_wait_controls=False,
 ):
     """First eligible past proposal, then a distinct control and first stable future.
 
@@ -155,9 +166,12 @@ def acquire_stable_keyframe_map(
             recovery_controls,
             safe_seed_controls,
             jump_controls,
+            long_wait_controls,
         )
     ):
         raise ValueError("micro control registration must be explicit boolean")
+    if long_wait_controls and not jump_controls:
+        raise ValueError("long waits require explicit compound motor registration")
     if jump_controls and not safe_seed_controls:
         raise ValueError("compound controls require explicit safe-seed registration")
     if safe_seed_controls and not recovery_controls:
@@ -169,7 +183,9 @@ def acquire_stable_keyframe_map(
     if responsive_controls and not micro_controls:
         raise ValueError("responsive controls require explicit micro registration")
     policy_type = (
-        StableJumpSafeSeedKeyframePolicy
+        StableLongWaitJumpKeyframePolicy
+        if long_wait_controls
+        else StableJumpSafeSeedKeyframePolicy
         if jump_controls
         else StableSafeSeedKeyframePolicy
         if safe_seed_controls
@@ -236,6 +252,8 @@ def acquire_stable_keyframe_map(
         result["seed_detection_registration"] = settings.seed_detection
     if jump_controls:
         result["movement_program_registration"] = settings.movement_program
+    if long_wait_controls:
+        result["settling_window_registration"] = settings.settling_profile
     shape = image.shape
     samples, ordinals = [], []
     sample_seeds = None
@@ -373,20 +391,29 @@ def acquire_stable_keyframe_map(
         return True
 
     def settle(phase):
+        window = (
+            PostMotorWaitWindow()
+            if long_wait_controls and phase != "initial"
+            else settings.stability
+        )
         if recovery_controls:
             starts = (
                 len(result["failed_wait_windows"]),
                 len(result["recovery_wait_windows"]),
             )
-            settled = settle_with_recovery(
-                result, phase, step, ordinal, settings.stability
-            )
+            settled = settle_with_recovery(result, phase, step, ordinal, window)
             epoch_id = len(result["epochs"]) - 1 if result["epochs"] else None
             for name, start in zip(
                 ("failed_wait_windows", "recovery_wait_windows"), starts, strict=True
             ):
                 for entry in result[name][start:]:
                     entry["epoch_id"] = epoch_id
+                    if long_wait_controls:
+                        entry["registered_window_ticks"] = window.maximum_wait_ticks
+            if settled and long_wait_controls:
+                result["settles"][-1]["registered_window_ticks"] = (
+                    window.maximum_wait_ticks
+                )
             return settled
         start, streak = ordinal(), 0
         for tick in range(1, settings.stability.maximum_wait_ticks + 1):

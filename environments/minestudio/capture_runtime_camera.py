@@ -108,6 +108,7 @@ def main():
     parser.add_argument("--recovering-keyframes", action="store_true")
     parser.add_argument("--safe-seed-keyframes", action="store_true")
     parser.add_argument("--jump-keyframes", action="store_true")
+    parser.add_argument("--long-wait-keyframes", action="store_true")
     args = parser.parse_args()
     if args.seed < 0:
         parser.error("seed must be nonnegative")
@@ -141,6 +142,8 @@ def main():
         parser.error("safe seed keyframes require explicit --recovering-keyframes")
     if args.jump_keyframes and not args.safe_seed_keyframes:
         parser.error("jump keyframes require explicit --safe-seed-keyframes")
+    if args.long_wait_keyframes and not args.jump_keyframes:
+        parser.error("long wait keyframes require explicit --jump-keyframes")
     if args.stable_keyframes and (
         args.active_causal
         or args.acquisition_strategy is not None
@@ -319,6 +322,7 @@ def main():
         from minecraft_scientist.exploration.stable_keyframe_map import (
             StableJumpSafeSeedKeyframePolicy,
             StableKeyframePolicy,
+            StableLongWaitJumpKeyframePolicy,
             StableMicroKeyframePolicy,
             StableRecoveringKeyframePolicy,
             StableResponsiveKeyframePolicy,
@@ -326,7 +330,9 @@ def main():
         )
 
         keyframe_policy_type = (
-            StableJumpSafeSeedKeyframePolicy
+            StableLongWaitJumpKeyframePolicy
+            if args.long_wait_keyframes
+            else StableJumpSafeSeedKeyframePolicy
             if args.jump_keyframes
             else StableSafeSeedKeyframePolicy
             if args.safe_seed_keyframes
@@ -339,7 +345,9 @@ def main():
             else StableKeyframePolicy
         )
         config.update(
-            schema="jump-safe-seed-stable-keyframe-camera-projection-v1"
+            schema="long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
+            if args.long_wait_keyframes
+            else "jump-safe-seed-stable-keyframe-camera-projection-v1"
             if args.jump_keyframes
             else "safe-seed-stable-keyframe-camera-projection-v1"
             if args.safe_seed_keyframes
@@ -355,7 +363,9 @@ def main():
             active_seed=2000,
             keyframe_policy=keyframe_policy_type().model_dump(mode="json"),
             scope=(
-                "four anonymous cardinal-plus-jump motor programs chosen from public novelty only; first-image safe seeds, unchanged recovery/geometry gates and 288-action cap; no private movement labels, new action kinds, metric/global/navigation claim"
+                "four anonymous cardinal-plus-jump programs with separate 24-frame post-motor WAIT windows; initial windows stay 16; original pixel/geometry gates and two episode-wide recovery windows/288-action cap; no private rest selection, raw-track promotion or navigation claim"
+                if args.long_wait_keyframes
+                else "four anonymous cardinal-plus-jump motor programs chosen from public novelty only; first-image safe seeds, unchanged recovery/geometry gates and 288-action cap; no private movement labels, new action kinds, metric/global/navigation claim"
                 if args.jump_keyframes
                 else "first-image-only support-masked seeds for public flow and frozen sampled maps; same recovery/geometry gates and 288-action cap; no future-based seed filtering or old namespace relabeling; no metric/global/navigation claim"
                 if args.safe_seed_keyframes
@@ -506,6 +516,7 @@ def main():
                         recovery_controls=args.recovering_keyframes,
                         safe_seed_controls=args.safe_seed_keyframes,
                         jump_controls=args.jump_keyframes,
+                        long_wait_controls=args.long_wait_keyframes,
                     ),
                 }
                 if keyframes["acquisition"]["failure"] is not None:

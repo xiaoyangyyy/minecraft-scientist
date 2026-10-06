@@ -11,7 +11,15 @@ Fabric mod supplies resettable hidden rules, and the Python boundary replaces it
 block, and entity names with seeded opaque IDs before an agent can observe them.
 Live execution still requires the user's explicit Minecraft EULA acceptance.
 
-Latest main-source visual development registers four anonymous cardinal-plus-jump
+Latest visual development separately registers longer post-motor WAIT windows,
+without changing pixel/geometry gates or the global action cap. Two fresh audited
+sessions now complete all eleven acquisition attempts without wait exhaustion,
+but each retains only two views and no map/navigation. Candidate focused tests
+pass 236 per platform, thirty-seed exact core repeats pass on both, and main
+default-only Linux passes 673/78 skips. New full verification is required; the
+earlier V34 full counts below do not cover this changed source. See the
+[`long-wait checkpoint`](docs/long-wait-keyframe-development.md).
+The preceding main-source visual development registers four anonymous cardinal-plus-jump
 motor programs with unchanged pixel/geometry gates. Both fresh independently
 audited development worlds exhaust their settling windows and acquire no map;
 body rest does not guarantee rendered-image stability. Terminal V34 regressions

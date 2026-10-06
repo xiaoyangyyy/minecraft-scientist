@@ -24,6 +24,7 @@ from minecraft_scientist.exploration.settled_map_control import PublicControlSte
 from minecraft_scientist.exploration.stable_keyframe_map import (
     StableJumpSafeSeedKeyframePolicy,
     StableKeyframePolicy,
+    StableLongWaitJumpKeyframePolicy,
     StableMicroKeyframePolicy,
     StableRecoveringKeyframePolicy,
     StableResponsiveKeyframePolicy,
@@ -59,7 +60,14 @@ def serializable_truth(truth):
 
 
 def registration(directory, config, report, definition):
-    jump = config.get("schema") == "jump-safe-seed-stable-keyframe-camera-projection-v1"
+    long_wait = (
+        config.get("schema")
+        == "long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
+    )
+    jump = (
+        long_wait
+        or config.get("schema") == "jump-safe-seed-stable-keyframe-camera-projection-v1"
+    )
     safe_seeds = (
         jump or config.get("schema") == "safe-seed-stable-keyframe-camera-projection-v1"
     )
@@ -76,7 +84,9 @@ def registration(directory, config, report, definition):
         or config.get("schema") == "micro-stable-keyframe-camera-projection-v1"
     )
     settings = (
-        StableJumpSafeSeedKeyframePolicy()
+        StableLongWaitJumpKeyframePolicy()
+        if long_wait
+        else StableJumpSafeSeedKeyframePolicy()
         if jump
         else StableSafeSeedKeyframePolicy()
         if safe_seeds
@@ -106,6 +116,7 @@ def registration(directory, config, report, definition):
             "recovering-stable-keyframe-camera-projection-v1",
             "safe-seed-stable-keyframe-camera-projection-v1",
             "jump-safe-seed-stable-keyframe-camera-projection-v1",
+            "long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1",
         )
         or json.dumps(config.get("keyframe_policy"), sort_keys=True, allow_nan=False)
         != json.dumps(settings.model_dump(mode="json"), sort_keys=True, allow_nan=False)
@@ -200,6 +211,7 @@ def registration(directory, config, report, definition):
             recovery_controls=recovery,
             safe_seed_controls=safe_seeds,
             jump_controls=jump,
+            long_wait_controls=long_wait,
         ),
     }
     result.update(

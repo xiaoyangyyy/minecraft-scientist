@@ -287,6 +287,16 @@ All 450 declared frozen hashes match after termination, recorded in
 yield no map/navigation. The isolated longer-WAIT candidate requires separate
 verification; these V34 results do not cover its changed source.
 
+The longer-WAIT checkpoint freezes 116 core entries (113 package sources) and
+passes both thirty-seed/two-repeat/eighteen-artifact/six-check verifiers at
+`runs/core-release-seeds0-29-{windows,wsl}-long-window-v1`. All those entries match
+main after the isolated development merge. Focused candidate tests pass 236 per
+platform; main default-only Linux passes 673/78 skips and package build/MVP bytes
+remain unchanged. Two fresh native captures pass source-bound independent replay
+but have no map/navigation. New full regression must be separately verified;
+historical V34 counts do not cover the changed code. See
+`docs/long-wait-keyframe-development.md` for controls, original failures and scope.
+
 From the repository root:
 
 ```powershell

@@ -58,7 +58,18 @@ until each required gate has current, inspectable evidence.
 
 ## Evidence discipline
 
-The latest main-source `docs/compound-motor-keyframe-development.md` checkpoint
+The latest `docs/long-wait-keyframe-development.md` checkpoint registers longer
+post-motor WAIT windows with unchanged geometry/global budgets. Both fresh audited
+sessions complete eleven acquisition trials with no failed/extra windows, but
+each retains two views and no map/navigation. Candidate focused/core repeat gates
+pass independently; changed-source full verification remains separate. Public
+support can now fail without wait recovery, while the original epoch boundary
+explicitly requires recovery. Next preregister public-support-loss local epochs,
+without gauge stitching or weaker track/fitting gates. This diagnoses another
+mapping failure; it does not close actual arrival, held-out, integrated-science,
+long-operation, comparison or release requirements.
+
+The preceding main-source `docs/compound-motor-keyframe-development.md` checkpoint
 registers four opaque cardinal-plus-jump programs. Both fresh independently
 audited captures still stop at public stability exhaustion, with no map or
 arrival. Terminal V34 full regressions pass Windows 1380/Linux 1382 cases, two

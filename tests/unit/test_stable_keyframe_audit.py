@@ -29,13 +29,16 @@ def keyframe_capture(diagnostic, scripts, monkeypatch, request):
     _, definition = scripts
     auditor = importlib.import_module("audit_stable_keyframes")
     mode = getattr(request, "param", False)
-    jump = mode == "jump-seeds"
+    long_wait = mode == "long-jump-seeds"
+    jump = long_wait or mode == "jump-seeds"
     safe_seeds = jump or mode == "safe-seeds"
     recovery = safe_seeds or mode == "recovering"
     responsive = recovery or mode == "responsive"
     micro = responsive or mode is True
     policy_type = (
-        auditor.StableJumpSafeSeedKeyframePolicy
+        auditor.StableLongWaitJumpKeyframePolicy
+        if long_wait
+        else auditor.StableJumpSafeSeedKeyframePolicy
         if jump
         else auditor.StableSafeSeedKeyframePolicy
         if safe_seeds
@@ -56,7 +59,9 @@ def keyframe_capture(diagnostic, scripts, monkeypatch, request):
     )
     config = json.loads((route / "config.json").read_bytes())
     config.update(
-        schema="jump-safe-seed-stable-keyframe-camera-projection-v1"
+        schema="long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
+        if long_wait
+        else "jump-safe-seed-stable-keyframe-camera-projection-v1"
         if jump
         else "safe-seed-stable-keyframe-camera-projection-v1"
         if safe_seeds
@@ -121,6 +126,7 @@ def keyframe_capture(diagnostic, scripts, monkeypatch, request):
         recovery_controls=recovery,
         safe_seed_controls=safe_seeds,
         jump_controls=jump,
+        long_wait_controls=long_wait,
     )
     assert result["terminal"] == "initial_wait_exhausted"
     save(
@@ -510,7 +516,7 @@ def test_recovery_flags_require_full_explicit_protocol_before_output(
 
 
 @pytest.mark.parametrize(
-    "keyframe_capture", ["safe-seeds", "jump-seeds"], indirect=True
+    "keyframe_capture", ["safe-seeds", "jump-seeds", "long-jump-seeds"], indirect=True
 )
 def test_safe_seed_registration_replays_full_detector_ledger_before_private_reads(
     keyframe_capture, monkeypatch
@@ -529,7 +535,7 @@ def test_safe_seed_registration_replays_full_detector_ledger_before_private_read
 
 
 @pytest.mark.parametrize(
-    "keyframe_capture", ["safe-seeds", "jump-seeds"], indirect=True
+    "keyframe_capture", ["safe-seeds", "jump-seeds", "long-jump-seeds"], indirect=True
 )
 @pytest.mark.parametrize(
     "case",
@@ -612,7 +618,9 @@ def test_safe_seed_flags_require_all_explicit_protocols_before_output(
     assert not output.exists()
 
 
-@pytest.mark.parametrize("keyframe_capture", ["jump-seeds"], indirect=True)
+@pytest.mark.parametrize(
+    "keyframe_capture", ["jump-seeds", "long-jump-seeds"], indirect=True
+)
 @pytest.mark.parametrize("case", ["schema", "policy", "marker", "drop_marker"])
 def test_compound_program_claim_is_not_interchangeable_with_parent(
     keyframe_capture, monkeypatch, case
@@ -657,6 +665,71 @@ def test_compound_program_claim_is_not_interchangeable_with_parent(
     ],
 )
 def test_jump_flag_requires_full_explicit_protocol_before_output(
+    scripts, tmp_path, monkeypatch, flags
+):
+    _, capture = scripts
+    output = tmp_path / "must-not-exist"
+    monkeypatch.setattr(
+        sys, "argv", [capture.__file__, *flags, "--output", str(output)]
+    )
+    with pytest.raises(SystemExit):
+        capture.main()
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("keyframe_capture", ["long-jump-seeds"], indirect=True)
+@pytest.mark.parametrize(
+    "case", ["schema", "budget", "profile", "marker", "window_ticks", "drop_ticks"]
+)
+def test_long_wait_claim_requires_exact_public_registration_and_replay(
+    keyframe_capture, monkeypatch, case
+):
+    auditor, route, engine = keyframe_capture
+    config = json.loads((route / "config.json").read_bytes())
+    saved = json.loads((route / "keyframe-acquisition.json").read_bytes())
+    acquisition = saved["acquisition"]
+    if case == "schema":
+        config["schema"] = "jump-safe-seed-stable-keyframe-camera-projection-v1"
+    elif case == "budget":
+        config["keyframe_policy"]["post_motor_wait_ticks"] = 25
+    elif case == "profile":
+        config["keyframe_policy"]["settling_profile"] = "unregistered-waits"
+    elif case == "marker":
+        acquisition.pop("settling_window_registration")
+    elif case == "window_ticks":
+        acquisition["failed_wait_windows"][0]["registered_window_ticks"] = 24
+    else:
+        acquisition["recovery_wait_windows"][0].pop("registered_window_ticks")
+    save(route / "config.json", config)
+    save(route / "keyframe-acquisition.json", saved)
+    report = json.loads((route / "report.json").read_bytes())
+    report["config_sha256"] = auditor.runtime.digest(route / "config.json")
+    report["artifact_sha256"]["keyframe-acquisition.json"] = auditor.runtime.digest(
+        route / "keyframe-acquisition.json"
+    )
+    save(route / "report.json", report)
+    private_guard(monkeypatch)
+    result = auditor.audit(route, engine)
+    assert not result["valid"] and result["evaluation"] is None
+    assert result["stability_diagnostics"] is None
+
+
+@pytest.mark.parametrize(
+    "flags",
+    [
+        ["--long-wait-keyframes"],
+        ["--long-wait-keyframes", "--jump-keyframes"],
+        [
+            "--long-wait-keyframes",
+            "--stable-keyframes",
+            "--micro-keyframes",
+            "--responsive-keyframes",
+            "--recovering-keyframes",
+            "--safe-seed-keyframes",
+        ],
+    ],
+)
+def test_long_wait_flag_requires_full_explicit_protocol_before_output(
     scripts, tmp_path, monkeypatch, flags
 ):
     _, capture = scripts

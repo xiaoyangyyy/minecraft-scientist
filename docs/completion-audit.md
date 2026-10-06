@@ -4,7 +4,19 @@ This audit compares the current repository with the original self-evolving symbo
 Minecraft system, not merely with the smaller offline MVP. A green unit test is not
 treated as proof of live Minecraft behavior.
 
-The latest main-source development checkpoint is
+The latest main-source checkpoint is `docs/long-wait-keyframe-development.md`:
+separately registered 24-frame post-motor WAIT windows preserve all geometry and
+global action gates. Both fresh independently audited sessions complete eleven
+acquisition attempts without wait exhaustion, but each still has only two views
+and no map, future motion or arrival. Focused candidate tests pass 236 on each
+platform, thirty-seed exact core checks pass with 116 source entries (113 package
+files) matching main, and main default-only Linux passes 673/78 skips. Changed-
+source full regression requires separate terminal verification. Old V34 full
+counts below are historical, not evidence for this new protocol. Next investigate
+public support-loss epoch boundaries independently of wait-window recovery;
+all original completion requirements remain open.
+
+The preceding main-source development checkpoint is
 `docs/compound-motor-keyframe-development.md`: four opaque cardinal-plus-jump
 programs preserve the original control/geometry gates. Both fresh independently
 audited development captures stop at `acquisition_wait_exhausted`, with no map,
