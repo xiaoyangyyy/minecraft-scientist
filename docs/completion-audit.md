@@ -4,7 +4,19 @@ This audit compares the current repository with the original self-evolving symbo
 Minecraft system, not merely with the smaller offline MVP. A green unit test is not
 treated as proof of live Minecraft behavior.
 
-The latest isolated development checkpoint is `docs/public-map-risk-development.md`.
+The newest isolated candidate is `docs/map-epoch-reacquisition-development.md`:
+one genuinely new map acquisition at the actual recovered public endpoint, with
+immutable parent history, fresh unconnected track namespaces and shared budgets.
+Eighteen source paths are frozen; current Windows/Linux combined batches each
+terminate with 243 passes, zero failures/errors/skips and all eighteen hashes
+unchanged. Each platform then closes 147 additional compatibility cases, yielding
+390 distinct current focused cases/platform. Earlier narrow tests and the Windows
+missing-temp-parent setup failure remain separately recorded. Fresh seed-201
+new-protocol capture has launched only. Full auditor/full candidate regression
+and terminal native child acquisition remain unproven. No new map, body motion,
+connected gauge or arrival is claimed.
+
+The latest native-verified isolated checkpoint is `docs/public-map-risk-development.md`.
 The original-map monitor has 34 Windows/34 Linux component passes, with 49 foundation
 and eight replay-driver cases per platform. Known public seed-201 replay challenges
 at 133 and prepares an unconnected observation anchor at 145; it is NOT a fresh

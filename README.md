@@ -11,7 +11,16 @@ Fabric mod supplies resettable hidden rules, and the Python boundary replaces it
 block, and entity names with seeded opaque IDs before an agent can observe them.
 Live execution still requires the user's explicit Minecraft EULA acceptance.
 
-Latest visual development separately registers longer post-motor WAIT windows,
+Current isolated research adds per-action original-map monitoring and bounded
+unconnected new-map acquisition. The monitored parent has two fresh independently
+audited captures: one challenges its map and prepares a new observation anchor;
+the other still acquires no map. The new acquisition candidate remains separately
+registered and under verification, not promoted main-source navigation. See the
+[`map-risk evidence`](docs/public-map-risk-development.md) and
+[`new-map candidate`](docs/map-epoch-reacquisition-development.md). No actual goal
+arrival or broad held-out navigation success is claimed.
+
+Latest main-source visual development separately registers longer post-motor WAIT windows,
 without changing pixel/geometry gates or the global action cap. Two fresh audited
 sessions now complete all eleven acquisition attempts without wait exhaustion,
 but each retains only two views and no map/navigation. Candidate focused tests

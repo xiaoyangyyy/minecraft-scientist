@@ -38,6 +38,14 @@ without relaxing geometry gates or retrospectively choosing successful endpoints
 preceding main V35 full release remains separate; none of the required outcomes
 above is narrowed to these two development worlds or offline compatibility.
 
+The subsequent isolated candidate is `docs/map-epoch-reacquisition-development.md`:
+actual recovered-frame child acquisition with immutable lineage, fresh unconnected
+tracks and shared original budgets. Eighteen source paths are frozen; current
+combined/compatibility batches pass 243/147 cases/platform with all hashes unchanged,
+giving 390 distinct focused cases/platform. Fresh seed-201 capture is launch-only;
+full regressions and terminal native child evidence remain open. This candidate is not covered by main V35 or
+the preceding parent's full auditor counts, and does not close any outcome above.
+
 1. Repair the visual navigation evidence. Evaluate correspondence/geometry signals
    from existing RGB scans without supplying evaluator coordinates to the policy.
    Reject low-support or inconsistent geometric estimates. Preregister a candidate
