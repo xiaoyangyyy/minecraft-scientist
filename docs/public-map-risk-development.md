@@ -104,19 +104,45 @@ Registration SHA-256:
 Package-focused coverage is 322/platform, research-driver coverage eight/platform;
 full auditor/full candidate regression explicitly remain not run.
 
-Seed 201 has now started a fresh serial native process, with 123 saved source
-snapshots. `runs/monitored-walk-live-seed201-launch-v1.json` describes that launch
-only. It is not a terminal result or independent audit. Seed 202 is registered
-but not launched. Outputs remain in the C-drive spill area; original failed,
-partial and known-public replay runs are untouched. Do not infer new performance
-from process startup or the preceding known replay.
+Both prospectively registered captures AND independent audits now terminate zero.
+`runs/monitored-walk-live-seed201-launch-v1.json` remains a historical launch-only
+receipt, not their terminal proof. Outputs remain in the C-drive spill area;
+original failed, partial and known-public replay runs are untouched.
+
+## Terminal fresh-native evidence
+
+Seed 201 consumes 145 actual actions/146 images. It selects
+`[77,87,96,105,114,123]`, fits one proposal and freezes at 123. Its ten actual
+future MOVE/WAIT receipts close the original map as `challenged` at 133. Twelve
+explicit WAIT receipts then produce `reacquisition_ready` at 145. This is a NEW
+native capture, not the old clip: its parent map and endpoint RGB hashes differ
+from known replay. The new epoch remains unconnected; future/motion are null,
+old-map restoration/body rest/metric gauge/navigation are NOT asserted. It
+establishes the online detection/passive-observation path, not actual map recovery.
+
+Seed 202 consumes 185 actual actions/186 images but selects only
+`[56,117,173,185]`; zero proposals or frozen maps form. It remains `map_unavailable`,
+with no monitor, recovery, future, motion or navigation. Do not count successful
+capture/audit execution as successful map acquisition or broad improvement.
+
+Each capture passes eight checks; each independent audit passes three outer/
+eighteen nested checks, replaying the full public chronology before private
+evaluation. Each preserves 123 source snapshots and matches 121 current project
+sources (two external SDK files are snapshot-only). All 296/376 artifact hashes,
+fourteen preregistered sources, config hashes and exact saved active auditor hashes
+match after terminal audit. Post-native receipts:
+
+- `runs/monitored-walk-seed201-post-native-verification-v1.json`
+- `runs/monitored-walk-seed202-post-native-verification-v1.json`
+
+Neither evaluation returns a motion score because neither accepts a future motion
+interval. These two familiar development worlds are not disjoint held-outs, paired
+superiority, reliable goal arrival or the requested excellent completed system.
 
 ## Required next evidence
 
-Close wider cross-platform regressions; freeze all fourteen sources and exact
-audit/capture policies BEFORE serial fresh seed-201/202 native launches. Independently
-replay the full new chronology before private evaluation. Preserve every failure.
-Then implement genuine new-epoch map acquisition from the recovered actual anchor
+Close the remaining full auditor/full candidate regressions without editing this
+source-bound candidate. Implement genuine new-epoch map acquisition from the recovered actual anchor
 (which may exceed the old startup-only 48..81 range), with explicit parent lineage
 and no implicit gauge connection. A ready observation alone is not map recovery.
 Reliable movement, arrival, disjoint terrain/condition heldouts, natural science/map
