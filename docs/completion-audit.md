@@ -32,8 +32,10 @@ acquires two. Both stop at `map_unavailable`, with zero proposals/future validat
 actual arrival. Each passes eight capture, three outer and eighteen nested audit
 checks with all 122 snapshots/120 current project sources/544 artifacts intact.
 Controller/new-audit/compatibility suites pass 91/13/155 on each platform and
-thirty-seed core checks pass, binding 118 sources (115 package). Complete 220-case
-auditor batches remain running, not terminal passes; no full candidate regression
+thirty-seed core checks pass, binding 118 sources (115 package). The complete
+Windows auditor batch terminates with 191 passes (437 distinct focused passes
+overall), correcting the earlier 220-case estimate from a different candidate.
+The Linux batch remains running, not a terminal pass; no full candidate regression
 or main promotion is claimed. See `docs/oriented-keyframe-development.md`.
 Observation steering is executable, not yet sufficient for reliable mapping.
 

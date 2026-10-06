@@ -56,9 +56,18 @@ candidate-root check passes without changing source. Eight unchanged compatibili
 files pass **155 on each platform**, zero failures/errors/skips, at
 `runs/oriented-compatibility-{windows,wsl}-v1.xml`. Together these are 259 terminal
 focused checks per platform, including the separately completed new audit tests.
-The complete 220-case stable-keyframe/runtime-audit batches are still running on
-both platforms and are not counted as passes. No full candidate regression is
-claimed; main V35 full counts do not cover this isolated protocol.
+The complete stable-keyframe/runtime-audit batch now terminates zero on Windows:
+**191 passes**, zero failures/errors/skips, in 740.154 seconds. Its JUnit is
+`runs/oriented-all-audits-windows-v1.xml`, SHA-256
+`d5b4a01a5276efb62d82e8241f4d34b9d74c9c699f879ddc95aa961981656225`.
+All ten preregistered candidate hashes still match after that terminal run.
+The earlier 220-case estimate mistakenly used counts from a different isolated
+candidate; the terminal JUnit, not that estimate, is authoritative. This yields
+**437 distinct focused Windows passes** (91 controller, 155 compatibility and
+191 auditors, including the separately completed thirteen new auditor cases).
+Linux still has 259 terminal focused passes while its full auditor batch is
+running and is not counted as passed. No full candidate regression is claimed;
+main V35 full counts do not cover this isolated protocol.
 
 Thirty-seed scientific-core checks complete on both platforms, two repetitions
 and eighteen identical artifacts each. All six checks pass; all 118 source entries
