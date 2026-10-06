@@ -12,9 +12,15 @@ terminate with 243 passes, zero failures/errors/skips and all eighteen hashes
 unchanged. Each platform then closes 147 additional compatibility cases, yielding
 390 distinct current focused cases/platform. Earlier narrow tests and the Windows
 missing-temp-parent setup failure remain separately recorded. Fresh seed-201
-new-protocol capture has launched only. Full auditor/full candidate regression
-and terminal native child acquisition remain unproven. No new map, body motion,
-connected gauge or arrival is claimed.
+capture/audit now terminate zero: actual new acquisition at 145 selects six views,
+freezes at 198 and passes ten public future checks at 208. Nevertheless rendered/
+body displacement is only 0.102769130/0.102686592 blocks, BOTH `false_translation`
+under the unchanged 0.15-block threshold. All 124 snapshots/122 current project
+sources/422 artifacts/eighteen changed hashes match after audit. Seed 202 capture/
+audit also terminate zero but select only one view, no proposals/map/child/motion,
+with 124 snapshots/122 current sources/394 artifacts/eighteen hashes intact.
+Valid capture/audit execution does not make this an acquisition success. Full auditor/full candidate
+regression, reliable body motion, connected gauge and arrival remain open.
 
 The latest native-verified isolated checkpoint is `docs/public-map-risk-development.md`.
 The original-map monitor has 34 Windows/34 Linux component passes, with 49 foundation

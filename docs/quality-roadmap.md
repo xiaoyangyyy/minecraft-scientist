@@ -42,8 +42,12 @@ The subsequent isolated candidate is `docs/map-epoch-reacquisition-development.m
 actual recovered-frame child acquisition with immutable lineage, fresh unconnected
 tracks and shared original budgets. Eighteen source paths are frozen; current
 combined/compatibility batches pass 243/147 cases/platform with all hashes unchanged,
-giving 390 distinct focused cases/platform. Fresh seed-201 capture is launch-only;
-full regressions and terminal native child evidence remain open. This candidate is not covered by main V35 or
+giving 390 distinct focused cases/platform. Fresh seed-201 capture/audit now prove
+real new local acquisition and public future consistency, but BOTH rendered/body
+scores are false_translation at about 0.103 blocks under unchanged 0.15-block
+threshold. Seed 202 capture/audit also close but only acquire one view/no map/child
+or motion score; all source/artifact hashes match. Full regressions, useful
+body motion and arrival remain open. This candidate is not covered by main V35 or
 the preceding parent's full auditor counts, and does not close any outcome above.
 
 1. Repair the visual navigation evidence. Evaluate correspondence/geometry signals
