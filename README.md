@@ -11,7 +11,15 @@ Fabric mod supplies resettable hidden rules, and the Python boundary replaces it
 block, and entity names with seeded opaque IDs before an agent can observe them.
 Live execution still requires the user's explicit Minecraft EULA acceptance.
 
-Latest visual development registers first-image-only safe seeds, freezing their
+Latest main-source visual development registers four anonymous cardinal-plus-jump
+motor programs with unchanged pixel/geometry gates. Both fresh independently
+audited development worlds exhaust their settling windows and acquire no map;
+body rest does not guarantee rendered-image stability. Terminal V34 regressions
+pass Windows 1380/Linux 1382 cases, two skips each, with all 450 frozen inputs
+verified after completion. A separately registered longer-wait candidate is being
+tested in an isolated source copy; these V34 results do not validate that candidate.
+See the [`compound-motor checkpoint`](docs/compound-motor-keyframe-development.md).
+The preceding visual development registers first-image-only safe seeds, freezing their
 identities and denominator before past fitting or future extension. Two fresh,
 independently audited worlds still fail to acquire a supported map (six/three
 views across unconnected epochs in one, four in the other). Complete raw-bridge

@@ -102,9 +102,12 @@ Seed-zero MVP retains byte hash
 the package builds without new runtime dependencies. Default-only isolated Linux
 passes 673/77 optional/platform skips, zero failures/errors.
 
-V34 full Windows and frozen persistent Linux regressions are still running, not
-reported as passing. Their JUnit targets are `runs/jump-keyframe-full-windows-v1.xml`
-and `runs/jump-keyframe-full-persistent-tree-wsl-v1.xml`. Exact source/test/checkpoint
+V34 full Windows and frozen persistent Linux regressions are terminal: Windows
+passes 1380/two skips and Linux 1382/two skips, zero failures/errors. Their JUnit
+targets are `runs/jump-keyframe-full-windows-v1.xml` and
+`runs/jump-keyframe-full-persistent-tree-wsl-v1.xml`. All 450 declared input hashes
+match each respective source root after termination, recorded separately in
+`runs/v34-full-post-verification-v1.json`. Exact source/test/checkpoint
 inputs are archived at `runs/v34-frozen-test-tree-v1`: 450 files/4,919,695 bytes,
 archive SHA-256
 `30c46444fab6160ec3f4ff11b39637446ee5af359f8c31b3ce387c146730cc81`.

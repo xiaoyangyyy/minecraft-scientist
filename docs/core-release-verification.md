@@ -276,6 +276,17 @@ earlier frozen tree. Both new valid native audits still yield no supported map;
 all thirty-one public raw-bridge comparisons remain development diagnostics.
 See `docs/safe-seed-keyframe-development.md` and both V33 post-verification reports.
 
+V34 registers anonymous compound motors, without changing offline core behavior
+or pixel/geometry gates. Both thirty-seed core reports at
+`runs/core-release-seeds0-29-windows-v34` and `-wsl-v34` pass all two repetitions,
+eighteen exact artifacts and six checks (115 source entries, 112 package files).
+Focused tests pass 198 per platform and default-only Linux 673/77 skips. Terminal
+full Windows passes 1380/two skips and Linux 1382/two skips, zero failures/errors.
+All 450 declared frozen hashes match after termination, recorded in
+`runs/v34-full-post-verification-v1.json`. Both fresh valid native audits still
+yield no map/navigation. The isolated longer-WAIT candidate requires separate
+verification; these V34 results do not cover its changed source.
+
 From the repository root:
 
 ```powershell

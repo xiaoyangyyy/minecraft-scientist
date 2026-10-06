@@ -58,7 +58,19 @@ until each required gate has current, inspectable evidence.
 
 ## Evidence discipline
 
-The latest `docs/safe-seed-keyframe-development.md` checkpoint registers and freezes
+The latest main-source `docs/compound-motor-keyframe-development.md` checkpoint
+registers four opaque cardinal-plus-jump programs. Both fresh independently
+audited captures still stop at public stability exhaustion, with no map or
+arrival. Terminal V34 full regressions pass Windows 1380/Linux 1382 cases, two
+skips each, with all 450 declared inputs unchanged after completion. Post-audit
+private timing distinguishes body rest from continued image motion; it cannot
+become an online settling decision. Next verify a separately registered longer
+post-motor WAIT budget in fresh runs, preserving pixel/geometry gates, first-
+eligible stopping and the global 288-action cap. Work is isolated from main V34
+sources and needs its own source-bound audit and verification. No original
+completion requirement is replaced or closed by that bounded development step.
+
+The preceding `docs/safe-seed-keyframe-development.md` checkpoint registers and freezes
 first-image support-masked detector seeds, with unchanged geometry gates. Both
 fresh independently audited worlds still lack a supported map or future prediction.
 All thirty-one original endpoint pairs replay exactly in public raw-bridge

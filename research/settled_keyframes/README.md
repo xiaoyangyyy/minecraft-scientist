@@ -196,3 +196,22 @@ has only 28/31 positive-depth withheld points throughout; small positive-depth r
 errors cannot rescue its physically invalid points. V1 remains untouched. Neither
 probe opens private poses, executes controls, chooses new views or fits a future.
 The tracker/fitter change is not adopted as a successful production map estimator.
+
+## Compound-control settling-time prototype
+
+`long_wait_profile.py` validates the complete original compound-motor geometry
+policy before choosing an exact wait-time profile: initial windows remain 16,
+post-motor acquisition/future windows become 24, minimum WAITs remain eight and
+three consecutive public stable pairs are still required. It exercises the
+unchanged production recovery helper; no pixels/private positions or old native
+capture tails are extrapolated. Thirteen prototype cases plus the eight helper
+tests pass on Windows and Linux (`runs/long-window-prototype-{windows,wsl}-v1.xml`).
+Synthetic stable booleans verify finite/shared budgets and first-eligible stopping,
+not actual image convergence, geometry, map acquisition or goal arrival.
+
+An exact V34 archive was separately restored into an ignored development source
+copy, then intentionally changed for a distinct capture/audit registration.
+`runs/long-window-development-tree-v1/report.json` proves the original restoration,
+not byte identity after subsequent development. The candidate has to pass its own
+tests, source-bound native captures and complete independent public replay. Main
+V34 regressions cannot be credited to it.

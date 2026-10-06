@@ -4,7 +4,21 @@ This audit compares the current repository with the original self-evolving symbo
 Minecraft system, not merely with the smaller offline MVP. A green unit test is not
 treated as proof of live Minecraft behavior.
 
-The latest development checkpoint is `docs/safe-seed-keyframe-development.md`:
+The latest main-source development checkpoint is
+`docs/compound-motor-keyframe-development.md`: four opaque cardinal-plus-jump
+programs preserve the original control/geometry gates. Both fresh independently
+audited development captures stop at `acquisition_wait_exhausted`, with no map,
+future motion or actual arrival. Separate post-audit timing evidence distinguishes
+body rest from continuing rendered-camera motion; it is never an online input.
+V34 thirty-seed/two-repeat/eighteen-artifact core checks pass on both platforms,
+focused tests pass 198 each and default-only Linux passes 673/77 skips. Full
+Windows passes 1380/two skips, Linux 1382/two skips, zero failures/errors; all 450
+declared inputs match after both terminal runs. The separate attestation is
+`runs/v34-full-post-verification-v1.json`. A longer post-motor wait candidate is
+being tested in an isolated source tree, not covered by these V34 regression
+results. All original completion gates remain open and the full goal is active.
+
+The preceding development checkpoint is `docs/safe-seed-keyframe-development.md`:
 first-image-only safe seeds are registered, frozen and independently replayed in
 two fresh development worlds. Neither supports a map: one retains four rejected
 six-view bootstrap models and a separate three-view recovered epoch; the other
