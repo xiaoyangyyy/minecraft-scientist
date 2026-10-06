@@ -35,9 +35,42 @@ Controller/new-audit/compatibility suites pass 91/13/155 on each platform and
 thirty-seed core checks pass, binding 118 sources (115 package). The complete
 Windows auditor batch terminates with 191 passes (437 distinct focused passes
 overall), correcting the earlier 220-case estimate from a different candidate.
-The Linux batch remains running, not a terminal pass; no full candidate regression
-or main promotion is claimed. See `docs/oriented-keyframe-development.md`.
+The Linux batch also terminates with 191 passes, zero failures/errors/skips, and
+all ten preregistered hashes intact, yielding 437 focused passes there as well.
+No full candidate regression or main promotion is claimed. See
+`docs/oriented-keyframe-development.md`.
 Observation steering is executable, not yet sufficient for reliable mapping.
+
+The isolated oriented-walking candidate replaces only the actual cardinal motor
+payload (no jump/sprint/sneak), keeping all source-bound budgets and geometry gates.
+Seed 201 acquires six eligible views and freezes three supported past bootstrap
+maps, but loses all original tracks in its consumed future and correctly rejects
+the prediction. The seed-202 serial recovery capture completes after two retained
+environmental failures but acquires only four views and has no map. Both complete
+captures pass eight capture/three outer/eighteen nested audit checks, with all
+122 snapshots/120 current project sources and 296/376 artifacts rehashed intact.
+Windows and Linux now each have 466 distinct focused passes; the complete Linux
+204-auditor v3 batch terminates zero using a persistent verified-new basetemp.
+No full candidate regression or promotion is claimed. Thirty-seed/two-repeat
+scientific-core artifacts and all 118 sources were post-verified on both platforms.
+See `docs/oriented-walk-keyframe-development.md` and its post-verification receipts.
+
+The separate known-public frozen-future diagnosis replays original past and failed
+future exactly. Tracking every consumed future image still leaves zero original
+features: 174 survive after the second MOVE, then all disappear during WAIT by
+frame 139. This is evidence against attributing the entire failure to sparse
+endpoint sampling, not proof of a hidden physical cause or an accepted earlier
+endpoint. The expanded diagnosis retains all 22 future prefixes and all four
+frozen bootstraps: required models 3/4/5 all pass public pixel tests at 124–132,
+all become inconsistent at 133 and unavailable at 134. No prefix is chosen or
+promoted; public pixel consistency is not body accuracy or arrival. Twenty-six
+diagnostic unit tests pass on each platform; the expanded 42 inputs/ten source
+files rehash intact. Next prospectively investigate
+public observability and control risk during both MOVE and WAIT, with uncertainty
+about body/camera/terrain causes. Original arrival, disjoint held-outs, natural
+scientific/map integration, 100-attempt recovery, comparison and consolidated
+release requirements remain unchanged and open. See
+`docs/frozen-future-public-diagnostic.md`.
 
 The preceding main-source development checkpoint is
 `docs/compound-motor-keyframe-development.md`: four opaque cardinal-plus-jump

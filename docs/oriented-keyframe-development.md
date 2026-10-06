@@ -65,8 +65,11 @@ The earlier 220-case estimate mistakenly used counts from a different isolated
 candidate; the terminal JUnit, not that estimate, is authoritative. This yields
 **437 distinct focused Windows passes** (91 controller, 155 compatibility and
 191 auditors, including the separately completed thirteen new auditor cases).
-Linux still has 259 terminal focused passes while its full auditor batch is
-running and is not counted as passed. No full candidate regression is claimed;
+The Linux batch also terminates zero with **191 passes** in 1108.284 seconds,
+zero failures/errors/skips. JUnit: `runs/oriented-all-audits-wsl-v1.xml`, SHA-256
+`1f5236806ac6e94590fd8f02bd50c996961217f3f439ffefd1e2f8784b02ebbd`.
+All ten preregistered hashes still match after completion. This brings Linux to
+**437 distinct focused passes** as well. No full candidate regression is claimed;
 main V35 full counts do not cover this isolated protocol.
 
 Thirty-seed scientific-core checks complete on both platforms, two repetitions

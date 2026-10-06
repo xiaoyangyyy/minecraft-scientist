@@ -20,6 +20,15 @@ until each required gate has current, inspectable evidence.
 
 ## Execution order
 
+Current development checkpoint: `docs/oriented-walk-keyframe-development.md`
+and `docs/frozen-future-public-diagnostic.md`. A six-view past map now freezes in
+one development world, but its future loses all original support; another world
+still lacks a map. Complete public future tracking reproduces total support loss
+during WAIT. Next investigate public observability/control risk before another
+fresh protocol, not relaxed gates or retrospectively chosen endpoints. The
+preceding main V35 full release remains separate; none of the required outcomes
+above is narrowed to these two development worlds or offline compatibility.
+
 1. Repair the visual navigation evidence. Evaluate correspondence/geometry signals
    from existing RGB scans without supplying evaluator coordinates to the policy.
    Reject low-support or inconsistent geometric estimates. Preregister a candidate
