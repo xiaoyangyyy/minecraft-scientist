@@ -118,7 +118,7 @@ checks on each platform**. Its six preregistered source hashes still match after
 the terminal run. It remains an independently audited **negative** native result,
 not promoted into main, and not covered by the historical main V35 full counts.
 
-All original completion requirements in `docs/quality-roadmap.md` remain open,
+All original completion requirements in `docs/quality-roadmap.md` remain required,
 including reliable actual arrival, disjoint worlds/terrain/conditions, integrated
 natural science/map operation, hundred-attempt recovery, baseline/ablation
 comparisons and consolidated release/hosted CI. The full goal stays active.
