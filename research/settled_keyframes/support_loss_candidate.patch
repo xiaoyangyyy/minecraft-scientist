@@ -1,0 +1,673 @@
+diff --git a/src/minecraft_scientist/exploration/stable_keyframe_map.py b/src/minecraft_scientist/exploration/stable_keyframe_map.py
+index e6657c8..ab7f888 100644
+--- a/src/minecraft_scientist/exploration/stable_keyframe_map.py
++++ b/src/minecraft_scientist/exploration/stable_keyframe_map.py
+@@ -109,6 +109,14 @@ class StableLongWaitJumpKeyframePolicy(StableJumpSafeSeedKeyframePolicy):
+     post_motor_wait_ticks: Literal[24] = 24
+ 
+ 
++class StableSupportLossKeyframePolicy(StableLongWaitJumpKeyframePolicy):
++    """Seal a disconnected public-support epoch, independently of WAIT recovery."""
++
++    epoch_boundary: Literal["public-support-loss-after-stable-control-v1"] = (
++        "public-support-loss-after-stable-control-v1"
++    )
++
++
+ class KeyframeIndex(BaseModel):
+     """Explicit selected-image clock, not consecutive physical ticks/poses."""
+ 
+@@ -151,6 +159,7 @@ def acquire_stable_keyframe_map(
+     safe_seed_controls=False,
+     jump_controls=False,
+     long_wait_controls=False,
++    support_loss_controls=False,
+ ):
+     """First eligible past proposal, then a distinct control and first stable future.
+ 
+@@ -167,9 +176,12 @@ def acquire_stable_keyframe_map(
+             safe_seed_controls,
+             jump_controls,
+             long_wait_controls,
++            support_loss_controls,
+         )
+     ):
+         raise ValueError("micro control registration must be explicit boolean")
++    if support_loss_controls and not long_wait_controls:
++        raise ValueError("support-loss epochs require explicit long-wait registration")
+     if long_wait_controls and not jump_controls:
+         raise ValueError("long waits require explicit compound motor registration")
+     if jump_controls and not safe_seed_controls:
+@@ -183,7 +195,9 @@ def acquire_stable_keyframe_map(
+     if responsive_controls and not micro_controls:
+         raise ValueError("responsive controls require explicit micro registration")
+     policy_type = (
+-        StableLongWaitJumpKeyframePolicy
++        StableSupportLossKeyframePolicy
++        if support_loss_controls
++        else StableLongWaitJumpKeyframePolicy
+         if long_wait_controls
+         else StableJumpSafeSeedKeyframePolicy
+         if jump_controls
+@@ -254,6 +268,8 @@ def acquire_stable_keyframe_map(
+         result["movement_program_registration"] = settings.movement_program
+     if long_wait_controls:
+         result["settling_window_registration"] = settings.settling_profile
++    if support_loss_controls:
++        result["epoch_boundary_registration"] = settings.epoch_boundary
+     shape = image.shape
+     samples, ordinals = [], []
+     sample_seeds = None
+@@ -570,11 +586,17 @@ def acquire_stable_keyframe_map(
+             epoch["trial_ids"].append(trial)
+             if (
+                 not supported
+-                and result["settles"][-1]["recovery_windows"] > 0
++                and (
++                    support_loss_controls
++                    or result["settles"][-1]["recovery_windows"] > 0
++                )
+                 and len(result["epochs"]) < settings.maximum_local_epochs
+             ):
+                 epoch.update(
+-                    status="connection_lost_after_recovery", termination_frame=ordinal()
++                    status="connection_lost_after_stable_control"
++                    if support_loss_controls
++                    else "connection_lost_after_recovery",
++                    termination_frame=ordinal(),
+                 )
+                 result["epoch_links"].append(
+                     {
+@@ -582,7 +604,9 @@ def acquire_stable_keyframe_map(
+                         "child_epoch": len(result["epochs"]),
+                         "parent_sha256": _digest(epoch),
+                         "at_frame": ordinal(),
+-                        "reason": "public_support_lost_after_recovery",
++                        "reason": "public_support_lost_after_stable_control"
++                        if support_loss_controls
++                        else "public_support_lost_after_recovery",
+                         "supported": False,
+                         "metric_scale_known": False,
+                     }
+@@ -596,7 +620,9 @@ def acquire_stable_keyframe_map(
+                     {
+                         "absolute_frame": ordinal(),
+                         "selected": True,
+-                        "reason": "new_local_anchor_after_public_recovery",
++                        "reason": "new_local_anchor_after_public_support_loss"
++                        if support_loss_controls
++                        else "new_local_anchor_after_public_recovery",
+                         "epoch_id": result["epochs"][-1]["epoch_id"],
+                     }
+                 )
+diff --git a/environments/minestudio/capture_runtime_camera.py b/environments/minestudio/capture_runtime_camera.py
+index ffa20ea..91e63e7 100644
+--- a/environments/minestudio/capture_runtime_camera.py
++++ b/environments/minestudio/capture_runtime_camera.py
+@@ -109,6 +109,7 @@ def main():
+     parser.add_argument("--safe-seed-keyframes", action="store_true")
+     parser.add_argument("--jump-keyframes", action="store_true")
+     parser.add_argument("--long-wait-keyframes", action="store_true")
++    parser.add_argument("--support-loss-keyframes", action="store_true")
+     args = parser.parse_args()
+     if args.seed < 0:
+         parser.error("seed must be nonnegative")
+@@ -144,6 +145,8 @@ def main():
+         parser.error("jump keyframes require explicit --safe-seed-keyframes")
+     if args.long_wait_keyframes and not args.jump_keyframes:
+         parser.error("long wait keyframes require explicit --jump-keyframes")
++    if args.support_loss_keyframes and not args.long_wait_keyframes:
++        parser.error("support loss keyframes require explicit --long-wait-keyframes")
+     if args.stable_keyframes and (
+         args.active_causal
+         or args.acquisition_strategy is not None
+@@ -327,10 +330,13 @@ def main():
+             StableRecoveringKeyframePolicy,
+             StableResponsiveKeyframePolicy,
+             StableSafeSeedKeyframePolicy,
++            StableSupportLossKeyframePolicy,
+         )
+ 
+         keyframe_policy_type = (
+-            StableLongWaitJumpKeyframePolicy
++            StableSupportLossKeyframePolicy
++            if args.support_loss_keyframes
++            else StableLongWaitJumpKeyframePolicy
+             if args.long_wait_keyframes
+             else StableJumpSafeSeedKeyframePolicy
+             if args.jump_keyframes
+@@ -345,7 +351,9 @@ def main():
+             else StableKeyframePolicy
+         )
+         config.update(
+-            schema="long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
++            schema="support-loss-long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
++            if args.support_loss_keyframes
++            else "long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
+             if args.long_wait_keyframes
+             else "jump-safe-seed-stable-keyframe-camera-projection-v1"
+             if args.jump_keyframes
+@@ -363,7 +371,9 @@ def main():
+             active_seed=2000,
+             keyframe_policy=keyframe_policy_type().model_dump(mode="json"),
+             scope=(
+-                "four anonymous cardinal-plus-jump programs with separate 24-frame post-motor WAIT windows; initial windows stay 16; original pixel/geometry gates and two episode-wide recovery windows/288-action cap; no private rest selection, raw-track promotion or navigation claim"
++                "new unconnected local epoch after first completed stable acquisition loses public correspondence support, independently of WAIT recovery; at most two epochs, eleven trials each/twenty-two total and 288 actions; same compound motors, long-wait and all pixel/geometry gates; no private re-anchor, gauge stitching or navigation claim"
++                if args.support_loss_keyframes
++                else "four anonymous cardinal-plus-jump programs with separate 24-frame post-motor WAIT windows; initial windows stay 16; original pixel/geometry gates and two episode-wide recovery windows/288-action cap; no private rest selection, raw-track promotion or navigation claim"
+                 if args.long_wait_keyframes
+                 else "four anonymous cardinal-plus-jump motor programs chosen from public novelty only; first-image safe seeds, unchanged recovery/geometry gates and 288-action cap; no private movement labels, new action kinds, metric/global/navigation claim"
+                 if args.jump_keyframes
+@@ -517,6 +527,7 @@ def main():
+                         safe_seed_controls=args.safe_seed_keyframes,
+                         jump_controls=args.jump_keyframes,
+                         long_wait_controls=args.long_wait_keyframes,
++                        support_loss_controls=args.support_loss_keyframes,
+                     ),
+                 }
+                 if keyframes["acquisition"]["failure"] is not None:
+diff --git a/scripts/audit_stable_keyframes.py b/scripts/audit_stable_keyframes.py
+index d681f91..eb175d1 100644
+--- a/scripts/audit_stable_keyframes.py
++++ b/scripts/audit_stable_keyframes.py
+@@ -29,6 +29,7 @@ from minecraft_scientist.exploration.stable_keyframe_map import (
+     StableRecoveringKeyframePolicy,
+     StableResponsiveKeyframePolicy,
+     StableSafeSeedKeyframePolicy,
++    StableSupportLossKeyframePolicy,
+     acquire_stable_keyframe_map,
+ )
+ from minecraft_scientist.protocols import TransitionRecord
+@@ -60,8 +61,13 @@ def serializable_truth(truth):
+ 
+ 
+ def registration(directory, config, report, definition):
+-    long_wait = (
++    support_loss = (
+         config.get("schema")
++        == "support-loss-long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
++    )
++    long_wait = (
++        support_loss
++        or config.get("schema")
+         == "long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
+     )
+     jump = (
+@@ -84,7 +90,9 @@ def registration(directory, config, report, definition):
+         or config.get("schema") == "micro-stable-keyframe-camera-projection-v1"
+     )
+     settings = (
+-        StableLongWaitJumpKeyframePolicy()
++        StableSupportLossKeyframePolicy()
++        if support_loss
++        else StableLongWaitJumpKeyframePolicy()
+         if long_wait
+         else StableJumpSafeSeedKeyframePolicy()
+         if jump
+@@ -117,6 +125,7 @@ def registration(directory, config, report, definition):
+             "safe-seed-stable-keyframe-camera-projection-v1",
+             "jump-safe-seed-stable-keyframe-camera-projection-v1",
+             "long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1",
++            "support-loss-long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1",
+         )
+         or json.dumps(config.get("keyframe_policy"), sort_keys=True, allow_nan=False)
+         != json.dumps(settings.model_dump(mode="json"), sort_keys=True, allow_nan=False)
+@@ -212,6 +221,7 @@ def registration(directory, config, report, definition):
+             safe_seed_controls=safe_seeds,
+             jump_controls=jump,
+             long_wait_controls=long_wait,
++            support_loss_controls=support_loss,
+         ),
+     }
+     result.update(
+diff --git a/scripts/audit_runtime_camera.py b/scripts/audit_runtime_camera.py
+index e395135..1118ec2 100644
+--- a/scripts/audit_runtime_camera.py
++++ b/scripts/audit_runtime_camera.py
+@@ -236,6 +236,7 @@ def public_data(directory, engine, *, registration=None):
+             "safe-seed-stable-keyframe-camera-projection-v1",
+             "jump-safe-seed-stable-keyframe-camera-projection-v1",
+             "long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1",
++            "support-loss-long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1",
+         )
+         and registration is not None
+     ):
+@@ -247,10 +248,14 @@ def public_data(directory, engine, *, registration=None):
+             StableRecoveringKeyframePolicy,
+             StableResponsiveKeyframePolicy,
+             StableSafeSeedKeyframePolicy,
++            StableSupportLossKeyframePolicy,
+         )
+ 
+         policy_type = (
+-            StableLongWaitJumpKeyframePolicy
++            StableSupportLossKeyframePolicy
++            if config["schema"]
++            == "support-loss-long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
++            else StableLongWaitJumpKeyframePolicy
+             if config["schema"]
+             == "long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
+             else StableJumpSafeSeedKeyframePolicy
+diff --git a/tests/unit/test_stable_keyframe_audit.py b/tests/unit/test_stable_keyframe_audit.py
+index 90d9f96..cd4f613 100644
+--- a/tests/unit/test_stable_keyframe_audit.py
++++ b/tests/unit/test_stable_keyframe_audit.py
+@@ -29,14 +29,17 @@ def keyframe_capture(diagnostic, scripts, monkeypatch, request):
+     _, definition = scripts
+     auditor = importlib.import_module("audit_stable_keyframes")
+     mode = getattr(request, "param", False)
+-    long_wait = mode == "long-jump-seeds"
++    support_loss = mode == "support-loss"
++    long_wait = support_loss or mode == "long-jump-seeds"
+     jump = long_wait or mode == "jump-seeds"
+     safe_seeds = jump or mode == "safe-seeds"
+     recovery = safe_seeds or mode == "recovering"
+     responsive = recovery or mode == "responsive"
+     micro = responsive or mode is True
+     policy_type = (
+-        auditor.StableLongWaitJumpKeyframePolicy
++        auditor.StableSupportLossKeyframePolicy
++        if support_loss
++        else auditor.StableLongWaitJumpKeyframePolicy
+         if long_wait
+         else auditor.StableJumpSafeSeedKeyframePolicy
+         if jump
+@@ -59,7 +62,9 @@ def keyframe_capture(diagnostic, scripts, monkeypatch, request):
+     )
+     config = json.loads((route / "config.json").read_bytes())
+     config.update(
+-        schema="long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
++        schema="support-loss-long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
++        if support_loss
++        else "long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
+         if long_wait
+         else "jump-safe-seed-stable-keyframe-camera-projection-v1"
+         if jump
+@@ -127,6 +132,7 @@ def keyframe_capture(diagnostic, scripts, monkeypatch, request):
+         safe_seed_controls=safe_seeds,
+         jump_controls=jump,
+         long_wait_controls=long_wait,
++        support_loss_controls=support_loss,
+     )
+     assert result["terminal"] == "initial_wait_exhausted"
+     save(
+@@ -516,7 +522,9 @@ def test_recovery_flags_require_full_explicit_protocol_before_output(
+ 
+ 
+ @pytest.mark.parametrize(
+-    "keyframe_capture", ["safe-seeds", "jump-seeds", "long-jump-seeds"], indirect=True
++    "keyframe_capture",
++    ["safe-seeds", "jump-seeds", "long-jump-seeds", "support-loss"],
++    indirect=True,
+ )
+ def test_safe_seed_registration_replays_full_detector_ledger_before_private_reads(
+     keyframe_capture, monkeypatch
+@@ -535,7 +543,9 @@ def test_safe_seed_registration_replays_full_detector_ledger_before_private_read
+ 
+ 
+ @pytest.mark.parametrize(
+-    "keyframe_capture", ["safe-seeds", "jump-seeds", "long-jump-seeds"], indirect=True
++    "keyframe_capture",
++    ["safe-seeds", "jump-seeds", "long-jump-seeds", "support-loss"],
++    indirect=True,
+ )
+ @pytest.mark.parametrize(
+     "case",
+@@ -619,7 +629,7 @@ def test_safe_seed_flags_require_all_explicit_protocols_before_output(
+ 
+ 
+ @pytest.mark.parametrize(
+-    "keyframe_capture", ["jump-seeds", "long-jump-seeds"], indirect=True
++    "keyframe_capture", ["jump-seeds", "long-jump-seeds", "support-loss"], indirect=True
+ )
+ @pytest.mark.parametrize("case", ["schema", "policy", "marker", "drop_marker"])
+ def test_compound_program_claim_is_not_interchangeable_with_parent(
+@@ -677,7 +687,9 @@ def test_jump_flag_requires_full_explicit_protocol_before_output(
+     assert not output.exists()
+ 
+ 
+-@pytest.mark.parametrize("keyframe_capture", ["long-jump-seeds"], indirect=True)
++@pytest.mark.parametrize(
++    "keyframe_capture", ["long-jump-seeds", "support-loss"], indirect=True
++)
+ @pytest.mark.parametrize(
+     "case", ["schema", "budget", "profile", "marker", "window_ticks", "drop_ticks"]
+ )
+@@ -740,3 +752,66 @@ def test_long_wait_flag_requires_full_explicit_protocol_before_output(
+     with pytest.raises(SystemExit):
+         capture.main()
+     assert not output.exists()
++
++
++@pytest.mark.parametrize("keyframe_capture", ["support-loss"], indirect=True)
++@pytest.mark.parametrize("case", ["schema", "boundary", "marker", "epochs", "link"])
++def test_support_loss_claim_requires_exact_boundary_and_full_epoch_replay(
++    keyframe_capture, monkeypatch, case
++):
++    auditor, route, engine = keyframe_capture
++    config = json.loads((route / "config.json").read_bytes())
++    saved = json.loads((route / "keyframe-acquisition.json").read_bytes())
++    if case == "schema":
++        config["schema"] = (
++            "long-wait-jump-safe-seed-stable-keyframe-camera-projection-v1"
++        )
++    elif case == "boundary":
++        config["keyframe_policy"]["epoch_boundary"] = "evaluator-chosen-rest-pose"
++    elif case == "marker":
++        saved["acquisition"].pop("epoch_boundary_registration")
++    elif case == "epochs":
++        config["keyframe_policy"]["maximum_local_epochs"] = 3
++    else:
++        saved["acquisition"]["epoch_links"] = [{"supported": True, "at_frame": 96}]
++    save(route / "config.json", config)
++    save(route / "keyframe-acquisition.json", saved)
++    report = json.loads((route / "report.json").read_bytes())
++    report["config_sha256"] = auditor.runtime.digest(route / "config.json")
++    report["artifact_sha256"]["keyframe-acquisition.json"] = auditor.runtime.digest(
++        route / "keyframe-acquisition.json"
++    )
++    save(route / "report.json", report)
++    private_guard(monkeypatch)
++    result = auditor.audit(route, engine)
++    assert not result["valid"] and result["evaluation"] is None
++    assert result["stability_diagnostics"] is None
++
++
++@pytest.mark.parametrize(
++    "flags",
++    [
++        ["--support-loss-keyframes"],
++        ["--support-loss-keyframes", "--long-wait-keyframes"],
++        [
++            "--support-loss-keyframes",
++            "--jump-keyframes",
++            "--safe-seed-keyframes",
++            "--recovering-keyframes",
++            "--responsive-keyframes",
++            "--micro-keyframes",
++            "--stable-keyframes",
++        ],
++    ],
++)
++def test_support_loss_flag_requires_full_explicit_protocol_before_output(
++    scripts, tmp_path, monkeypatch, flags
++):
++    _, capture = scripts
++    output = tmp_path / "must-not-exist"
++    monkeypatch.setattr(
++        sys, "argv", [capture.__file__, *flags, "--output", str(output)]
++    )
++    with pytest.raises(SystemExit):
++        capture.main()
++    assert not output.exists()
+diff --git a/tests/unit/test_support_loss_keyframes.py b/tests/unit/test_support_loss_keyframes.py
+new file mode 100644
+--- /dev/null
++++ b/tests/unit/test_support_loss_keyframes.py
+@@ -0,0 +1,266 @@
++from itertools import groupby
++
++import numpy as np
++import pytest
++from pydantic import ValidationError
++
++pytest.importorskip("cv2", reason="optional public-support map geometry")
++
++from test_joint_multiview_map import CAMERA
++from test_safe_seed_keyframes import (
++    seeded_scene as seeded_scene,  # noqa: PLC0414 -- fixture re-export
++)
++from test_stable_keyframe_map import (
++    public_scene as public_scene,  # noqa: PLC0414 -- fixture dependency
++)
++
++from minecraft_scientist.exploration import stable_keyframe_map as stable
++from minecraft_scientist.exploration.settled_map_control import PublicControlStep
++
++
++def acquire(first, execute, *, support_loss=True):
++    return stable.acquire_stable_keyframe_map(
++        first,
++        execute,
++        CAMERA,
++        anchor_frame=48,
++        seed=13,
++        micro_controls=True,
++        responsive_controls=True,
++        recovery_controls=True,
++        safe_seed_controls=True,
++        jump_controls=True,
++        long_wait_controls=True,
++        support_loss_controls=support_loss,
++    )
++
++
++def lose(measured):
++    return measured | {
++        "tracks": {"track_ids": [], "seed_count": measured["tracks"]["seed_count"]},
++        "cells": 0,
++    }
++
++
++@pytest.mark.parametrize("support_loss", [False, True])
++def test_completed_public_loss_without_extra_wait_has_distinct_epoch_semantics(
++    seeded_scene, monkeypatch, support_loss
++):
++    # Mock perception tests chronology; real synthetic 3-D fitting tests geometry.
++    first, execute, calls, _, _, tracked_inputs = seeded_scene
++    flow = stable._visible_flow
++
++    def one_lost_pair(first, last, *args, **kwargs):
++        measured = flow(first, last, *args, **kwargs)
++        return (
++            lose(measured)
++            if (int(first[0, 0, 0]), int(last[0, 0, 0])) == (8, 17)
++            else measured
++        )
++
++    monkeypatch.setattr(stable, "_visible_flow", one_lost_pair)
++    result = acquire(first, execute, support_loss=support_loss)
++    assert result["terminal"] == "validated"
++    assert not result["failed_wait_windows"] and not result["recovery_wait_windows"]
++    assert not result["samples"][1]["selected"]
++    assert result["samples"][1]["correspondence_supported"] is False
++    assert not result["navigation_accepted"] and not result["metric_scale_known"]
++    assert stable._digest(result["frozen"]) == result["frozen_sha256"]
++    if not support_loss:
++        assert len(result["epochs"]) == 1 and not result["epoch_links"]
++        assert "epoch_boundary_registration" not in result
++        return
++    assert result["epoch_boundary_registration"] == (
++        "public-support-loss-after-stable-control-v1"
++    )
++    parent, child = result["epochs"]
++    assert parent["status"] == "connection_lost_after_stable_control"
++    assert parent["frame_ordinals"] == [56] and parent["trial_ids"] == [0]
++    assert parent["termination_frame"] == child["anchor_frame"] == 65
++    assert child["frame_ordinals"] == [65, 74, 83, 92, 101, 110]
++    assert child["trial_ids"] == list(range(1, 6))
++    assert child["detector"]["seed_image_frame"] == 65
++    assert (
++        child["detector"]["seed_image_sha256"]
++        != parent["detector"]["seed_image_sha256"]
++    )
++    assert not child["global_gauge_aligned"]
++    link = result["epoch_links"][0]
++    assert link["parent_sha256"] == stable._digest(parent)
++    assert link["reason"] == "public_support_lost_after_stable_control"
++    assert not link["supported"] and not link["metric_scale_known"]
++    assert result["frozen"]["detector"] == child["detector"]
++    assert result["frozen"]["index"]["namespace"] == child["namespace"]
++    assert all(entry[1] is tracked_inputs[0][1] for entry in tracked_inputs)
++    choices = result["control_choices"]
++    assert choices[1]["observed_trials"] == 0 and choices[1]["scoring_trial_ids"] == []
++    assert choices[-1]["scoring_trial_ids"] == [1, 2, 3, 4]
++    assert (
++        max(len(list(run)) for _, run in groupby(item["handle"] for item in choices))
++        <= 4
++    )
++    assert len(calls) + 48 < 288
++
++
++def test_repeated_losses_cannot_create_a_third_epoch_or_extend_local_budget(
++    seeded_scene, monkeypatch
++):
++    first, execute, calls, _, _, _ = seeded_scene
++    flow = stable._visible_flow
++
++    def lost(first, last, *args, **kwargs):
++        measured = flow(first, last, *args, **kwargs)
++        return (
++            lose(measured) if int(last[0, 0, 0]) - int(first[0, 0, 0]) > 1 else measured
++        )
++
++    monkeypatch.setattr(stable, "_visible_flow", lost)
++    result = acquire(first, execute)
++    assert result["terminal"] == "map_unavailable"
++    assert len(result["epochs"]) == 2 and len(result["epoch_links"]) == 1
++    assert result["epochs"][0]["trial_ids"] == [0]
++    assert result["epochs"][1]["trial_ids"] == list(range(1, 12))
++    assert len(result["control_choices"]) == 12 and len(calls) == 116
++    assert result["epochs"][1]["frame_ordinals"] == [65]
++    assert not result["attempts"] and result["frozen"] is None
++    assert not result["recovery_wait_windows"]
++
++
++def test_supported_stalls_do_not_consume_an_epoch(seeded_scene, monkeypatch):
++    first, execute, _, _, _, _ = seeded_scene
++    flow = stable._visible_flow
++
++    def stalled(*args, **kwargs):
++        return flow(*args, **kwargs) | {"median_flow_pixels": 0}
++
++    monkeypatch.setattr(stable, "_visible_flow", stalled)
++    result = acquire(first, execute)
++    assert result["terminal"] == "map_unavailable"
++    assert len(result["epochs"]) == 1 and not result["epoch_links"]
++    assert len(result["control_choices"]) == 11
++    assert not result["attempts"] and result["frozen"] is None
++
++
++def test_noncompliant_completed_move_cannot_create_a_new_map_epoch(seeded_scene):
++    first, execute, _, _, _, _ = seeded_scene
++
++    def invalid(kind, handle):
++        receipt = execute(kind, handle)
++        return (
++            PublicControlStep(receipt.frame, kind, handle, False, 1)
++            if kind == "move"
++            else receipt
++        )
++
++    result = acquire(first, invalid)
++    assert result["terminal"] == "execution_failed"
++    assert len(result["epochs"]) == 1 and not result["epoch_links"]
++    assert len(result["samples"]) == 1
++    assert result["steps"][-1]["compliant"] is False
++
++
++def test_unstable_initial_frame_has_no_epoch_or_support_loss_escape(
++    seeded_scene, monkeypatch
++):
++    first, execute, calls, _, _, _ = seeded_scene
++    flow = stable._visible_flow
++
++    def unstable(*args, **kwargs):
++        return flow(*args, **kwargs) | {"stable": False}
++
++    monkeypatch.setattr(stable, "_visible_flow", unstable)
++    result = acquire(first, execute)
++    assert result["terminal"] == "initial_wait_exhausted" and len(calls) == 48
++    assert not result["epochs"] and not result["epoch_links"]
++    assert len(result["recovery_wait_windows"]) == 2
++
++
++def test_future_wait_failure_never_reanchors_or_refits_the_frozen_past(
++    seeded_scene, monkeypatch
++):
++    first, execute, _, _, _, tracked_inputs = seeded_scene
++    flow = stable._visible_flow
++
++    def late_failure(first, last, *args, **kwargs):
++        measured = flow(first, last, *args, **kwargs)
++        return measured | {"stable": False} if int(last[0, 0, 0]) > 53 else measured
++
++    monkeypatch.setattr(stable, "_visible_flow", late_failure)
++    result = acquire(first, execute)
++    assert result["terminal"] == "future_wait_exhausted"
++    assert len(result["epochs"]) == 1 and not result["epoch_links"]
++    assert result["frozen"]["index"]["frame_ordinals"] == [56, 65, 74, 83, 92, 101]
++    assert stable._digest(result["frozen"]) == result["frozen_sha256"]
++    assert len(tracked_inputs) == 1 and tracked_inputs[0][0] == 53
++    assert result["future"] is None and not result["navigation_accepted"]
++
++
++def test_longer_two_epoch_episode_stops_inside_actual_partial_wait_at_288(
++    seeded_scene, monkeypatch
++):
++    first, execute, calls, _, _, _ = seeded_scene
++    flow = stable._visible_flow
++
++    def slow(first, last, *args, **kwargs):
++        a, b = int(first[0, 0, 0]), int(last[0, 0, 0])
++        measured = flow(first, last, *args, **kwargs)
++        if b - a == 1 and b >= 10:
++            return measured | {"stable": (b - 9) % 25 >= 22}
++        if (a, b) == (8, 33):
++            return lose(measured)
++        return measured | {"median_flow_pixels": 0} if b - a > 1 else measured
++
++    monkeypatch.setattr(stable, "_visible_flow", slow)
++    result = acquire(first, execute)
++    assert result["terminal"] == "budget_exhausted" and len(calls) + 48 == 288
++    assert len(result["epochs"]) == 2 and len(result["epoch_links"]) == 1
++    assert result["epochs"][1]["termination_frame"] == 288
++    assert not result["recovery_wait_windows"]
++    assert result["frozen"] is None and not result["navigation_accepted"]
++
++
++@pytest.mark.parametrize("flag", [1, None, "true"])
++def test_support_loss_flag_requires_explicit_boolean_before_dispatch(flag):
++    def forbidden(*args):
++        raise AssertionError("invalid protocol dispatched")
++
++    with pytest.raises(ValueError, match="explicit boolean"):
++        stable.acquire_stable_keyframe_map(
++            np.zeros((224, 224, 3), dtype=np.uint8),
++            forbidden,
++            CAMERA,
++            anchor_frame=48,
++            support_loss_controls=flag,
++        )
++
++
++def test_support_loss_registration_requires_long_wait_protocol_before_dispatch():
++    def forbidden(*args):
++        raise AssertionError("invalid protocol dispatched")
++
++    with pytest.raises(ValueError, match="explicit long-wait"):
++        stable.acquire_stable_keyframe_map(
++            np.zeros((224, 224, 3), dtype=np.uint8),
++            forbidden,
++            CAMERA,
++            anchor_frame=48,
++            support_loss_controls=True,
++        )
++
++
++@pytest.mark.parametrize(
++    "field,value",
++    [("epoch_boundary", "evaluator-selected-anchor"), ("maximum_local_epochs", 3)],
++)
++def test_new_boundary_cannot_relax_gates_budgets_or_masquerade_as_parent(field, value):
++    settings = stable.StableSupportLossKeyframePolicy().model_dump(mode="json")
++    with pytest.raises(ValidationError):
++        stable.StableLongWaitJumpKeyframePolicy.model_validate(settings)
++    with pytest.raises(ValidationError):
++        stable.StableSupportLossKeyframePolicy.model_validate(settings | {field: value})
++    new, old = (
++        stable.StableSupportLossKeyframePolicy(),
++        stable.StableLongWaitJumpKeyframePolicy(),
++    )
++    for name in ("stability", "fitting", "consensus", "temporal"):
++        assert getattr(new, name) == getattr(old, name)
