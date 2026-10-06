@@ -20,12 +20,18 @@ until each required gate has current, inspectable evidence.
 
 ## Execution order
 
-Current development checkpoint: `docs/oriented-walk-keyframe-development.md`
-and `docs/frozen-future-public-diagnostic.md`. A six-view past map now freezes in
+Current development checkpoint: `docs/public-map-risk-development.md`, following
+`docs/oriented-walk-keyframe-development.md` and the public future diagnostic.
+The isolated component passes 34/49/8 focused cases on each platform, and a known
+public replay challenges the map at frame 133/prepares an unconnected anchor at
+145. Controller/capture/public-first auditor integration now exists in a distinct
+research patch; wider regression and fresh native validation remain required.
+No recovered map, body motion, navigation or arrival is claimed. A six-view past map freezes in
 one development world, but its future loses all original support; another world
 still lacks a map. Complete public future tracking reproduces total support loss
-during WAIT. Next investigate public observability/control risk before another
-fresh protocol, not relaxed gates or retrospectively chosen endpoints. The
+during WAIT. Next verify the registered per-action monitor/passive recovery in
+fresh native captures, then acquire a genuinely new local map without relaxing
+gates or retrospectively choosing successful endpoints. The
 preceding main V35 full release remains separate; none of the required outcomes
 above is narrowed to these two development worlds or offline compatibility.
 

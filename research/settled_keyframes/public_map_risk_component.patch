@@ -1,0 +1,884 @@
+diff --git a/src/minecraft_scientist/exploration/public_map_risk.py b/src/minecraft_scientist/exploration/public_map_risk.py
+new file mode 100644
+--- /dev/null
++++ b/src/minecraft_scientist/exploration/public_map_risk.py
+@@ -0,0 +1,447 @@
++"""Per-action frozen-map observability, followed by explicit passive recovery.
++
++Public pixels/control receipts only. Pixel consistency is not body accuracy or
++safety. Challenged maps never recover by reseeding, refitting, endpoint selection
++or replacing their original partitions; recovery prepares an unconnected epoch.
++"""
++
++from __future__ import annotations
++
++import copy
++import hashlib
++from dataclasses import dataclass
++from typing import Literal
++
++import numpy as np
++from pydantic import BaseModel, ConfigDict, model_validator
++
++from .causal_map_window import CausalWindowPolicy
++from .joint_multiview_map import JointMapConfig, JointMapEvidence, validate_joint_future
++from .map_recovery import _digest
++from .public_wait_profile import PostMotorWaitWindow
++from .safe_track_seeds import safe_seeds
++from .second_leg_shadow import retain_tracks
++from .settled_map_control import PublicControlStep
++from .shared_map_endpoint import SharedEndpointPolicy, _visible_flow
++from .temporal_tracks import TemporalTrackConfig, track_frame_chain
++from .visual_geometry import _frame
++
++
++class MapRiskPolicy(BaseModel):
++    model_config = ConfigDict(extra="forbid", frozen=True)
++    registration: Literal["continuous-original-map-observability-v1"] = (
++        "continuous-original-map-observability-v1"
++    )
++    maximum_episode_actions: Literal[288] = 288
++    maximum_future_steps: Literal[80] = 80
++    maximum_passive_windows: Literal[2] = 2
++    temporal: TemporalTrackConfig = TemporalTrackConfig(maximum_frames=128)
++    consensus: CausalWindowPolicy = CausalWindowPolicy()
++    passive: PostMotorWaitWindow = PostMotorWaitWindow()
++    stability: SharedEndpointPolicy = SharedEndpointPolicy()
++
++    @model_validator(mode="before")
++    @classmethod
++    def _strict_budgets(cls, values):
++        if isinstance(values, dict) and any(
++            type(values.get(name, default)) is not int
++            for name, default in (
++                ("maximum_episode_actions", 288),
++                ("maximum_future_steps", 80),
++                ("maximum_passive_windows", 2),
++            )
++        ):
++            raise ValueError("map-risk budgets must be exact integers")
++        return values
++
++    @model_validator(mode="after")
++    def _registered_gates(self):
++        if (
++            self.temporal != TemporalTrackConfig(maximum_frames=128)
++            or self.consensus != CausalWindowPolicy()
++            or self.passive != PostMotorWaitWindow()
++            or self.stability != SharedEndpointPolicy()
++        ):
++            raise ValueError("map-risk monitoring cannot relax tracking/settling gates")
++        return self
++
++
++@dataclass(frozen=True)
++class RecoveryObservation:
++    journal: dict
++    frame: np.ndarray | None
++
++
++def _rgb_hash(frame):
++    return hashlib.sha256(frame.tobytes()).hexdigest()
++
++
++def _checked_receipt(receipt, kind, handle, shape):
++    if (
++        not isinstance(receipt, PublicControlStep)
++        or type(receipt.executed_kind) is not str
++        or type(receipt.compliant) is not bool
++        or receipt.compliant is not True
++        or type(receipt.ticks) is not int
++        or receipt.ticks != 1
++        or receipt.executed_kind != kind
++        or receipt.executed_handle != handle
++        or (kind == "wait" and receipt.executed_handle is not None)
++        or (kind == "move" and type(receipt.executed_handle) is not int)
++    ):
++        raise ValueError("requires an exact compliant one-tick public receipt")
++    frame = _frame(receipt.frame).copy()
++    if frame.shape != shape:
++        raise ValueError("map-risk control changed the public sensor")
++    frame.setflags(write=False)
++    return frame
++
++
++class FrozenMapMonitor:
++    """No actions are dispatched here. A failure irreversibly seals this epoch."""
++
++    def __init__(self, frozen, frames, *, policy=None):
++        # Lazy schema import permits the acquisition controller to use this
++        # monitor without a circular module-initialization dependency.
++        from .stable_keyframe_map import KeyframeIndex
++
++        self.policy = MapRiskPolicy.model_validate(
++            policy.model_dump() if isinstance(policy, MapRiskPolicy) else policy or {}
++        )
++        # Refuse extra/private context before cloning or serializing the parent.
++        if type(frozen) is not dict or set(frozen) != {
++            "index",
++            "past",
++            "frozen_at_frame",
++            "detector",
++            "maps",
++            "required_bootstraps",
++        }:
++            raise ValueError("map monitor accepts only the registered public proposal")
++        if type(frozen["detector"]) is not dict or set(frozen["detector"]) != {
++            "registration",
++            "seed_image_frame",
++            "seed_image_sha256",
++            "seed_pixels",
++        }:
++            raise ValueError("map detector cannot include extra/private context")
++        self._parent = frozen
++        self._parent_sha = _digest(frozen)
++        self._frozen = copy.deepcopy(frozen)
++        self._index = KeyframeIndex.model_validate(frozen["index"])
++        self._past = self._index.tracks
++        if (
++            type(frozen["frozen_at_frame"]) is not int
++            or frozen["past"] != self._past.model_dump(mode="json")
++            or frozen["frozen_at_frame"] != self._index.frame_ordinals[-1]
++            or not 6 <= self._past.frame_count <= 12
++            or not 0 <= frozen["frozen_at_frame"] <= 288
++        ):
++            raise ValueError("monitor requires the exact complete frozen past")
++        self._images = tuple(_frame(frame).copy() for frame in frames)
++        if (
++            len(self._images) != self._past.frame_count
++            or any(frame.shape != self._images[0].shape for frame in self._images)
++            or tuple(_rgb_hash(frame) for frame in self._images)
++            != self._index.rgb_sha256
++        ):
++            raise ValueError("monitor images differ from frozen image clock/hashes")
++        for frame in self._images:
++            frame.setflags(write=False)
++        detector = frozen["detector"]
++        self._seeds = safe_seeds(self._images[0]).copy()
++        self._seeds.setflags(write=False)
++        if (
++            detector["registration"] != "first-image-only-safe-support-mask-v1"
++            or type(detector["seed_image_frame"]) is not int
++            or detector["seed_image_frame"] != self._index.frame_ordinals[0]
++            or detector["seed_image_sha256"] != self._index.rgb_sha256[0]
++            or detector["seed_pixels"] != self._seeds.tolist()
++        ):
++            raise ValueError("monitor cannot replace original detector seeds")
++        replayed = track_frame_chain(
++            self._images, config=self.policy.temporal, seed_pixels=self._seeds
++        )
++        if replayed != self._past:
++            raise ValueError("monitor tracking does not replay original frozen pixels")
++        self._models = tuple(
++            JointMapEvidence.model_validate(item) for item in frozen["maps"]
++        )
++        self._required = tuple(frozen["required_bootstraps"])
++        if (
++            tuple(model.bootstrap_slot for model in self._models)
++            != tuple(range(2, self._past.frame_count))
++            or self._required
++            != tuple(model.bootstrap_slot for model in self._models if model.supported)
++            or len(self._required) < self.policy.consensus.minimum_models
++            or any(
++                model.input_sha256
++                != hashlib.sha256(self._past.model_dump_json().encode()).hexdigest()
++                or model.fitting_frames != self._past.frame_count
++                or model.config != JointMapConfig()
++                for model in self._models
++            )
++        ):
++            raise ValueError("monitor cannot select other models/partitions/gates")
++        self._future = []
++        self._retained = set(self._past.track_ids)
++        self._state = "observable"
++        self._records = []
++        self._recovery_started = False
++        self._ordinal = frozen["frozen_at_frame"]
++        self._latest = self._images[-1]
++        self._integrity()
++
++    def _integrity(self):
++        if (
++            _digest(self._parent) != self._parent_sha
++            or _digest(self._frozen) != self._parent_sha
++        ):
++            raise ValueError("the original frozen map was changed")
++
++    @property
++    def state(self):
++        return self._state
++
++    @property
++    def journal(self):
++        self._integrity()
++        return {
++            "policy": self.policy.model_dump(mode="json"),
++            "parent_sha256": self._parent_sha,
++            "records": copy.deepcopy(self._records),
++            "terminal": self._state,
++            "latent_cause": "unidentified",
++            "body_rest_known": False,
++            "motion_validated": False,
++            "navigation_accepted": False,
++        }
++
++    def preflight(self, kind, handle):
++        self._integrity()
++        if (
++            kind not in ("move", "wait")
++            or (kind == "move" and (type(handle) is not int or not 0 <= handle < 4))
++            or (kind == "wait" and handle is not None)
++        ):
++            raise ValueError("requires a registered anonymous MOVE or WAIT")
++        if self._state != "observable":
++            return False
++        if (
++            self._ordinal >= 288
++            or len(self._future) >= self.policy.maximum_future_steps
++        ):
++            self._state = "budget_exhausted"
++            return False
++        return True
++
++    def observe(self, receipt, *, kind, handle, absolute_frame):
++        if not self.preflight(kind, handle):
++            raise ValueError("closed/risky epoch cannot consume more map evidence")
++        if type(absolute_frame) is not int or absolute_frame != self._ordinal + 1:
++            raise ValueError("map monitor requires the next exact actual image ordinal")
++        record = {
++            "absolute_frame": absolute_frame,
++            "requested_kind": kind,
++            "requested_handle": handle,
++            "compliant": False,
++            "executed_kind": getattr(receipt, "executed_kind", None),
++            "executed_handle": getattr(receipt, "executed_handle", None),
++            "ticks": getattr(receipt, "ticks", None),
++            "receipt_compliance": getattr(receipt, "compliant", None),
++            "candidates": [],
++            "original_seed_count": len(self._seeds),
++            "retained_past_ids": [],
++            "theory_counterexample": False,
++            "counterexample_scope": "frozen-map-public-pixel-prediction-only",
++            "latent_cause": "unidentified",
++            "motion_validated": False,
++            "navigation_accepted": False,
++        }
++        self._records.append(record)
++        self._ordinal = absolute_frame
++        try:
++            current = _checked_receipt(receipt, kind, handle, self._images[0].shape)
++        except (TypeError, ValueError) as error:
++            record.update(
++                status="control_failed",
++                failure={"type": type(error).__name__, "message": str(error)},
++            )
++            self._state = "control_failed"
++            return copy.deepcopy(record)
++        record.update(compliant=True, rgb_sha256=_rgb_hash(current))
++        self._latest = current
++        self._future.append(current)
++        try:
++            tracked = track_frame_chain(
++                self._images + tuple(self._future),
++                config=self.policy.temporal,
++                seed_pixels=self._seeds,
++            )
++            if tracked.seed_count != len(self._seeds):
++                raise ValueError("future tracking changed original seed denominator")
++            self._retained &= set(tracked.track_ids)
++            extended = retain_tracks(tracked, self._retained)
++            record["retained_past_ids"] = list(extended.track_ids)
++            for model in self._models:
++                result = validate_joint_future(
++                    model,
++                    self._past,
++                    extended,
++                    target_slots=(extended.frame_count - 1,),
++                )
++                record["candidates"].append(
++                    {
++                        "bootstrap_slot": model.bootstrap_slot,
++                        "required": model.bootstrap_slot in self._required,
++                        "future": result,
++                    }
++                )
++            statuses = [
++                item["future"]["status"]
++                for item in record["candidates"]
++                if item["required"]
++            ]
++            if any(
++                status not in ("consistent", "inconsistent", "unavailable")
++                for status in statuses
++            ):
++                raise ValueError("unregistered frozen-model prediction status")
++            self._state = (
++                "challenged"
++                if "inconsistent" in statuses
++                else "support_lost"
++                if "unavailable" in statuses
++                else "observable"
++            )
++            record.update(
++                status=self._state, theory_counterexample=self._state == "challenged"
++            )
++        except Exception as error:  # noqa: BLE001 -- solver failure is not a scientific counterexample
++            record.update(
++                status="geometry_failed",
++                failure={"type": type(error).__name__, "message": str(error)},
++            )
++            self._state = "geometry_failed"
++        self._integrity()
++        return copy.deepcopy(record)
++
++    def recover_observation(self, execute):
++        """WAIT only, up to two registered 24-tick windows/global clock 288.
++
++        A stable new observation permits separate acquisition, not reinstatement
++        of the challenged parent, inferred ground contact or aligned map gauges.
++        """
++        self._integrity()
++        if (
++            self._state not in ("challenged", "support_lost", "geometry_failed")
++            or self._recovery_started
++        ):
++            raise ValueError("recovery requires one new publicly failed map epoch")
++        self._recovery_started = True
++        journal = {
++            "registration": "bounded-passive-map-risk-recovery-v1",
++            "parent_sha256": self._parent_sha,
++            "source_failure_sha256": _digest(self._records[-1]),
++            "anchor_frame": self._ordinal,
++            "steps": [],
++            "windows": [],
++            "terminal": "recovering",
++            "new_epoch": None,
++            "old_map_restored": False,
++            "gauge_connection_known": False,
++            "body_rest_known": False,
++            "motion_validated": False,
++            "navigation_accepted": False,
++        }
++        current, streak = self._latest, 0
++        for number in range(self.policy.maximum_passive_windows):
++            window = {
++                "number": number,
++                "start_frame": self._ordinal,
++                "end_frame": self._ordinal,
++                "status": "running",
++            }
++            journal["windows"].append(window)
++            for tick in range(1, self.policy.passive.maximum_wait_ticks + 1):
++                self._integrity()
++                if self._ordinal >= 288:
++                    journal["terminal"] = window["status"] = "budget_exhausted"
++                    return RecoveryObservation(journal, None)
++                entry = {
++                    "absolute_frame": self._ordinal + 1,
++                    "requested_kind": "wait",
++                    "requested_handle": None,
++                    "compliant": False,
++                }
++                journal["steps"].append(entry)
++                try:
++                    receipt = execute("wait", None)
++                except Exception as error:  # noqa: BLE001 -- unknown control consumption stays explicit
++                    entry.update(
++                        failure={"type": type(error).__name__, "message": str(error)},
++                        actual_frame_known=False,
++                    )
++                    journal["terminal"] = window["status"] = "execution_failed"
++                    return RecoveryObservation(journal, None)
++                self._ordinal += 1
++                window["end_frame"] = self._ordinal
++                entry.update(
++                    executed_kind=getattr(receipt, "executed_kind", None),
++                    executed_handle=getattr(receipt, "executed_handle", None),
++                    ticks=getattr(receipt, "ticks", None),
++                    receipt_compliance=getattr(receipt, "compliant", None),
++                )
++                try:
++                    image = _checked_receipt(receipt, "wait", None, current.shape)
++                    entry.update(compliant=True, rgb_sha256=_rgb_hash(image))
++                except (TypeError, ValueError) as error:
++                    entry.update(
++                        failure={"type": type(error).__name__, "message": str(error)}
++                    )
++                    journal["terminal"] = window["status"] = "control_failed"
++                    return RecoveryObservation(journal, None)
++                try:
++                    seeds = safe_seeds(current)
++                    flow = _visible_flow(
++                        current, image, self.policy.stability, seed_pixels=seeds
++                    )
++                    entry["flow"] = flow
++                    entry.update(
++                        namespace=f"risk-recovery-pair-{self._ordinal}",
++                        seed_detection_registration="first-image-only-safe-support-mask-v1",
++                        seed_image_sha256=_rgb_hash(current),
++                    )
++                    if type(flow.get("stable")) is not bool or flow["tracks"][
++                        "seed_count"
++                    ] != len(seeds):
++                        raise ValueError("invalid independently seeded recovery flow")
++                except Exception as error:  # noqa: BLE001 -- never mistake solver failure for stabilization
++                    journal["terminal"] = window["status"] = "geometry_failed"
++                    entry["failure"] = {
++                        "type": type(error).__name__,
++                        "message": str(error),
++                    }
++                    return RecoveryObservation(journal, None)
++                current = image
++                streak = streak + 1 if flow["stable"] else 0
++                if (
++                    tick >= self.policy.passive.minimum_wait_ticks
++                    and streak >= self.policy.passive.stable_prefixes
++                ):
++                    journal["terminal"] = window["status"] = "reacquisition_ready"
++                    journal["new_epoch"] = {
++                        "namespace": f"unconnected-risk-recovery-{self._ordinal}",
++                        "anchor_frame": self._ordinal,
++                        "rgb_sha256": _rgb_hash(current),
++                        "parent_sha256": self._parent_sha,
++                        "connection_supported": False,
++                    }
++                    self._integrity()
++                    ready = current.copy()
++                    ready.setflags(write=False)
++                    return RecoveryObservation(journal, ready)
++            window["status"] = "exhausted"
++        journal["terminal"] = "recovery_exhausted"
++        self._integrity()
++        return RecoveryObservation(journal, None)
+diff --git a/tests/unit/test_public_map_risk.py b/tests/unit/test_public_map_risk.py
+new file mode 100644
+--- /dev/null
++++ b/tests/unit/test_public_map_risk.py
+@@ -0,0 +1,427 @@
++"""Guard/dispatch fixtures are not proof of native geometry or navigation."""
++
++import copy
++import hashlib
++from types import SimpleNamespace
++
++import numpy as np
++import pytest
++from pydantic import ValidationError
++
++cv2 = pytest.importorskip("cv2")
++
++from minecraft_scientist.exploration import public_map_risk as risk
++from minecraft_scientist.exploration.joint_multiview_map import JointMapConfig
++from minecraft_scientist.exploration.safe_track_seeds import safe_seeds
++from minecraft_scientist.exploration.settled_map_control import PublicControlStep
++from minecraft_scientist.exploration.temporal_tracks import (
++    TemporalTrackConfig,
++    TemporalTracks,
++    track_frame_chain,
++)
++
++
++@pytest.fixture
++def fixture(monkeypatch):
++    # Real public-pixel tracking, but the model parser/validator are explicit
++    # dispatch doubles: these fixtures cannot establish actual map correctness.
++    gray = cv2.GaussianBlur(
++        np.random.default_rng(42).integers(0, 256, (224, 224), dtype=np.uint8),
++        (5, 5),
++        0.8,
++    )
++    rgb = np.repeat(gray[:, :, None], 3, axis=2)
++    frames = [rgb.copy() for _ in range(6)]
++    seeds = safe_seeds(frames[0])
++    tracks = track_frame_chain(
++        frames, config=TemporalTrackConfig(maximum_frames=128), seed_pixels=seeds
++    )
++    ordinal = [56, 65, 74, 83, 92, 101]
++    frozen = {
++        "index": {
++            "namespace": "unit-dispatch-only",
++            "frame_ordinals": ordinal,
++            "rgb_sha256": [risk._rgb_hash(frame) for frame in frames],
++            "tracks": tracks.model_dump(mode="json"),
++            "continuous_raw_identity": False,
++        },
++        "past": tracks.model_dump(mode="json"),
++        "frozen_at_frame": 101,
++        "detector": {
++            "registration": "first-image-only-safe-support-mask-v1",
++            "seed_image_frame": 56,
++            "seed_image_sha256": risk._rgb_hash(frames[0]),
++            "seed_pixels": seeds.tolist(),
++        },
++        "maps": [
++            {
++                "bootstrap_slot": slot,
++                "supported": slot != 2,
++                "input_sha256": hashlib.sha256(
++                    tracks.model_dump_json().encode()
++                ).hexdigest(),
++                "fitting_frames": 6,
++                "config": JointMapConfig(),
++            }
++            for slot in (2, 3, 4, 5)
++        ],
++        "required_bootstraps": [3, 4, 5],
++    }
++    # _digest requires JSON values; parser double reconstitutes the config.
++    for model in frozen["maps"]:
++        model["config"] = model["config"].model_dump(mode="json")
++    monkeypatch.setattr(
++        risk.JointMapEvidence,
++        "model_validate",
++        lambda item: SimpleNamespace(
++            **(item | {"config": JointMapConfig.model_validate(item["config"])})
++        ),
++    )
++    calls = []
++
++    def validate(model, past, extended, *, target_slots):
++        calls.append((model.bootstrap_slot, extended.frame_count, target_slots))
++        return {
++            "status": "consistent" if model.supported else "unavailable",
++            "navigation_accepted": False,
++        }
++
++    monkeypatch.setattr(risk, "validate_joint_future", validate)
++    return frozen, frames, calls
++
++
++def receipt(frame, kind="wait", handle=None, **changes):
++    return PublicControlStep(
++        **(
++            {
++                "frame": frame,
++                "executed_kind": kind,
++                "executed_handle": handle,
++                "compliant": True,
++                "ticks": 1,
++            }
++            | changes
++        )
++    )
++
++
++def test_all_moves_and_waits_check_every_frozen_model(fixture):
++    frozen, frames, calls = fixture
++    before = copy.deepcopy(frozen)
++    monitor = risk.FrozenMapMonitor(frozen, frames)
++    first = monitor.observe(
++        receipt(frames[-1], "move", 0), kind="move", handle=0, absolute_frame=102
++    )
++    second = monitor.observe(
++        receipt(frames[-1]), kind="wait", handle=None, absolute_frame=103
++    )
++    assert first["status"] == second["status"] == "observable"
++    assert [call[0] for call in calls] == [2, 3, 4, 5] * 2
++    assert [call[2] for call in calls] == [(6,)] * 4 + [(7,)] * 4
++    assert frozen == before
++    assert first["motion_validated"] is False
++    assert monitor.journal["navigation_accepted"] is False
++    first["candidates"].clear()
++    assert len(monitor.journal["records"][0]["candidates"]) == 4
++
++
++@pytest.mark.parametrize(
++    "status,state,counterexample",
++    [("inconsistent", "challenged", True), ("unavailable", "support_lost", False)],
++)
++def test_failure_is_latched_without_selecting_a_better_model(
++    fixture, monkeypatch, status, state, counterexample
++):
++    frozen, frames, _ = fixture
++    monitor = risk.FrozenMapMonitor(frozen, frames)
++    monkeypatch.setattr(
++        risk,
++        "validate_joint_future",
++        lambda model, *args, **kwargs: {
++            "status": status if model.bootstrap_slot == 4 else "consistent"
++        },
++    )
++    record = monitor.observe(
++        receipt(frames[-1]), kind="wait", handle=None, absolute_frame=102
++    )
++    assert monitor.state == record["status"] == state
++    assert record["theory_counterexample"] is counterexample
++    assert len(record["candidates"]) == 4
++    assert record["latent_cause"] == "unidentified"
++    assert monitor.preflight("move", 1) is False
++    with pytest.raises(ValueError, match="closed/risky"):
++        monitor.observe(
++            receipt(frames[-1]), kind="wait", handle=None, absolute_frame=103
++        )
++
++
++@pytest.mark.parametrize(
++    "change",
++    [
++        {"compliant": False},
++        {"ticks": True},
++        {"ticks": 2},
++        {"executed_handle": True},
++        {"executed_kind": "wait"},
++    ],
++)
++def test_failed_controls_cannot_enter_geometric_or_theory_evidence(fixture, change):
++    frozen, frames, calls = fixture
++    monitor = risk.FrozenMapMonitor(frozen, frames)
++    record = monitor.observe(
++        receipt(frames[-1], "move", 0, **change),
++        kind="move",
++        handle=0,
++        absolute_frame=102,
++    )
++    assert calls == []
++    assert record["status"] == "control_failed"
++    assert record["theory_counterexample"] is False
++    assert record["compliant"] is False
++    assert record["candidates"] == []
++    with pytest.raises(ValueError):
++        monitor.recover_observation(lambda *args: receipt(frames[-1]))
++
++
++def test_solver_failure_is_not_a_scientific_counterexample(fixture, monkeypatch):
++    frozen, frames, _ = fixture
++    monitor = risk.FrozenMapMonitor(frozen, frames)
++
++    def fail(*args, **kwargs):
++        raise RuntimeError("solver unavailable")
++
++    monkeypatch.setattr(risk, "validate_joint_future", fail)
++    record = monitor.observe(
++        receipt(frames[-1]), kind="wait", handle=None, absolute_frame=102
++    )
++    assert record["status"] == "geometry_failed"
++    assert record["compliant"] is True
++    assert record["theory_counterexample"] is False
++
++
++@pytest.mark.parametrize("clock", [True, 102.0, 103, 101])
++def test_wrong_clock_rejected_before_consuming_evidence(fixture, clock):
++    frozen, frames, calls = fixture
++    monitor = risk.FrozenMapMonitor(frozen, frames)
++    with pytest.raises(ValueError, match="ordinal"):
++        monitor.observe(
++            receipt(frames[-1]), kind="wait", handle=None, absolute_frame=clock
++        )
++    assert calls == [] and monitor.journal["records"] == []
++
++
++@pytest.mark.parametrize("case", ["hash", "clock", "detector", "partition", "gate"])
++def test_frozen_identity_and_gates_cannot_be_changed(fixture, case):
++    frozen, frames, _ = fixture
++    if case == "hash":
++        frozen["index"]["rgb_sha256"][0] = "0" * 64
++    elif case == "clock":
++        frozen["frozen_at_frame"] = 101.0
++    elif case == "detector":
++        frozen["detector"]["seed_pixels"].pop()
++    elif case == "partition":
++        frozen["required_bootstraps"] = [3, 5]
++    else:
++        frozen["maps"][0]["config"]["iterations"] = 2
++    with pytest.raises(ValueError):
++        risk.FrozenMapMonitor(frozen, frames)
++
++
++def challenge(fixture, monkeypatch):
++    frozen, frames, _ = fixture
++    monitor = risk.FrozenMapMonitor(frozen, frames)
++    monkeypatch.setattr(
++        risk,
++        "validate_joint_future",
++        lambda *args, **kwargs: {"status": "inconsistent"},
++    )
++    monitor.observe(receipt(frames[-1]), kind="wait", handle=None, absolute_frame=102)
++    return monitor, frames
++
++
++def test_passive_recovery_prepares_unconnected_epoch_never_restores_parent(
++    fixture, monkeypatch
++):
++    monitor, frames = challenge(fixture, monkeypatch)
++    controls = []
++
++    def execute(kind, handle):
++        controls.append((kind, handle))
++        return receipt(frames[-1])
++
++    result = monitor.recover_observation(execute)
++    assert controls == [("wait", None)] * 8
++    assert result.journal["terminal"] == "reacquisition_ready"
++    assert result.journal["new_epoch"]["anchor_frame"] == 110
++    assert result.journal["old_map_restored"] is False
++    assert result.journal["gauge_connection_known"] is False
++    assert result.journal["body_rest_known"] is False
++    assert result.journal["navigation_accepted"] is False
++    assert result.frame.flags.writeable is False
++    assert monitor.state == "challenged" and not monitor.preflight("move", 0)
++    with pytest.raises(ValueError):
++        monitor.recover_observation(execute)
++
++
++def test_recovery_exhaustion_is_bounded_and_recorded(fixture, monkeypatch):
++    monitor, frames = challenge(fixture, monkeypatch)
++    monkeypatch.setattr(
++        risk,
++        "_visible_flow",
++        lambda first, second, policy, *, seed_pixels: {
++            "stable": False,
++            "tracks": {"seed_count": len(seed_pixels)},
++        },
++    )
++    result = monitor.recover_observation(lambda *args: receipt(frames[-1]))
++    assert result.journal["terminal"] == "recovery_exhausted"
++    assert len(result.journal["steps"]) == 48
++    assert [item["status"] for item in result.journal["windows"]] == [
++        "exhausted",
++        "exhausted",
++    ]
++    assert result.frame is None and result.journal["new_epoch"] is None
++
++
++@pytest.mark.parametrize("failure", ["exception", "bad_receipt", "bad_flow"])
++def test_failed_recovery_cannot_create_an_anchor(fixture, monkeypatch, failure):
++    monitor, frames = challenge(fixture, monkeypatch)
++
++    def execute(*args):
++        if failure == "exception":
++            raise RuntimeError("controller lost")
++        return receipt(frames[-1], compliant=failure != "bad_receipt")
++
++    if failure == "bad_flow":
++        monkeypatch.setattr(
++            risk, "_visible_flow", lambda *args, **kwargs: {"stable": 1}
++        )
++    result = monitor.recover_observation(execute)
++    assert result.journal["terminal"] in (
++        "execution_failed",
++        "control_failed",
++        "geometry_failed",
++    )
++    assert result.journal["new_epoch"] is None and result.frame is None
++    assert len(result.journal["steps"]) == 1
++
++
++def test_mutated_parent_and_sensor_are_not_silently_used(fixture):
++    frozen, frames, calls = fixture
++    monitor = risk.FrozenMapMonitor(frozen, frames)
++    frozen["required_bootstraps"].pop()
++    with pytest.raises(ValueError, match="changed"):
++        monitor.preflight("wait", None)
++    assert calls == []
++
++
++def test_global_clock_stops_recovery_without_dispatching_extra_waits(
++    fixture, monkeypatch
++):
++    frozen, frames, _ = fixture
++    frozen["index"]["frame_ordinals"] = [242, 251, 260, 269, 278, 287]
++    frozen["frozen_at_frame"] = 287
++    frozen["detector"]["seed_image_frame"] = 242
++    monitor = risk.FrozenMapMonitor(frozen, frames)
++    monkeypatch.setattr(
++        risk,
++        "validate_joint_future",
++        lambda *args, **kwargs: {"status": "inconsistent"},
++    )
++    monitor.observe(receipt(frames[-1]), kind="wait", handle=None, absolute_frame=288)
++
++    def forbidden(*args):
++        raise AssertionError("global cap must prevent dispatch")
++
++    result = monitor.recover_observation(forbidden)
++    assert result.journal["terminal"] == "budget_exhausted"
++    assert result.journal["steps"] == []
++    assert result.frame is None
++
++
++def test_future_buffer_budget_prevents_an_extra_action(fixture):
++    frozen, frames, calls = fixture
++    monitor = risk.FrozenMapMonitor(frozen, frames)
++    # Dispatch gate unit only, not an eighty-step native-world claim.
++    monitor._future = [None] * 80
++    assert monitor.preflight("move", 0) is False
++    assert monitor.state == "budget_exhausted"
++    assert calls == []
++
++
++@pytest.mark.parametrize("location", ["proposal", "detector"])
++def test_private_context_is_rejected_before_parent_serialization(
++    fixture, monkeypatch, location
++):
++    frozen, frames, _ = fixture
++    target = frozen if location == "proposal" else frozen["detector"]
++    target["hidden_world_truth"] = object()
++
++    def forbidden(*args):
++        raise AssertionError("unregistered private context cannot be serialized")
++
++    monkeypatch.setattr(risk, "_digest", forbidden)
++    with pytest.raises(ValueError, match="public proposal|private context"):
++        risk.FrozenMapMonitor(frozen, frames)
++
++
++def test_changing_sensor_is_control_failure_not_map_counterexample(fixture):
++    frozen, frames, calls = fixture
++    monitor = risk.FrozenMapMonitor(frozen, frames)
++    altered = np.zeros((225, 224, 3), dtype=np.uint8)
++    record = monitor.observe(
++        receipt(altered), kind="wait", handle=None, absolute_frame=102
++    )
++    assert record["status"] == "control_failed"
++    assert record["theory_counterexample"] is False
++    assert calls == []
++
++
++def test_original_identity_cannot_reappear_after_it_was_lost(fixture, monkeypatch):
++    frozen, frames, _ = fixture
++    monitor = risk.FrozenMapMonitor(frozen, frames)
++    base = monitor._past
++    dead = base.track_ids[0]
++    count = 0
++
++    def tracked(images, **kwargs):
++        nonlocal count
++        count += 1
++        values = base.model_dump() | {
++            "frame_count": len(images),
++            "surviving_counts": base.surviving_counts
++            + (len(base.track_ids),) * (len(images) - base.frame_count),
++            "pixels": base.pixels
++            + (base.pixels[-1],) * (len(images) - base.frame_count),
++        }
++        extended = TemporalTracks.model_validate(values)
++        return (
++            risk.retain_tracks(extended, set(base.track_ids) - {dead})
++            if count == 1
++            else extended
++        )
++
++    # Real TemporalTracks schema, fabricated tracking output for identity logic.
++    monkeypatch.setattr(risk, "track_frame_chain", tracked)
++    first = monitor.observe(
++        receipt(frames[-1]), kind="wait", handle=None, absolute_frame=102
++    )
++    second = monitor.observe(
++        receipt(frames[-1]), kind="wait", handle=None, absolute_frame=103
++    )
++    assert dead not in first["retained_past_ids"]
++    assert dead not in second["retained_past_ids"]
++
++
++@pytest.mark.parametrize(
++    "change",
++    [
++        {"maximum_future_steps": 80.0},
++        {"maximum_passive_windows": True},
++        {"temporal": {"reference_cycle_error": 2}},
++        {"private_pose": [0, 0, 0]},
++    ],
++)
++def test_policy_does_not_accept_relaxed_or_privileged_fields(change):
++    with pytest.raises(ValidationError):
++        risk.MapRiskPolicy(**change)

@@ -4,6 +4,17 @@ This audit compares the current repository with the original self-evolving symbo
 Minecraft system, not merely with the smaller offline MVP. A green unit test is not
 treated as proof of live Minecraft behavior.
 
+The latest isolated development checkpoint is `docs/public-map-risk-development.md`.
+The original-map monitor has 34 Windows/34 Linux component passes, with 49 foundation
+and eight replay-driver cases per platform. Known public seed-201 replay challenges
+at 133 and prepares an unconnected observation anchor at 145; it is NOT a fresh
+native launch or recovered map. A separate fourteen-file research patch now connects
+per-action monitoring/finite WAIT recovery to acquisition, capture and independent
+public-first audit. Current Windows/Linux controller/new-audit checks each pass
+153/14 with fourteen source hashes intact, but wider compatibility/full-auditor
+regression, fresh capture and actual new-map acquisition remain open. These counts
+do not replace the preceding main V35 evidence or close any excellence requirement.
+
 The latest main-source checkpoint is `docs/long-wait-keyframe-development.md`:
 separately registered 24-frame post-motor WAIT windows preserve all geometry and
 global action gates. Both fresh independently audited sessions complete eleven
