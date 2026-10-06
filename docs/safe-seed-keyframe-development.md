@@ -78,6 +78,45 @@ would change later anchors, response scores and potentially actions. It cannot b
 counted as extra connected keyframes or a passing map. Neither saved capture nor
 its failed outcome is replaced. Identical native RGB across runs is not claimed.
 
+### Complete past-proposal geometry, separately checked after V33
+
+`research/settled_keyframes/safe_raw_fit_probe.py` extends the diagnosis to every
+existing rejected past proposal, not a selected passing subset. It verifies the
+sealed proposal, original first-image detector and selected RGB hashes, then
+replays sparse past tracks and all original bootstrap models exactly. It tracks
+the complete raw prefix with the same frozen seeds and samples the already chosen
+view slots without changing identities, original partitions, fitting budgets or
+geometry gates. Public inputs and all 112 package-source files are hash bound.
+
+`runs/safe-seed-raw-fit-seed201-v1/report.json` preserves the original six views
+56/76/94/104/113/122 and every raw image 56→122. Raw projection retains 124 of
+249 frozen seed IDs, versus the original sparse proposal's 123. Bootstrap five
+now passes the original past withheld-ray/positive-depth checks: all six views
+retain 31 withheld landmarks over five cells with full acceptance; maximum
+per-view 95th-percentile ray error is 0.584192 actual pixels. Bootstraps two,
+three and four still fail parallax or positive-depth support. Thus only one of
+four models passes, below the unchanged requirement of two, and
+`raw_past_consensus_candidate` remains false. This is not a unique/correct map,
+future-motion result or navigation success. No evaluator pose is used for fitting.
+
+`runs/safe-seed-raw-fit-seed202-v1/report.json` retains zero proposals explicitly;
+none is invented. Both reports pass all four preservation checks and retain
+source snapshots. Twenty-five research checks pass on Windows/Linux separately
+from the earlier frozen V33 full suite. They cover all bootstrap slots, original
+IDs/clock/failed middle images, seed-denominator and proposal tampering, no-proposal
+captures, private-file guards and unchanged gates. The initial Windows research
+run (twenty passes/five fixture-setup errors) is preserved; a removed pytest fixture
+import was repaired, registered explicitly and verified in separate successful
+reports. Production/package/test inputs of V33 are unchanged by this research.
+
+This evidence supports investigating better controlled geometric view diversity,
+not accepting the single passing model. The existing visual adapter already supports
+opaque compound movement programs including cardinal movement plus jump; the current
+capture exposes only the four plain cardinal programs. A fresh explicitly registered
+compound-control experiment can test whether an agent can escape confined terrain
+and obtain useful views, without new action kinds, privileged action selection,
+changing the SDK or relaxing any geometric acceptance gate.
+
 ## Verification and remaining work
 
 Focused Windows/WSL tests pass 146 each (Windows groups 92 and 54); isolated
