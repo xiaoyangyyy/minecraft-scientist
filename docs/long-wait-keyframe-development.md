@@ -101,7 +101,7 @@ displacement; private diagnostics remain separate from online decisions.
 
 Both acquisitions keep only their original local epoch, despite four/ten completed
 trials failing correspondence support. In seed 201 the first lost pair 89→123 has
-124/304 tracks (0.407895), six cells and 6.140685 median pixels: visible difference
+124/304 tracks (0.407895), six cells and 6.140438 median pixels: visible difference
 alone cannot override the unchanged 0.5 survival requirement. In seed 202, after
 selecting 111, all eight later trials fail support, eventually retaining only one
 of 432 first-image seeds. Returning to the old anchor on another handle is not

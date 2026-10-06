@@ -24,8 +24,8 @@ motor programs with unchanged pixel/geometry gates. Both fresh independently
 audited development worlds exhaust their settling windows and acquire no map;
 body rest does not guarantee rendered-image stability. Terminal V34 regressions
 pass Windows 1380/Linux 1382 cases, two skips each, with all 450 frozen inputs
-verified after completion. A separately registered longer-wait candidate is being
-tested in an isolated source copy; these V34 results do not validate that candidate.
+verified after completion. Longer-wait development was isolated from these V34
+inputs; its separate evidence is described above, not validated by V34 counts.
 See the [`compound-motor checkpoint`](docs/compound-motor-keyframe-development.md).
 The preceding visual development registers first-image-only safe seeds, freezing their
 identities and denominator before past fitting or future extension. Two fresh,
