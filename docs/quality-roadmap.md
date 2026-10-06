@@ -54,9 +54,11 @@ the preceding parent's full auditor counts, and does not close any outcome above
 
 The newest isolated candidate is `docs/four-move-map-epoch-development.md`: a fixed
 four-MOVE child future stimulus, with unchanged startup, gates, shared budgets and
-private physical evaluator. Twenty source paths are frozen; thirty new cases pass
-on each platform. Broader current-source regression and fresh native effects are
-not yet verified; the parent/native counts remain separate. This one-factor
+private physical evaluator. Twenty source paths are frozen; current combined
+batches pass 273 cases/platform with all hashes intact. Its complete native inputs
+and two absent development outputs are prospectively frozen; the seed-201 JVM has
+launched, but terminal native effects/independent audit remain unverified.
+Compatibility/full auditor/package and the parent/native counts remain separate. This one-factor
 experiment does not address difficult-world acquisition or narrow the full goal.
 
 1. Repair the visual navigation evidence. Evaluate correspondence/geometry signals

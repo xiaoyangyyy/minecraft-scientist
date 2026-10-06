@@ -7,9 +7,12 @@ treated as proof of live Minecraft behavior.
 The newest isolated candidate is `docs/four-move-map-epoch-development.md`:
 only the child future stimulus grows from two to four actual monitored MOVEs;
 startup, all image/geometry gates, shared budgets and the physical evaluator stay
-unchanged. Twenty source paths are frozen; thirty new Windows/Linux cases pass
-per platform, but native effects and broader current-source regressions are not
-yet verified. Parent coverage/native results are not borrowed for this candidate.
+unchanged. Twenty source paths are frozen; current Windows/Linux combined batches
+each pass 273 cases with zero failures/errors/skips and all hashes intact. The
+thirty new narrow cases are subsets, not extra distinct cases. Its native inputs
+and two absent development outputs are prospectively registered; the seed-201 JVM
+has launched but terminal effects/independent audit remain unverified. Compatibility,
+full auditor/package and parent coverage/native results are not borrowed.
 
 The preceding isolated candidate is `docs/map-epoch-reacquisition-development.md`:
 one genuinely new map acquisition at the actual recovered public endpoint, with

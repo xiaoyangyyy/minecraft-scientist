@@ -72,10 +72,22 @@ chronology, registration and rejection boundaries, not native geometry or useful
 body motion. The Windows/XML and Linux/XML hashes are preserved in the
 source-bound receipts; native effects remain unverified at this checkpoint.
 
-A broader current-source Windows batch has launched for 273 cases, including the
-old controller/shared-WAIT cases, old new-map audit guards and these thirty new
-cases. Launch is not terminal verification. Compatibility, full auditor and full
-package regressions remain separate; none can borrow the parent's counts.
+The broader current-source Windows AND Linux batches now terminate zero with 273
+passes/platform, zero failures/errors/skips, and all twenty source hashes intact.
+These are 220 controller/shared-WAIT/schema cases plus 53 native-auditor/guard
+cases. The narrower thirty-case receipts are subsets, not thirty additional
+distinct cases. See `runs/excited-epoch-focused-post-verification-v1.json`.
+Compatibility, full auditor and full package regressions remain separate and
+open; none can borrow the parent's counts.
+
+`runs/excited-epoch-live-registration-v1.json` prospectively freezes all four XML
+receipts, twenty source paths, 117 package/122 native project sources, two unchanged
+external SDK source hashes, the unchanged engine, exact policies/shared budgets
+and two absent native output paths. The unchanged independent thresholds are
+0.15 blocks translation, 20 degrees direction error and 5 degrees rotation error.
+The seed-201 fresh JVM has launched with its own 1200-second timeout; see
+`runs/excited-epoch-seed201-launch-v1.json`. Launch does not prove terminal capture,
+successful geometry, useful body motion, independent audit or arrival.
 
 ## Next gates and unchanged full objective
 
