@@ -75,6 +75,13 @@ Agent 的理论最多 provisional，尚无 shadow validation 或 replacement str
 `./scripts/verify_h2_development.ps1`；后续源码改变时应拒绝复用本证据。
 这些不是项目全量回归，也不借用旧 H1 的 67 项或导航历史全量测试。
 
+随后同一包源码的 Windows 默认测试集完成：1,538 项通过、2 项跳过，零失败/
+错误，进程 37430 退出 0，结束后 122 个包源码哈希未变。跳过的是可选 Torch
+训练相关测试，不算训练能力通过；Linux 默认全量与完整发布仍未验证。回执
+为 `runs/h2-full-windows-verification-v1.json`。独立探针另外证明旧注册表嵌套
+内容存在别名可变缺陷，聚焦/默认全量通过不证明该不变性；H3 晋升前先修复，
+见 `structural-revision-design.md`。
+
 每种规划器在每种动作契约下包含 27 个开发案例（九种真值组合 × 三组名称）：
 
 | 动作契约 | 机制状态判断正确 | 机制状态未解决 | 错误机制变化 | 平均总成本 |
