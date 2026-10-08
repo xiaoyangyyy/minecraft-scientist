@@ -20,6 +20,13 @@ class TheoryInterpreter:
                    for key, value in required_context.items()):
                 raise ValueError("execution context is outside the theory scope")
         mechanism = ir.mechanism
+        if mechanism == "finite_transducer":
+            from .finite_state import FiniteStateProgram
+
+            sequence = inputs["sequence"]
+            program = FiniteStateProgram.from_ir(ir)
+            emitted, state = program.execute(sequence, state=inputs.get("state"))
+            return {"outputs": emitted, "state": state}
         if mechanism == "tool_capability":
             tool_id = str(inputs["tool_id"])
             target_id = str(inputs["target_id"])

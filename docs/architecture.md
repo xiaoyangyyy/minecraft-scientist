@@ -31,6 +31,37 @@ maps every inventory type, block instance, and entity instance to a seeded opaqu
 identifier. Only coordinates, counts, physical features, and action affordances
 cross into `Observation`; semantic names remain confined to the controller side.
 
+## Research-first mechanism identification and joint diagnosis
+
+The newer bounded research loop is described in `research-framework-v2.md`,
+`identification-development.md` and `diagnosis-development.md`. It reuses the
+public capability view, TheoryIR, TransitionRecord and TheoryRegistry. The
+historical discovery loop above and this loop have different assumptions;
+evidence and acceptance claims must retain their source-phase scope.
+
+`theory/finite_state.py` registers a total deterministic Mealy language in the
+shared interpreter. `discovery/discrimination.py` groups exact behavior classes
+and compares bounded multi-step queries under explicit reset/action costs.
+`agent/identification.py` freezes predictions before actual dispatch and submits
+only provisional theories; it does not bypass independent shadow validation.
+
+`discovery/diagnosis.py` composes declared controller and mechanism transducers
+into that same IR. `agent/diagnosis.py` uses the unchanged identification loop,
+then projects conclusions over all surviving factors. An identified joint behavior
+class can contain different causal factors; conversely, mechanism change can be
+resolved while controller type or joint behavior remains unresolved.
+
+`world/diagnosis.py` independently executes the two hidden components. Its
+TransitionRecord marks compliance scope as issued-command and treatment delivery
+as unknown; it does not disclose delivered commands or true fault labels.
+`evaluation/diagnosis.py` checks public policy, compilation, filtering and factor
+projections before private I/O, then independently evaluates actual control and
+mechanism behavior. The evaluator never supplies new evidence to the policy.
+
+These are fixed, deterministic known-family development slices, not open program
+synthesis, stochastic fault inference, independent version promotion or a method
+novelty claim. Neither closes the original Minecraft/RGB/release requirements.
+
 ## Learned experiment planner
 
 The training package exposes ToolDiscoveryEnv as a Gymnasium environment. A

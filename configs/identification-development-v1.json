@@ -1,0 +1,21 @@
+{
+  "schema": "h1-development-design-v1",
+  "phase": "development protocol verification, not a structural holdout",
+  "world_seed_start": 0,
+  "opaque_instantiations_per_family": 30,
+  "agent_rng_seed": 20261008,
+  "world_seed_passed_to_agent": false,
+  "total_primitive_cost_budget": 20,
+  "query_horizon": 5,
+  "reset_cost": 1,
+  "action_cost": 1,
+  "calibration_cost": 6,
+  "families": ["activation", "delay", "toggle", "equivalent", "model_mismatch"],
+  "methods": ["random", "informative_random", "one_step_ig", "sequence_ig", "witness_cover", "optimal_reference"],
+  "primary_comparison": "witness_cover versus sequence_ig at the SAME horizon, candidates, behavior-class prior and primitive budget",
+  "one_step_ig_role": "horizon ablation, not a matched method-innovation baseline",
+  "optimal_reference_role": "minimum expected-cost adaptive decision tree under the shared prior; not a budget-success oracle or clairvoyant strategy",
+  "required_checks": ["complete public policy replay before private reads", "independent raw-table control replay", "exhaustive small-universe pair certificate", "exact repeated artifacts", "all current source hashes unchanged"],
+  "theory_promotion_limit": "provisional; independent shadow validation remains required",
+  "scope_exclusions": ["structure generation", "unseen structural families", "noisy causal inference", "hidden control-fault attribution", "theory revision", "symbol transfer", "Minecraft", "RGB navigation", "overall completion", "proven method novelty"]
+}

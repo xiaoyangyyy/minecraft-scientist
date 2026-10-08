@@ -1237,5 +1237,49 @@ def minecraft_live_benchmark(
     console.print(f"Artifacts: {output.resolve()}")
 
 
+@app.command("benchmark-identification")
+def benchmark_identification(
+    output: Annotated[Path, typer.Option(help="New artifact directory")],
+    seed: Annotated[int, typer.Option(min=0)] = 0,
+    seeds: Annotated[int, typer.Option(min=1)] = 4,
+    budget: Annotated[int, typer.Option(min=1)] = 20,
+) -> None:
+    """Known-candidate H1 development protocol; not an innovation claim."""
+    from minecraft_scientist.evaluation.identification import (
+        run_identification_benchmark,
+    )
+
+    result = run_identification_benchmark(
+        output=output, seed=seed, seeds=seeds, budget=budget
+    )
+    console.print_json(
+        json.dumps({
+            "runs": len(result["rows"]),
+            "audits_valid": result["all_independent_audits_valid"],
+            "scope": result["scope"],
+        })
+    )
+    console.print(f"Artifacts: {output.resolve()}")
+
+
+@app.command("benchmark-diagnosis")
+def benchmark_diagnosis(
+    output: Annotated[Path, typer.Option(help="New artifact directory")],
+    seed: Annotated[int, typer.Option(min=0)] = 0,
+    seeds: Annotated[int, typer.Option(min=1)] = 2,
+    budget: Annotated[int, typer.Option(min=1)] = 32,
+) -> None:
+    """Known-family hidden-control H2 development, not complete fault diagnosis."""
+    from minecraft_scientist.evaluation.diagnosis import run_diagnosis_benchmark
+
+    result = run_diagnosis_benchmark(output=output, seed=seed, seeds=seeds, budget=budget)
+    console.print_json(json.dumps({
+        "runs": len(result["rows"]),
+        "audits_valid": result["all_independent_audits_valid"],
+        "scope": result["scope"],
+    }))
+    console.print(f"Artifacts: {output.resolve()}")
+
+
 if __name__ == "__main__":
     app()

@@ -5,11 +5,31 @@ world-model discovery. It studies whether an agent can select interventions,
 recover executable theories, revise them after a hidden rule change, and compress
 repeated mechanisms into reusable symbols.
 
+The latest [research framework v2](docs/research-framework-v2.md) prioritizes
+budgeted executable mechanism discrimination, revision and transfer, with
+navigation as independently evaluated evidence acquisition. It distinguishes
+implemented infrastructure from proposed experiments; it does not replace or
+close the original RGB/open-world completion requirements.
+
+The first [H1 implementation](docs/identification-development.md) executes
+anonymous finite-state mechanisms through the shared TheoryIR, compares
+same-horizon experiment planners, and independently replays public decisions
+before private evaluation. It remains a known-candidate deterministic development
+slice: shadow validation, structure revision, transfer and novelty are unproven.
+
+The next [H2 development slice](docs/diagnosis-development.md) models hidden
+actuator delivery and mechanism changes as competing joint explanations. It
+preserves attribution ambiguity and compares matched sequence planners; its
+known deterministic families are not a complete fault diagnosis method.
+
 The deterministic research core uses a structured opaque world. A live Minecraft
 path is also implemented: Mineflayer performs whitelisted actions, a server-only
 Fabric mod supplies resettable hidden rules, and the Python boundary replaces item,
 block, and entity names with seeded opaque IDs before an agent can observe them.
 Live execution still requires the user's explicit Minecraft EULA acceptance.
+
+<details>
+<summary>Historical navigation development evidence (separate from the H1 research slice)</summary>
 
 Current isolated research adds per-action original-map monitoring and bounded
 unconnected new-map acquisition. The monitored parent has two fresh independently
@@ -83,6 +103,8 @@ the
 [`shared-anchor checkpoint`](docs/shared-anchor-reconstruction-development.md)
 retains its bounded camera success, player-motion failure and limited ablations.
 
+</details>
+
 ## Quick start
 
     uv sync
@@ -91,6 +113,8 @@ retains its bounded camera success, player-motion failure and limited ablations.
     uv run minecraft-scientist benchmark --suite mvp --seed 0
     uv run minecraft-scientist benchmark --suite full --seed 0
     uv run minecraft-scientist benchmark-baselines --seed 0 --seeds 10
+    uv run minecraft-scientist benchmark-identification --output runs/h1-new-run --seeds 30
+    uv run minecraft-scientist benchmark-diagnosis --output runs/h2-new-run --seeds 3
 
 With the training extra installed, run the paired component ablations:
 

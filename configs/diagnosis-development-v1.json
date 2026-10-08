@@ -1,0 +1,40 @@
+{
+  "schema": "h2-development-design-v1",
+  "purpose": "Controller/mechanism factor attribution under a declared deterministic joint family; development only",
+  "budget": 32,
+  "horizon": 5,
+  "reset_cost": 1,
+  "ordinary_action_cost": 1,
+  "alternate_actuation_cost": 3,
+  "initial_evidence_cost": 5,
+  "agent_rng_seed": 20261008,
+  "mechanisms": ["unchanged", "delayed", "activation_edge_removed"],
+  "controllers": ["healthy", "primary_drop", "alternating_drop"],
+  "conditions": ["ordinary-route-only", "ordinary-and-alternate-route"],
+  "methods": ["witness_cover", "sequence_ig"],
+  "candidate_count": 9,
+  "prior": "uniform over exact behavior classes, not over syntactic aliases",
+  "guards": [
+    "Neither hidden delivered commands nor fault labels enter AgentWorldView",
+    "Issued command compliance is not verified treatment delivery",
+    "Freeze all candidate predictions before dispatch",
+    "Project attribution over every surviving factor, never only a representative",
+    "Public policy, factor compilation and evidence replay precede private reads",
+    "Private runtime executes controller and mechanism separately from compiled IR",
+    "Preserve all ambiguous, unresolved and failed cases",
+    "Same prior, horizon, costs and maximum budget for both planners"
+  ],
+  "expected_boundary": "Absent alternate actuation, unchanged mechanism with primary drop can be behaviorally identical to removed activation with healthy controller",
+  "analysis": "Report mechanism and controller resolution separately; correct behavior identification does not imply unique factor attribution",
+  "exclusions": [
+    "No independent structural holdout: seeds randomize names of fixed families",
+    "No stochastic faults or noise inference",
+    "Reset explicitly includes hidden controller state",
+    "No learned control model: candidates are supplied",
+    "Baseline is supplied reference knowledge, not newly validated in this run",
+    "No actual rule mutation within a run",
+    "No generated replacement structure or shadow validation",
+    "No innovation or superiority claim",
+    "No Minecraft, natural RGB or overall completion claim"
+  ]
+}
