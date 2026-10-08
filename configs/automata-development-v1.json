@@ -1,0 +1,28 @@
+{
+  "schema": "apartness-development-design-v1",
+  "status": "development protocol; not a statistical preregistration",
+  "method": "basic-lsharp-finite-conformance",
+  "generator": "aal-tables-v1",
+  "seed": 0,
+  "seeds": 2,
+  "families": ["dense", "sparse", "cycle", "branch"],
+  "private_state_counts": [2, 3, 4, 5],
+  "protocol": {
+    "budget": 240,
+    "horizon": 5,
+    "epoch": "stationary-v1",
+    "seed": 20261008,
+    "conformance_count": 8,
+    "operation_budget": 200000
+  },
+  "agent_inputs": ["actions", "outputs", "costs", "protocol", "capability_view"],
+  "claims": {
+    "stationary_development_only": true,
+    "full_adaptive_lsharp": false,
+    "all_H_queries_certified_by_agent": false,
+    "causal_factor_attribution": false,
+    "formal_structural_holdout": false,
+    "method_superiority": false
+  },
+  "metrics": ["actual_paid_cost", "paid_queries", "paid_actions", "conformance_cost", "unresolved", "incorrect_provisional_at_H", "learner_wall_and_cpu_seconds", "auditor_wall_and_cpu_seconds"]
+}

@@ -79,6 +79,18 @@ fixed-template edit experiments, not complete H3 or unique causal discovery; see
 `revision-development.md` for unresolved attribution, the strong-baseline negative
 result and remaining structure/transfer/Minecraft/RGB gates.
 
+`discovery/active_automata.py` adds a from-scratch basic L# adaptation with
+public-prefix observation trees, constructive state separation, folding into
+the same TheoryIR, consistency and binary counterexample processing. Epoch-local
+caching never supplies old-world traces as new queries. Real conformance batches
+are frozen and charged; finite passing returns only provisional evidence, not
+all-H or unique causal identification. `evaluation/active_automata.py` checks
+public clocks/receipts and independent raw folds/predictions before private I/O.
+`world/active_automata.py` supplies stationary synthetic development tasks only.
+This is not full Adaptive L#, an online revision baseline or a completed strong
+comparison; all wrong provisional and unresolved outcomes remain in the report.
+See `active-automata-development.md` for the new source-phase evidence and limits.
+
 ## Learned experiment planner
 
 The training package exposes ToolDiscoveryEnv as a Gymnasium environment. A

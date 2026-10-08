@@ -29,6 +29,13 @@ replay and independent raw edit/component checks precede private evaluation. Its
 fixed-template results preserve a case where multi-step IG resolves behavior but
 witness planning does not; full H3, transfer and novelty remain unproven.
 
+The [from-scratch active automata baseline](docs/active-automata-development.md)
+now learns executable programs from real anonymous queries without supplied
+candidates. It implements basic L# with charged finite conformance, not full
+Adaptive L# or a completed H3 comparison. Its 32-case development grid retains
+18 H-correct provisional models, three wrong provisional models and eleven
+unresolved cases; an audit passing is not a mechanism-recovery success.
+
 The deterministic research core uses a structured opaque world. A live Minecraft
 path is also implemented: Mineflayer performs whitelisted actions, a server-only
 Fabric mod supplies resettable hidden rules, and the Python boundary replaces item,
@@ -123,6 +130,7 @@ retains its bounded camera success, player-motion failure and limited ablations.
     uv run minecraft-scientist benchmark-identification --output runs/h1-new-run --seeds 30
     uv run minecraft-scientist benchmark-diagnosis --output runs/h2-new-run --seeds 3
     uv run minecraft-scientist benchmark-revision --output runs/h3-new-run --seeds 2 --budget 240
+    uv run minecraft-scientist benchmark-automata --output runs/automata-new-run --seeds 2 --budget 240
 
 The H1/H2/H3 research commands require a new output directory and do not support
 overwrite. The H3 default remains offline and needs no API key or Minecraft install.

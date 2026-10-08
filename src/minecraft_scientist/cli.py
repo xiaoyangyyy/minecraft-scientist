@@ -1253,11 +1253,13 @@ def benchmark_identification(
         output=output, seed=seed, seeds=seeds, budget=budget
     )
     console.print_json(
-        json.dumps({
-            "runs": len(result["rows"]),
-            "audits_valid": result["all_independent_audits_valid"],
-            "scope": result["scope"],
-        })
+        json.dumps(
+            {
+                "runs": len(result["rows"]),
+                "audits_valid": result["all_independent_audits_valid"],
+                "scope": result["scope"],
+            }
+        )
     )
     console.print(f"Artifacts: {output.resolve()}")
 
@@ -1272,12 +1274,18 @@ def benchmark_diagnosis(
     """Known-family hidden-control H2 development, not complete fault diagnosis."""
     from minecraft_scientist.evaluation.diagnosis import run_diagnosis_benchmark
 
-    result = run_diagnosis_benchmark(output=output, seed=seed, seeds=seeds, budget=budget)
-    console.print_json(json.dumps({
-        "runs": len(result["rows"]),
-        "audits_valid": result["all_independent_audits_valid"],
-        "scope": result["scope"],
-    }))
+    result = run_diagnosis_benchmark(
+        output=output, seed=seed, seeds=seeds, budget=budget
+    )
+    console.print_json(
+        json.dumps(
+            {
+                "runs": len(result["rows"]),
+                "audits_valid": result["all_independent_audits_valid"],
+                "scope": result["scope"],
+            }
+        )
+    )
     console.print(f"Artifacts: {output.resolve()}")
 
 
@@ -1291,13 +1299,53 @@ def benchmark_revision(
     """Bounded online H3 development; not open-family discovery or novelty proof."""
     from minecraft_scientist.evaluation.revision import run_revision_benchmark
 
-    result = run_revision_benchmark(output=output, seed=seed, seeds=seeds, budget=budget)
-    console.print_json(json.dumps({
-        "runs": len(result["rows"]),
-        "audits_valid": result["all_independent_audits_valid"],
-        "summaries": result["summaries"],
-        "scope": result["scope"],
-    }))
+    result = run_revision_benchmark(
+        output=output, seed=seed, seeds=seeds, budget=budget
+    )
+    console.print_json(
+        json.dumps(
+            {
+                "runs": len(result["rows"]),
+                "audits_valid": result["all_independent_audits_valid"],
+                "summaries": result["summaries"],
+                "scope": result["scope"],
+            }
+        )
+    )
+    console.print(f"Artifacts: {output.resolve()}")
+
+
+@app.command("benchmark-automata")
+def benchmark_automata(
+    output: Annotated[Path, typer.Option(help="New artifact directory")],
+    seed: Annotated[int, typer.Option(min=0)] = 0,
+    seeds: Annotated[int, typer.Option(min=1, max=64)] = 2,
+    budget: Annotated[int, typer.Option(min=1)] = 240,
+    horizon: Annotated[int, typer.Option(min=1, max=8)] = 5,
+    maximum_states: Annotated[int, typer.Option(min=2, max=8)] = 5,
+    conformance_count: Annotated[int, typer.Option(min=1, max=64)] = 8,
+) -> None:
+    """From-scratch basic L# development; not full Adaptive L# or H3 comparison."""
+    from minecraft_scientist.evaluation.active_automata import run_automata_benchmark
+
+    report = run_automata_benchmark(
+        output=output,
+        seed=seed,
+        seeds=seeds,
+        budget=budget,
+        horizon=horizon,
+        maximum_states=maximum_states,
+        conformance_count=conformance_count,
+    )
+    console.print_json(
+        json.dumps(
+            {
+                "summary": report["summary"],
+                "audits_valid": report["all_independent_audits_valid"],
+                "scope": report["scope"],
+            }
+        )
+    )
     console.print(f"Artifacts: {output.resolve()}")
 
 
