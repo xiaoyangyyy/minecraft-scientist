@@ -115,6 +115,48 @@ def validate_costs(actions: tuple[str, ...], costs: dict[str, int]) -> None:
         raise ValueError("every public action requires an exact positive integer cost")
 
 
+def bounded_behavior_classes(programs: tuple[FiniteStateProgram, ...], horizon: int):
+    """Exact reset-query equivalence up to H, via finite-depth partition refinement.
+
+    This does not prove unbounded equivalence. No exponential word enumeration or
+    digest-collision assumption is used: signatures are interned exact tuples.
+    """
+    if (
+        not programs
+        or len(programs) > 512
+        or type(horizon) is not int
+        or not 0 <= horizon <= 8
+    ):
+        raise ValueError("bounded equivalence requires <=512 programs and H in [0,8]")
+    actions = tuple(sorted(programs[0].actions))
+    if any(set(program.actions) != set(actions) for program in programs):
+        raise ValueError("bounded equivalence requires shared action alphabets")
+    colors = {
+        (index, state): 0
+        for index, program in enumerate(programs)
+        for state in program.states
+    }
+    for _ in range(horizon):
+        signatures, refined = {}, {}
+        for index, program in enumerate(programs):
+            for state in program.states:
+                signature = tuple(
+                    (
+                        program.table[state, action].output,
+                        colors[index, program.table[state, action].target],
+                    )
+                    for action in actions
+                )
+                refined[index, state] = signatures.setdefault(
+                    signature, len(signatures)
+                )
+        colors = refined
+    groups = {}
+    for index, program in enumerate(programs):
+        groups.setdefault(colors[index, program.initial_state], []).append(index)
+    return tuple(tuple(group) for group in groups.values())
+
+
 def shortest_witness(
     left: FiniteStateProgram,
     right: FiniteStateProgram,

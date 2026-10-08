@@ -22,6 +22,13 @@ actuator delivery and mechanism changes as competing joint explanations. It
 preserves attribution ambiguity and compares matched sequence planners; its
 known deterministic families are not a complete fault diagnosis method.
 
+The latest [H3 development slice](docs/revision-development.md) learns and separately
+validates an old theory, encounters a real hidden online change, enumerates bounded
+structural edits and validates a new version before replacing the old one. Public
+replay and independent raw edit/component checks precede private evaluation. Its
+fixed-template results preserve a case where multi-step IG resolves behavior but
+witness planning does not; full H3, transfer and novelty remain unproven.
+
 The deterministic research core uses a structured opaque world. A live Minecraft
 path is also implemented: Mineflayer performs whitelisted actions, a server-only
 Fabric mod supplies resettable hidden rules, and the Python boundary replaces item,
@@ -115,6 +122,10 @@ retains its bounded camera success, player-motion failure and limited ablations.
     uv run minecraft-scientist benchmark-baselines --seed 0 --seeds 10
     uv run minecraft-scientist benchmark-identification --output runs/h1-new-run --seeds 30
     uv run minecraft-scientist benchmark-diagnosis --output runs/h2-new-run --seeds 3
+    uv run minecraft-scientist benchmark-revision --output runs/h3-new-run --seeds 2 --budget 240
+
+The H1/H2/H3 research commands require a new output directory and do not support
+overwrite. The H3 default remains offline and needs no API key or Minecraft install.
 
 With the training extra installed, run the paired component ablations:
 

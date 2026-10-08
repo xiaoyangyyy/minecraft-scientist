@@ -62,6 +62,23 @@ These are fixed, deterministic known-family development slices, not open program
 synthesis, stochastic fault inference, independent version promotion or a method
 novelty claim. Neither closes the original Minecraft/RGB/release requirements.
 
+`agent/revision.py` adds a bounded H3 continuation: learn the old joint program,
+validate it with fresh experiments, monitor an actual unknown change, synthesize
+edits through `discovery/revision.py`, diagnose all retained controller/mechanism
+explanations and validate a replacement before version promotion. The generator
+never receives a world or replacement table. `world/revision.py` changes raw
+components at a private episode boundary; the Agent receives only its capabilities.
+
+`theory/shadow.py` freezes each entire batch before dispatch, excludes previous
+discovery words, checks full affordability and does not refit the candidate from
+validation. `evaluation/revision.py` adds independent raw edit/compilation/cost
+checks before private I/O, then checks actual chronology and all reset behavior
+up to the declared horizon. Registry ownership isolates nested content. Promoted
+IR explicitly prohibits non-reset or beyond-horizon use. These remain deterministic
+fixed-template edit experiments, not complete H3 or unique causal discovery; see
+`revision-development.md` for unresolved attribution, the strong-baseline negative
+result and remaining structure/transfer/Minecraft/RGB gates.
+
 ## Learned experiment planner
 
 The training package exposes ToolDiscoveryEnv as a Gymnasium environment. A

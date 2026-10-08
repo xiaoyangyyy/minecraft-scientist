@@ -24,7 +24,16 @@ class TheoryInterpreter:
             from .finite_state import FiniteStateProgram
 
             sequence = inputs["sequence"]
+            maximum = ir.scope.get("intervention_horizon")
+            if maximum is not None and (
+                type(maximum) is not int or not 1 <= maximum <= 64
+                or type(sequence) is not tuple or len(sequence) > maximum
+            ):
+                raise ValueError("query is outside the theory's certified intervention horizon")
             program = FiniteStateProgram.from_ir(ir)
+            reset_only = ir.scope.get("certified_reset_only", False)
+            if type(reset_only) is not bool or (reset_only and inputs.get("state") is not None):
+                raise ValueError("certified theory only supports queries from a fresh reset")
             emitted, state = program.execute(sequence, state=inputs.get("state"))
             return {"outputs": emitted, "state": state}
         if mechanism == "tool_capability":

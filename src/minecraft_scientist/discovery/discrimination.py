@@ -15,6 +15,7 @@ from collections import Counter
 from minecraft_scientist.protocols import TheoryIR
 from minecraft_scientist.theory.finite_state import (
     FiniteStateProgram,
+    bounded_behavior_classes,
     shortest_witness,
     validate_costs,
 )
@@ -37,9 +38,17 @@ class DiscriminationSpace:
         *,
         horizon: int = 4,
         reset_cost: int = 1,
+        candidate_limit: int = 12,
+        equivalence_horizon: int | None = None,
     ):
-        if not 1 <= len(candidates) <= 12:
-            raise ValueError("one to twelve declared candidates are required")
+        if (
+            type(candidate_limit) is not int
+            or not 1 <= candidate_limit <= 512
+            or not 1 <= len(candidates) <= candidate_limit
+        ):
+            raise ValueError(
+                "candidate count exceeds the declared capacity (maximum 512)"
+            )
         self.programs = tuple(FiniteStateProgram.from_ir(ir) for ir in candidates)
         self.actions = tuple(sorted(self.programs[0].actions))
         validate_costs(self.actions, costs)
@@ -62,6 +71,13 @@ class DiscriminationSpace:
         self._predictions = {}
         self._optimal_cache = {}
         self._optimal_evaluations = 0
+        if equivalence_horizon is not None:
+            if type(equivalence_horizon) is not int or equivalence_horizon != horizon:
+                raise ValueError(
+                    "equivalence horizon must equal the query-language horizon"
+                )
+            self.classes = bounded_behavior_classes(self.programs, equivalence_horizon)
+            return
         classes: list[list[int]] = []
         for index, program in enumerate(self.programs):
             for group in classes:

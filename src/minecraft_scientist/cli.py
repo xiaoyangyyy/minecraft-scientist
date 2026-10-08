@@ -1281,5 +1281,25 @@ def benchmark_diagnosis(
     console.print(f"Artifacts: {output.resolve()}")
 
 
+@app.command("benchmark-revision")
+def benchmark_revision(
+    output: Annotated[Path, typer.Option(help="New artifact directory")],
+    seed: Annotated[int, typer.Option(min=0)] = 0,
+    seeds: Annotated[int, typer.Option(min=1)] = 2,
+    budget: Annotated[int, typer.Option(min=1)] = 240,
+) -> None:
+    """Bounded online H3 development; not open-family discovery or novelty proof."""
+    from minecraft_scientist.evaluation.revision import run_revision_benchmark
+
+    result = run_revision_benchmark(output=output, seed=seed, seeds=seeds, budget=budget)
+    console.print_json(json.dumps({
+        "runs": len(result["rows"]),
+        "audits_valid": result["all_independent_audits_valid"],
+        "summaries": result["summaries"],
+        "scope": result["scope"],
+    }))
+    console.print(f"Artifacts: {output.resolve()}")
+
+
 if __name__ == "__main__":
     app()

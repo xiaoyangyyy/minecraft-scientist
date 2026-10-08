@@ -1,0 +1,39 @@
+{
+  "schema": "h3-development-design-v1",
+  "purpose": "Learn and separately validate an old mechanism, undergo an unknown online change, synthesize bounded edits and validate a replacement",
+  "budget": 240,
+  "horizon": 5,
+  "monitor_trials": 10,
+  "search_budget": 1000,
+  "shadow_count": 3,
+  "candidate_limit": 512,
+  "bootstrap_joint_count": 9,
+  "complete_generated_mechanism_count": 129,
+  "complete_generated_joint_count": 387,
+  "world_change_boundary_episode": 8,
+  "agent_rng_seed": 20261008,
+  "methods": ["witness_cover", "sequence_ig"],
+  "cases": ["unchanged", "controller_fault", "redirect_start", "redirect_wait", "retain_ready", "state_insert", "outside_grammar"],
+  "grammar": ["single redirect_transition", "single change_output", "add_state_from_template plus redirect_transition"],
+  "guards": [
+    "Old theory must be learned from public interaction and separately validated",
+    "Neither private post-change table, change boundary, case label nor world seed enters the Agent",
+    "Charge resets, monitoring, failures, diagnostic discovery and independent validation",
+    "Keep control-only explanations in the same competing space",
+    "Preserve all finite-horizon behavior and attribution aliases",
+    "No silent candidate truncation or acceptance after incomplete search",
+    "Freeze whole validation batch before dispatch; never fit this candidate to its validation results",
+    "Shadow words and query IDs must be fresh",
+    "Public policy and independent raw edit/compile/ledger checks must precede private truth reads",
+    "Acceptance certifies conditional reset behavior only, not unique causal structure"
+  ],
+  "analysis": "Report all cases, detection delay, attribution errors, prediction recovery, unresolved coverage and total experiment cost",
+  "limitations": [
+    "Development, not a formal statistical preregistration",
+    "Two fixed bootstrap templates, no independent structural train/test split",
+    "Known deterministic resettable controller family",
+    "Candidate-dependent shadow action coverage, not an unbiased random test",
+    "No full computation-cost, posterior calibration, adaptive-learner or LLM comparison",
+    "No H4 transfer, Minecraft/RGB or overall completion claim"
+  ]
+}

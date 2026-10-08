@@ -24,6 +24,9 @@ def identify_mechanism(
     seed=0,
     budget=20,
     horizon=5,
+    candidate_limit=12,
+    equivalence_horizon=None,
+    query_prefix="query-",
 ):
     """No ground-truth/world-family argument. All resets and actions are charged.
 
@@ -35,9 +38,21 @@ def identify_mechanism(
         or type(seed) is not int
         or seed < 0
         or (type(budget) is not int or budget < 1)
+        or type(query_prefix) is not str
+        or not 1 <= len(query_prefix) <= 64
     ):
         raise ValueError("invalid method/seed/budget")
-    space = DiscriminationSpace(candidates, costs, horizon=horizon)
+    candidates = tuple(
+        TheoryIR.model_validate(candidate.model_dump()) for candidate in candidates
+    )
+    space = DiscriminationSpace(
+        candidates,
+        costs,
+        horizon=horizon,
+        candidate_limit=candidate_limit,
+        equivalence_horizon=equivalence_horizon,
+    )
+    costs = space.costs
     rng, events, spent, queries = random.Random(seed), [], 0, 0
     stopped = None
 
@@ -49,7 +64,7 @@ def identify_mechanism(
         predictions = {
             str(index): list(space.prediction(index, word)) for index in space.remaining
         }
-        query_id = f"query-{queries}"
+        query_id = f"{query_prefix}{queries}"
         intervention = InterventionSpec(
             intervention_id=query_id,
             mechanism="finite_transducer",
