@@ -102,5 +102,9 @@ uv run minecraft-scientist benchmark-automata --output runs/<new-directory> --se
 就变更 H3 的验收口径。未知/随机控制器、噪声、H4 迁移和负迁移、公平 LLM、
 受控 Minecraft、自然 RGB/导航/恢复及完整发布继续保留，整体目标未完成。
 
-H3 的 1,665 通过/2 跳过默认回归绑定前一阶段 127 文件包；它不覆盖本阶段
-新模块或修改后的 CLI。当前 342 项属于聚焦证据，不是新的默认全量发布。
+H3 的 1,665 通过/2 跳过默认回归绑定前一阶段 127 文件包，不借给新模块。
+本阶段 Windows 默认全量已实际退出 0：1,746 通过、2 项 Torch 跳过；全部
+130 个源码和 131 个测试哈希不变，见 `runs/apartness-full-windows-verification-v1.json`。
+同冻结 Linux 默认全量已派发句柄 8597，当前仍需终态核验；聚焦 342 项不
+替代其结果或可选训练。隔离自适应原型另见 `adaptive-rules-development.md`，
+不属于本阶段主包默认全量，也不算完整强基线矩阵验收。
