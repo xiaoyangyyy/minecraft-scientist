@@ -1,6 +1,9 @@
 # 自适应规则与有界随机 Wp：隔离开发阶段
 
-日期：2026-10-08。实现位置：`research/adaptive_automata`，不在主包或默认
+日期：2026-10-08，v1 历史阶段。源码已按原注册哈希保存到
+`runs/adaptive-rules-source-v1`；当前完整运行审计阶段另见
+`adaptive-audit-development.md`。这里的 107 项与夹具证据不覆盖当前改动。
+实现位置：`research/adaptive_automata`，不在主包或默认
 测试收集范围内。基础 L# 主包 130 个源码、131 个测试文件的冻结未改变。
 本阶段是强基线适配契约的实现进展，不是完整研究、基线优势或创新证明。
 

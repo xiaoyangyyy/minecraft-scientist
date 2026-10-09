@@ -10,13 +10,20 @@ function Assert-Hash([string]$relative, [string]$expected) {
     if ($actual -cne $expected) { throw "SHA256 mismatch: $relative" }
 }
 
+function Assert-HistoricalSource([string]$relative, [string]$expected) {
+    if ($relative.StartsWith('research/adaptive_automata/')) {
+        $relative = 'runs/adaptive-rules-source-v1/' + $relative.Substring('research/adaptive_automata/'.Length)
+    }
+    Assert-Hash $relative $expected
+}
+
 $proof = Read-ArtifactJson 'runs/adaptive-rules-cross-platform-verification-v1.json'
 $registration = Read-ArtifactJson 'runs/adaptive-rules-source-registration-v1.json'
 Assert-Hash 'runs/adaptive-rules-source-registration-v1.json' $proof.registration_sha256
 foreach ($entry in $registration.source_sha256.PSObject.Properties) {
-    Assert-Hash ('research/adaptive_automata/' + $entry.Name) $entry.Value
+    Assert-Hash ('runs/adaptive-rules-source-v1/' + $entry.Name) $entry.Value
 }
-$actualPrototypeFiles = @(Get-ChildItem -LiteralPath (Join-Path $repoRoot 'research/adaptive_automata') -File | Where-Object { $_.Extension -in '.py','.md' } | ForEach-Object Name | Sort-Object)
+$actualPrototypeFiles = @(Get-ChildItem -LiteralPath (Join-Path $repoRoot 'runs/adaptive-rules-source-v1') -File | Where-Object { $_.Extension -in '.py','.md' } | ForEach-Object Name | Sort-Object)
 $registeredPrototypeFiles = @($registration.source_sha256.PSObject.Properties.Name | Sort-Object)
 if (@(Compare-Object $actualPrototypeFiles $registeredPrototypeFiles).Count -ne 0) { throw 'Prototype file set changed' }
 Assert-Hash $registration.main_registration $registration.main_registration_sha256
@@ -46,8 +53,8 @@ foreach ($run in $proof.fixture_exports.runs) {
     if (@($manifest.sha256.PSObject.Properties).Count -ne 26) { throw 'Fixture manifest count changed' }
     if (@(Get-ChildItem -LiteralPath (Join-Path $repoRoot $run.path) -Recurse -File).Count -ne 27) { throw 'Fixture file set changed' }
     foreach ($entry in $manifest.sha256.PSObject.Properties) { Assert-Hash ($run.path + '/' + $entry.Name) $entry.Value }
-    foreach ($entry in $fixtureRegistration.source_sha256.PSObject.Properties) { Assert-Hash $entry.Name $entry.Value }
+    foreach ($entry in $fixtureRegistration.source_sha256.PSObject.Properties) { Assert-HistoricalSource $entry.Name $entry.Value }
     $report = Read-ArtifactJson ($run.path + '/report.json')
     if (@($report.rows).Count -ne 8 -or @($report.rows | Where-Object { $_.fixture_evaluator_behavior_correct -ne $true }).Count -ne 0) { throw 'Declared fixture evaluator outcomes changed' }
 }
-Write-Output 'Verified 107 focused cases per platform; 26 deterministic artifacts plus identical manifest in each of 3 fixture exports. Plan checks only, not whole-run audit, fair baseline, structural holdout or full-project completion.'
+Write-Output 'Verified HISTORICAL v1 archived snapshot only: 107 focused cases per platform and 3 identical fixture exports. Does NOT cover the current changed learner/auditor, whole-run audit, fair baseline or project completion.'

@@ -2,7 +2,9 @@
 
 Status: isolated research implementation, **not yet an accepted strong baseline**.
 The package and default tests remain frozen while their Linux full regression
-runs. These files are not silently substituted into that source freeze.
+runs. These files are not silently substituted into that source freeze. The
+older 107-case phase is preserved in `runs/adaptive-rules-source-v1`; its tests
+are historical, not evidence for the changed current learner/auditor.
 
 This advances the existing strong-baseline contract, not the entire project
 completion claim. H3 structural holdouts, H4/negative transfer, unknown delivery
@@ -64,8 +66,22 @@ These tests are deliberately outside the default `tests` directory. Exact
 source-bound Windows/Linux counts and failures belong in run verification files,
 not inferred from this document. Earlier failed XML files must remain visible.
 
-Missing before promotion: whole adaptive-run public/private-I/O audit and policy
-replay; controlled-failure/incomplete-query cases; counterexample-heavy programs
-beyond counter fixtures; paid old-model learning, online epoch wrapper and fair
-comparison; a prospectively frozen structural split and independent evaluation.
-This work does not close those gates or prove novelty.
+Current `audit_run.py` adds a full stationary policy replay and independent raw
+ledger before private I/O. Basis promotions, rebuilding closure and folded
+hypotheses are frozen as events. Raw checks enforce input/reset/receipt clocks,
+intervention intent, failed/partial query exclusion, per-action costs, actual
+caches, epoch provenance, observed apartness, fold tables, conformance order and
+candidate validation. A genuine wrong provisional proposal remains a valid run
+with a false private behavior score, not an audit failure hidden from the report.
+
+The policy replay uses the same learner; independent raw checks protect specific
+shared faults, not every possible algorithm bug. Known terminal failed dispatch
+is charged/excluded. Unknown delivery/confounders, nonstationary worlds and causal
+factor attribution are not certified under this stationary trusted-reset protocol.
+
+Before strong-baseline acceptance: source-bound cross-platform evidence for this
+new phase; paid old-model learning, online epoch wrapper, matched tester/prior/
+cost comparisons; prospectively frozen structural splits and transfer evaluation.
+The development runner supplies a fixed two-state cycle public prior without
+charging prior learning; do not call it an online transfer comparison. See
+`docs/adaptive-audit-development.md`. None of this proves novelty or full release.

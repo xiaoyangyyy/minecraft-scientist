@@ -8,7 +8,7 @@ Adaptive L# baseline validation. Main source/test files stay frozen meanwhile.
 from __future__ import annotations
 
 from random_wp import random_wp_plan
-from reference_matching import ReferencePool
+from reference_matching import ReferencePool, fingerprint
 
 from minecraft_scientist.discovery.active_automata import (
     LearnerStop,
@@ -58,6 +58,15 @@ def learn_adaptive(
         if len(basis) == 16:
             raise LearnerStop("theory_state_capacity_exhausted")
         basis.append(prefix)
+        query.events.append(
+            {
+                "kind": "basis_promotion",
+                "rule": rule,
+                "access": list(prefix),
+                "basis": [list(p) for p in basis],
+                "observation_digest": fingerprint(tree.snapshot()),
+            }
+        )
         rules.append({"rule": rule, "access": list(prefix)})
 
     def apply(plan):
@@ -80,6 +89,13 @@ def learn_adaptive(
                 promote(promotion, "PP")
                 continue
             rules.append({"rule": "rebuilding_closed"})
+            query.events.append(
+                {
+                    "kind": "rebuilding_closed",
+                    "basis": [list(p) for p in basis],
+                    "observation_digest": fingerprint(tree.snapshot()),
+                }
+            )
             break
         while True:
             # Explicit FM 2024 section-6 priority, unlike the basic L# loop.
@@ -143,6 +159,14 @@ def learn_adaptive(
                 apply(plan)
                 continue
             candidate = fold_hypothesis(tree, basis)
+            query.events.append(
+                {
+                    "kind": "hypothesis_plan",
+                    "candidate_ir": candidate.to_ir(horizon).model_dump(mode="json"),
+                    "basis": [list(p) for p in basis],
+                    "observation_digest": fingerprint(tree.snapshot()),
+                }
+            )
             conflict = consistency_conflict(tree, candidate)
             if conflict is not None:
                 before = tree.norm(basis)
@@ -209,7 +233,7 @@ def learn_adaptive(
     except LearnerStop as error:
         reason = str(error)
     return {
-        "schema": "isolated-adaptive-rules-v2",
+        "schema": "isolated-adaptive-rules-v3",
         "status": status,
         "stop_reason": reason,
         "budget": budget,

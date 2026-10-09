@@ -105,6 +105,9 @@ uv run minecraft-scientist benchmark-automata --output runs/<new-directory> --se
 H3 的 1,665 通过/2 跳过默认回归绑定前一阶段 127 文件包，不借给新模块。
 本阶段 Windows 默认全量已实际退出 0：1,746 通过、2 项 Torch 跳过；全部
 130 个源码和 131 个测试哈希不变，见 `runs/apartness-full-windows-verification-v1.json`。
-同冻结 Linux 默认全量已派发句柄 8597，当前仍需终态核验；聚焦 342 项不
-替代其结果或可选训练。隔离自适应原型另见 `adaptive-rules-development.md`，
+同冻结 Linux 默认全量 v1 的句柄 8597 在约 49% 返回终态退出码
+1073807364，未生成 JUnit；确认内部 pytest 也不再存活，不算通过。失败
+记录保留于 `runs/apartness-full-linux-terminal-v1.json`。同 130/131 文件
+冻结的 v2 已重跑（句柄 87685），仍需终态核验；聚焦 342 项不替代其结果
+或可选训练。隔离自适应原型另见 `adaptive-rules-development.md`，
 不属于本阶段主包默认全量，也不算完整强基线矩阵验收。
