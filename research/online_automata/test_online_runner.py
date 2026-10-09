@@ -30,6 +30,7 @@ def online_runner():
         {"suite": "unknown"},
         {"seed": -1},
         {"horizon": 9},
+        {"bootstrap_mode": "private-truth"},
     ],
 )
 def test_invalid_grid_never_creates_output(online_runner, tmp_path, protocol):
@@ -60,6 +61,8 @@ def test_controlled_grid_replays_all_artifacts_and_preserves_negative_results(
     )
     assert all(p["same_paid_bootstrap_and_monitoring"] for p in report["pairs"])
     for row in report["rows"]:
+        assert row["bootstrap_mode"] == "known-family"
+        assert row["evaluation"]["old_behavior_correct_at_H"] is True
         assert (
             row["spent"]
             == row["old_spent"] + row["monitor_spent"] + row["repair_spent"]
@@ -70,6 +73,18 @@ def test_controlled_grid_replays_all_artifacts_and_preserves_negative_results(
         (first / path).read_bytes() == (second / path).read_bytes()
         for path in manifest["sha256"]
     )
+
+
+def test_alphabet_only_ablation_remains_explicit_and_separate(online_runner, tmp_path):
+    report = online_runner.run(
+        output=tmp_path / "alphabet",
+        seeds=1,
+        suite="controlled",
+        budget=1,
+        bootstrap_mode="alphabet",
+    )
+    assert report["registration"]["controlled_bootstrap_mode"] == "alphabet"
+    assert all(row["bootstrap_mode"] == "alphabet" for row in report["rows"])
 
 
 def test_changed_source_keeps_partial_data_without_certified_manifest(

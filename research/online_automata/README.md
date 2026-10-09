@@ -45,11 +45,26 @@ uv run pytest research/online_automata -q
 uv run python scripts/run_online_automata_development.py --output runs/<new-directory>
 ```
 
-The default development grid has two seeds, four two-action cases with five
-hidden boundaries, and seven existing controlled H3 cases. Both baseline methods
-have matching knowledge/tester/budget. Existing full H3 methods have extra
-bootstrap/DSL/factor knowledge and are NOT yet compared as matched here. This is
+The current default controlled condition uses the SAME declared public bootstrap
+family/calibration for both methods, paid witness-cover identification, then
+fresh positive-if-available/action-coverage shadow validation. `shared_bootstrap.py`
+reuses production identification/validation, rather than treating evaluator
+answers as old knowledge. `audit_bootstrap.py` independently checks raw factor
+compilation, behavioral classes, frozen query predictions, filtering, cost,
+complete prospective coverage, disjoint evidence and publication before private I/O.
+An accepted old model can still be wrong outside the supplied family/finite scope.
+`--bootstrap-mode alphabet` preserves the earlier no-family ablation explicitly.
+Two-action tasks remain alphabet-only. The repair learners/tester are unchanged.
+
+The development grid has two seeds, four two-action cases with five hidden
+boundaries, and seven existing controlled H3 cases. Both baseline methods have
+matching initial knowledge/tester/budget within each condition. Existing full H3
+methods are NOT yet routed through this common entry or compared as matched here.
+The shared bootstrap is an entry towards that comparison, not its completion. This is
 not structural train/test holdout, statistical superiority, causal identification,
 learned-symbol migration, unknown stochastic delivery, natural Minecraft/RGB,
 recovery/release or a novelty claim. Source-bound runs/tests are separately recorded
-in `docs/online-automata-development.md`; old green counts cannot certify changes.
+in `docs/shared-bootstrap-development.md`. The previous 313-case/650-artifact
+phase is byte-exact archived under `runs/online-automata-source-v1` and documented
+in `docs/online-automata-development.md`; its verifier reads that historical source,
+not this changed implementation. Old green counts cannot certify changes.

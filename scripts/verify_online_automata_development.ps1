@@ -1,8 +1,11 @@
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
+$historicalRoot = Join-Path $repoRoot 'runs/online-automata-source-v1'
+$historicalRegistration = Get-Content -LiteralPath (Join-Path $repoRoot 'runs/online-automata-source-registration-v1.json') -Raw | ConvertFrom-Json
 function Read-RunJson([string]$relative) { Get-Content -LiteralPath (Join-Path $repoRoot $relative) -Raw | ConvertFrom-Json }
 function Assert-RunHash([string]$relative, [string]$expected) {
-    if ((Get-FileHash -LiteralPath (Join-Path $repoRoot $relative)).Hash.ToLower() -cne $expected) { throw "Source/artifact drift: $relative" }
+    $sourceRoot = if ($null -ne $historicalRegistration.source_sha256.PSObject.Properties[$relative]) { $historicalRoot } else { $repoRoot }
+    if ((Get-FileHash -LiteralPath (Join-Path $sourceRoot $relative)).Hash.ToLower() -cne $expected) { throw "Source/artifact drift: $relative" }
 }
 function Assert-SameJson($left, $right, [string]$label) {
     if (($left | ConvertTo-Json -Depth 100 -Compress) -cne ($right | ConvertTo-Json -Depth 100 -Compress)) { throw "JSON mismatch: $label" }
@@ -13,7 +16,7 @@ Assert-RunHash 'runs/online-automata-source-registration-v1.json' $proof.registr
 if (@($registration.source_sha256.PSObject.Properties).Count -ne 11) { throw 'Unexpected phase source set' }
 foreach ($entry in $registration.source_sha256.PSObject.Properties) { Assert-RunHash $entry.Name $entry.Value }
 $registered = @($registration.source_sha256.PSObject.Properties.Name | Where-Object { $_.StartsWith('research/online_automata/') } | Sort-Object)
-$actual = @(Get-ChildItem (Join-Path $repoRoot 'research/online_automata') -File | Where-Object { $_.Extension -in '.py','.md' } | ForEach-Object { 'research/online_automata/' + $_.Name } | Sort-Object)
+$actual = @(Get-ChildItem (Join-Path $historicalRoot 'research/online_automata') -File | Where-Object { $_.Extension -in '.py','.md' } | ForEach-Object { 'research/online_automata/' + $_.Name } | Sort-Object)
 if (@(Compare-Object $registered $actual).Count -ne 0) { throw 'Prototype file set changed' }
 Assert-RunHash $registration.upstream_registration $registration.upstream_registration_sha256
 $upstream = Read-RunJson $registration.upstream_registration
@@ -95,4 +98,4 @@ foreach ($run in $proof.runs) {
     }
     if ($both -ne 12 -or $adaptiveCheaper -ne 0 -or $scratchCheaper -ne 12 -or $tied -ne 0 -or $report.summary.both_repaired_correct_pairs -ne $both -or $report.summary.adaptive_cheaper_among_both_repaired_correct -ne $adaptiveCheaper -or $report.summary.scratch_cheaper_among_both_repaired_correct -ne $scratchCheaper -or $report.summary.tied_cost_among_both_repaired_correct -ne $tied) { throw 'Repair-conditioned cost comparison changed' }
 }
-Write-Output 'Verified isolated online phase: Windows/Linux 313 focused cases each; three identical 650-artifact runs; 108 valid public-first audits. Each method: 16 finite replacements, 12 H-correct/4 wrong, 6 unresolved, 32 bounded no-anomaly. Both-repair-correct cost wins: adaptive 0/scratch 12. NOT matched full H3, stable transfer gain, factor attribution, structure holdouts, stochastic-control solution, novelty, main/default full regression or full release.'
+Write-Output 'Verified HISTORICAL archived online phase ONLY: Windows/Linux 313 focused cases each; three identical 650-artifact runs; 108 valid public-first audits. Each method: 16 finite replacements, 12 H-correct/4 wrong, 6 unresolved, 32 bounded no-anomaly. Both-repair-correct cost wins: adaptive 0/scratch 12. NOT current-source certification, matched full H3, stable transfer gain, factor attribution, structure holdouts, stochastic-control solution, novelty, main/default full regression or full release.'

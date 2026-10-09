@@ -43,7 +43,17 @@ def hashes():
     }
 
 
-def run(*, output, seed=0, seeds=2, suite="all", budget=600, old_budget=250, horizon=5):
+def run(
+    *,
+    output,
+    seed=0,
+    seeds=2,
+    suite="all",
+    budget=600,
+    old_budget=250,
+    horizon=5,
+    bootstrap_mode="known-family",
+):
     if (
         type(seed) is not int
         or seed < 0
@@ -54,6 +64,8 @@ def run(*, output, seed=0, seeds=2, suite="all", budget=600, old_budget=250, hor
         or any(type(v) is not int or v < 1 for v in (budget, old_budget))
         or type(horizon) is not int
         or not 1 <= horizon <= 8
+        or type(bootstrap_mode) is not str
+        or bootstrap_mode not in ("alphabet", "known-family")
     ):
         raise ValueError("invalid online development runner protocol")
     output.mkdir(parents=True, exist_ok=False)
@@ -69,7 +81,7 @@ def run(*, output, seed=0, seeds=2, suite="all", budget=600, old_budget=250, hor
         "operation_budget": 200_000,
         "reference_operation_budget": 200_000,
     }
-    scope = "paired one-crisis issued-behavior baseline development with hidden episode switches; not full knowledge-matched H3, factor attribution, structural holdout, unknown noise, learned symbol transfer or novelty"
+    scope = "paired one-crisis issued-behavior baseline development with explicit bootstrap knowledge and hidden episode switches; not a completed full-H3 comparison, factor attribution, structural holdout, unknown noise, learned symbol transfer or novelty"
     grid = []
     for world_seed in range(seed, seed + seeds):
         if suite in ("all", "automata"):
@@ -80,19 +92,21 @@ def run(*, output, seed=0, seeds=2, suite="all", budget=600, old_budget=250, hor
         if suite in ("all", "controlled"):
             grid += [(world_seed, "controlled", case, 25) for case in REVISION_CASES]
     registration = {
-        "schema": "online-automata-development-registration-v1",
+        "schema": "online-automata-development-registration-v2",
+        "controlled_bootstrap_mode": bootstrap_mode,
         "source_sha256": sources,
         "protocol": protocol,
         "methods": list(METHODS),
         "private_grid": [list(c) for c in grid],
         "scope": scope,
-        "knowledge_boundary": "only capability/anonymous alphabet/costs reach both agents; controller/bootstrap candidates stay evaluator-owned. Existing H3 full method has additional bootstrap/DSL/factor knowledge, so not compared as matched here",
+        "knowledge_boundary": "automata: anonymous alphabet only. Controlled known-family mode: BOTH methods receive the same public bootstrap factors/calibration and pay the same witness-cover discovery plus fresh coverage validation. Alphabet mode withholds this prior as a separate ablation. No private schedule/replacement enters either. Full H3 is not yet routed through this shared entry and is not compared here",
     }
     dump(output / "registration.json", registration)
     rows, pairs, timings = [], [], []
     for world_seed, family, case, boundary in grid:
         previous, paired = None, {}
         for method in METHODS:
+            initial_family = None
             directory = (
                 output
                 / f"seed-{world_seed}"
@@ -116,18 +130,37 @@ def run(*, output, seed=0, seeds=2, suite="all", budget=600, old_budget=250, hor
                 actions = tuple(task.costs)
                 outputs = tuple(task.bootstrap[0].mechanism_ir.parameters["outputs"])
                 costs, private, view = task.costs, task.private_spec, task.view
+                if bootstrap_mode == "known-family":
+                    initial_family = {
+                        "hypotheses": [
+                            h.model_dump(mode="json") for h in task.bootstrap
+                        ],
+                        "calibration": list(task.calibration),
+                        "discovery_budget": 40,
+                        "shadow_count": 3,
+                    }
             config = {
-                "schema": "online-relearning-config-v1",
+                "schema": "online-relearning-config-v2"
+                if initial_family is not None
+                else "online-relearning-config-v1",
                 "method": method,
                 "actions": list(actions),
                 "outputs": list(outputs),
                 "costs": costs,
                 "protocol": protocol,
             }
+            if initial_family is not None:
+                config["initial_family"] = initial_family
             dump(directory / "config.json", config)
             wall, cpu = perf_counter(), process_time()
             result = online_relearn(
-                view, actions, outputs, costs, method=method, **protocol
+                view,
+                actions,
+                outputs,
+                costs,
+                method=method,
+                initial_family=initial_family,
+                **protocol,
             )
             learning_time = {
                 "wall_seconds": perf_counter() - wall,
@@ -193,6 +226,9 @@ def run(*, output, seed=0, seeds=2, suite="all", budget=600, old_budget=250, hor
                 "case": case,
                 "private_boundary": boundary,
                 "method": method,
+                "bootstrap_mode": "known-family"
+                if initial_family is not None
+                else "alphabet",
                 "status": result["status"],
                 "stop_reason": result["stop_reason"],
                 "spent": result["spent"],
@@ -277,7 +313,7 @@ def run(*, output, seed=0, seeds=2, suite="all", budget=600, old_budget=250, hor
         ),
     }
     report = {
-        "schema": "online-automata-development-report-v1",
+        "schema": "online-automata-development-report-v2",
         "registration": registration,
         "scope": scope,
         "rows": rows,
@@ -325,4 +361,7 @@ if __name__ == "__main__":
     parser.add_argument("--budget", type=int, default=600)
     parser.add_argument("--old-budget", type=int, default=250)
     parser.add_argument("--horizon", type=int, default=5)
+    parser.add_argument(
+        "--bootstrap-mode", choices=("alphabet", "known-family"), default="known-family"
+    )
     run(**vars(parser.parse_args()))

@@ -3,11 +3,13 @@
 import json
 from collections import deque
 
+from audit_bootstrap import check_bootstrap_public
 from audit_random_wp import check_random_wp_plan
 from audit_run import PublicLedger, canonical
 from audit_transfer import replay_capability
 from online import online_relearn
 from paid_transfer import METHODS, learn_phase, phase_config
+from shared_bootstrap import bootstrap_config, final_validation_ids, validated
 
 from minecraft_scientist.evaluation.diagnosis import _factor_step, _rows
 from minecraft_scientist.protocols import (
@@ -62,6 +64,9 @@ class IssuedBehaviorLedger(PublicLedger):
 
 
 def check_phase_public(phase):
+    if phase["config"]["schema"] == "public-family-bootstrap-config-v1":
+        check_bootstrap_public(phase)
+        return
     ledger = IssuedBehaviorLedger(phase["config"], phase["run"])
     ledger.validate()
     view, consumed = replay_capability(phase["run"])
@@ -276,16 +281,17 @@ def check_lineage(result):
 
     def publish(phase, epoch, version, parent):
         run = phase["run"]
-        final = run["conformance"][-1]["query_ids"]
+        final = final_validation_ids(run)
         discovery = [
             f"{epoch}/{e['query_id']}"
             for e in run["events"]
             if e["kind"] == "evidence" and e["query_id"] not in final
         ]
         validation = [f"{epoch}/{q}" for q in final]
-        if (
-            set(discovery) & set(validation)
-            or len(set(validation)) != phase["config"]["protocol"]["conformance_count"]
+        if set(discovery) & set(validation) or len(set(validation)) != (
+            phase["config"]["family"]["shadow_count"]
+            if phase["config"]["schema"] == "public-family-bootstrap-config-v1"
+            else phase["config"]["protocol"]["conformance_count"]
         ):
             raise ValueError("independent online validation evidence overlap/count")
         ir = json.loads(canonical(run["candidate_ir"]))
@@ -315,7 +321,7 @@ def check_lineage(result):
         return events[-1]
 
     old = None
-    if result["old"]["run"]["status"] == "provisional_conformance_passed":
+    if validated(result["old"]["run"]):
         old = publish(result["old"], "old-epoch", 1, None)
     if canonical(old) != canonical(result["public_old_theory"]):
         raise ValueError("independent online paid old theory mismatch")
@@ -343,8 +349,21 @@ def validate_online_public(config, result):
     if (
         type(config) is not dict
         or set(config)
-        != {"schema", "method", "actions", "outputs", "costs", "protocol"}
-        or config["schema"] != "online-relearning-config-v1"
+        != (
+            {
+                "schema",
+                "method",
+                "actions",
+                "outputs",
+                "costs",
+                "protocol",
+                "initial_family",
+            }
+            if config.get("schema") == "online-relearning-config-v2"
+            else {"schema", "method", "actions", "outputs", "costs", "protocol"}
+        )
+        or config["schema"]
+        not in ("online-relearning-config-v1", "online-relearning-config-v2")
         or type(config["method"]) is not str
         or config["method"] not in METHODS
     ):
@@ -367,7 +386,12 @@ def validate_online_public(config, result):
         if type(value) is not int or value < low or (high is not None and value > high):
             raise ValueError("independent exact online protocol bound mismatch")
     if (
-        result["schema"] != "paid-online-relearning-v1"
+        result["schema"]
+        != (
+            "paid-online-relearning-v2"
+            if config["schema"] == "online-relearning-config-v2"
+            else "paid-online-relearning-v1"
+        )
         or result["method"] != config["method"]
         or type(result["budget"]) is not int
         or result["budget"] != protocol["budget"]
@@ -399,14 +423,26 @@ def validate_online_public(config, result):
             "reference_operation_budget",
         )
     }
-    expected_old = phase_config(
-        tuple(config["actions"]),
-        tuple(config["outputs"]),
-        config["costs"],
-        (),
-        budget=min(protocol["old_budget"], protocol["budget"]),
-        epoch="old-epoch",
-        **common,
+    expected_old = (
+        bootstrap_config(
+            tuple(config["actions"]),
+            tuple(config["outputs"]),
+            config["costs"],
+            config["initial_family"],
+            budget=min(protocol["old_budget"], protocol["budget"]),
+            horizon=protocol["horizon"],
+            seed=protocol["seed"],
+        )
+        if config["schema"] == "online-relearning-config-v2"
+        else phase_config(
+            tuple(config["actions"]),
+            tuple(config["outputs"]),
+            config["costs"],
+            (),
+            budget=min(protocol["old_budget"], protocol["budget"]),
+            epoch="old-epoch",
+            **common,
+        )
     )
     if canonical(expected_old) != canonical(result["old"]["config"]):
         raise ValueError("independent online bootstrap prior/protocol mismatch")
@@ -511,6 +547,7 @@ def validate_online_public(config, result):
         tuple(config["outputs"]),
         config["costs"],
         method=config["method"],
+        initial_family=config.get("initial_family"),
         **protocol,
     )
     if not consumed() or canonical(replay) != canonical(result):

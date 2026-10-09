@@ -4,6 +4,11 @@
 或 Minecraft/RGB 验收完成。源位于 `research/online_automata`，主包和默认
 测试仍保持原冻结；付费上下文迁移的 20 文件阶段也未改动、不借用旧绿灯。
 
+本页现在是历史冻结阶段：11 文件已字节归档到 `runs/online-automata-source-v1`，
+历史验证器从该归档读源，不认证随后改动。新的共享公开先验/付费覆盖验证
+入口见 `shared-bootstrap-development.md`；本页所有 313 项/650 文件及负结果
+保留原知识条件，不改写为新阶段成果。
+
 ## 真正在线的流程
 
 同一个世界的全局 episode 持续增长，隐藏程序在 evaluator-owned 边界切换。

@@ -8,6 +8,12 @@ An anomaly challenges issued-command behavior, NOT a unique causal factor.
 from paid_transfer import METHODS, learn_phase, phase_config
 from random_wp import random_wp_plan
 from recorded_epoch import RecordedEpoch
+from shared_bootstrap import (
+    bootstrap_config,
+    final_validation_ids,
+    learn_shared_bootstrap,
+    validated,
+)
 
 from minecraft_scientist.discovery.active_automata import (
     LearnerStop,
@@ -36,6 +42,7 @@ def online_relearn(
     monitor_count=8,
     operation_budget=200_000,
     reference_operation_budget=200_000,
+    initial_family=None,
 ):
     if (
         type(method) is not str
@@ -56,9 +63,24 @@ def online_relearn(
         or not 1 <= monitor_rounds <= 16
     ):
         raise ValueError("invalid bounded online relearning protocol")
+    initial_config = (
+        None
+        if initial_family is None
+        else bootstrap_config(
+            actions,
+            outputs,
+            costs,
+            initial_family,
+            budget=min(old_budget, budget),
+            horizon=horizon,
+            seed=seed,
+        )
+    )
     registry = TheoryRegistry()
     result = {
-        "schema": "paid-online-relearning-v1",
+        "schema": "paid-online-relearning-v2"
+        if initial_config is not None
+        else "paid-online-relearning-v1",
         "method": method,
         "budget": budget,
         "spent": 0,
@@ -79,7 +101,7 @@ def online_relearn(
     }
 
     def publish(run, epoch, parent):
-        final = run["conformance"][-1]["query_ids"]
+        final = final_validation_ids(run)
         acquired = [e["query_id"] for e in run["events"] if e["kind"] == "evidence"]
         discovery = tuple(f"{epoch}/{q}" for q in acquired if q not in final)
         validation = tuple(f"{epoch}/{q}" for q in final)
@@ -128,16 +150,26 @@ def online_relearn(
         result["spent"] += run["spent"]
         return {"config": config, "run": run, "raw_controls": recorder.controls}
 
-    result["old"] = phase("old-epoch", (), min(old_budget, budget))
+    if initial_config is None:
+        result["old"] = phase("old-epoch", (), min(old_budget, budget))
+    else:
+        recorder = RecordedEpoch(world)
+        run = learn_shared_bootstrap(recorder.view, initial_config)
+        result["spent"] += run["spent"]
+        result["old"] = {
+            "config": initial_config,
+            "run": run,
+            "raw_controls": recorder.controls,
+        }
     old = result["old"]["run"]
-    if old["status"] != "provisional_conformance_passed":
+    if not validated(old):
         result["stop_reason"] = "old_learning_unresolved"
         return result
     old_version = publish(old, "old-epoch", None)
     result["public_old_theory"] = old_version.model_dump(mode="json")
     hypothesis = TreeHypothesis(
         FiniteStateProgram.from_ir(old_version.ir),
-        tuple(tuple(p) for p in old["basis"]),
+        tuple(tuple(p) for p in old.get("basis", [])),
     )
     for index in range(monitor_rounds):
         try:
