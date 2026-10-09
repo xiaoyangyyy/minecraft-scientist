@@ -237,7 +237,7 @@ def partition_records(records, *, salt, weights=(60, 20, 20)):
             or type(record["id"]) is not str
             or not record["id"]
             or type(record["leakage_keys"]) is not tuple
-            or not 1 <= len(record["leakage_keys"]) <= 16
+            or not 1 <= len(record["leakage_keys"]) <= 64
             or any(
                 type(k) is not str or not 1 <= len(k) <= 256
                 for k in record["leakage_keys"]

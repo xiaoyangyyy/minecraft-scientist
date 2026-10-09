@@ -92,8 +92,11 @@ IG 比 witness 全网格少 22 单位费用，但恢复/错误/未解决数相�
 主要依赖策略重放，而非第二个独立全枚举器，未知控制/噪声及因子可识别性
 仍未解决。共用有界最终验证也未阻止一般状态机方法的全部错误晋升。
 
-新增主包的默认全量 Windows/Linux 已按上述源冻结启动，见
-`runs/matched-h3-full-dispatch-v1.json`；取得实际终态/XML/源绑定前仍不算通过。
+新增主包默认全量Windows已实际退出0：1747通过/2项Torch相关跳过，XML共
+1749项且case ID唯一；133包源/132测试未变。证据为
+`runs/matched-h3-full-windows-verification-v1.json`。同冻结Linux句柄85256仍在
+运行，见 `runs/matched-h3-full-dispatch-v1.json`；取得实际终态/XML/源绑定前
+不算Linux通过，也不推断可选训练能力。
 当前包的离线 MVP CLI 已退出 0，但它是原 MVP 协议，不是本四方法 runner、
 完整 H4 或自然 Minecraft 结果。
 
