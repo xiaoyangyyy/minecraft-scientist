@@ -5,6 +5,12 @@ old history, monitor identically, then either ignore or reuse its public IR.
 An anomaly challenges issued-command behavior, NOT a unique causal factor.
 """
 
+from matched_repair import (
+    MATCHED_METHODS,
+    check_policy,
+    learn_matched_repair,
+    repair_config,
+)
 from paid_transfer import METHODS, learn_phase, phase_config
 from random_wp import random_wp_plan
 from recorded_epoch import RecordedEpoch
@@ -43,10 +49,11 @@ def online_relearn(
     operation_budget=200_000,
     reference_operation_budget=200_000,
     initial_family=None,
+    repair_policy=None,
 ):
     if (
         type(method) is not str
-        or method not in METHODS
+        or method not in (MATCHED_METHODS if repair_policy is not None else METHODS)
         or any(
             type(v) is not int or v < 1
             for v in (budget, old_budget, operation_budget, reference_operation_budget)
@@ -63,6 +70,10 @@ def online_relearn(
         or not 1 <= monitor_rounds <= 16
     ):
         raise ValueError("invalid bounded online relearning protocol")
+    if repair_policy is not None:
+        repair_policy = check_policy(repair_policy)
+        if initial_family is None or horizon > 5:
+            raise ValueError("matched repair requires a public family and H <= 5")
     initial_config = (
         None
         if initial_family is None
@@ -78,7 +89,9 @@ def online_relearn(
     )
     registry = TheoryRegistry()
     result = {
-        "schema": "paid-online-relearning-v2"
+        "schema": "paid-online-relearning-v3"
+        if repair_policy is not None
+        else "paid-online-relearning-v2"
         if initial_config is not None
         else "paid-online-relearning-v1",
         "method": method,
@@ -100,14 +113,16 @@ def online_relearn(
         "scope": "one bounded issued-behavior crisis with unannounced episode changes; trusted resets, deterministic queries, finite validation; no factor attribution, noisy continuous-world or full H3/H4 claim",
     }
 
-    def publish(run, epoch, parent):
+    def publish(run, epoch, parent, *, accepted=True):
         final = final_validation_ids(run)
         acquired = [e["query_id"] for e in run["events"] if e["kind"] == "evidence"]
         discovery = tuple(f"{epoch}/{q}" for q in acquired if q not in final)
         validation = tuple(f"{epoch}/{q}" for q in final)
         if set(discovery) & set(validation):
             raise ValueError("online generation/validation evidence overlap")
-        ir = TheoryIR.model_validate(run["candidate_ir"])
+        ir = TheoryIR.model_validate(
+            run["candidate_ir"] if accepted else run["proposed_ir"]
+        )
         ir.scope["evidence_epoch"] = epoch
         version = registry.propose(
             "issued-response",
@@ -116,10 +131,16 @@ def online_relearn(
             parent_version=parent,
             validation_score=0.0,
             confidence=0.0,
-            created_by="ordered-lsharp-paid-online-relearning",
+            created_by="shared-paid-scientific-lifecycle"
+            if repair_policy is not None
+            else "ordered-lsharp-paid-online-relearning",
         )
         result["theory_events"].append(version.model_dump(mode="json"))
-        for status in (TheoryStatus.PROVISIONAL, TheoryStatus.ACCEPTED):
+        for status in (
+            (TheoryStatus.PROVISIONAL, TheoryStatus.ACCEPTED)
+            if accepted
+            else (TheoryStatus.PROVISIONAL,)
+        ):
             version = registry.transition("issued-response", version.version, status)
             result["theory_events"].append(version.model_dump(mode="json"))
         result["validation_assignments"].append(
@@ -262,9 +283,44 @@ def online_relearn(
         result["stop_reason"] = "no_relearning_budget"
         return result
     references = (old_version.ir,) if method == "adaptive" else ()
-    result["new"] = phase("repair-epoch", references, remaining)
+    if repair_policy is None:
+        result["new"] = phase("repair-epoch", references, remaining)
+    else:
+        config = repair_config(
+            actions,
+            outputs,
+            costs,
+            method=method,
+            family=initial_config["family"],
+            anchor_index=min(old["discovery"]["remaining_candidates"]),
+            old_ir=old_version.ir.model_dump(mode="json"),
+            anomaly=result["anomaly"],
+            policy=repair_policy,
+            protocol=common | {"budget": remaining, "epoch": "repair-epoch"},
+        )
+        recorder = RecordedEpoch(world)
+        run = learn_matched_repair(recorder.view, config)
+        result["spent"] += run["spent"]
+        result["new"] = {
+            "config": config,
+            "run": run,
+            "raw_controls": recorder.controls,
+        }
     new = result["new"]["run"]
-    if new["status"] != "provisional_conformance_passed":
+    if not validated(new):
+        if repair_policy is not None and new["proposed_ir"] is not None:
+            version = publish(new, "repair-epoch", 1, accepted=False)
+            if new["validation_counterexample_ids"]:
+                rejected = registry.transition(
+                    "issued-response",
+                    version.version,
+                    TheoryStatus.REJECTED,
+                    counterexample_ids=tuple(
+                        f"repair-epoch/{q}"
+                        for q in new["validation_counterexample_ids"]
+                    ),
+                )
+                result["theory_events"].append(rejected.model_dump(mode="json"))
         result["stop_reason"] = "repair_learning_unresolved"
         return result
     publish(new, "repair-epoch", 1)

@@ -4,7 +4,7 @@ $historicalRoot = Join-Path $repoRoot 'runs/online-automata-source-v1'
 $historicalRegistration = Get-Content -LiteralPath (Join-Path $repoRoot 'runs/online-automata-source-registration-v1.json') -Raw | ConvertFrom-Json
 function Read-RunJson([string]$relative) { Get-Content -LiteralPath (Join-Path $repoRoot $relative) -Raw | ConvertFrom-Json }
 function Assert-RunHash([string]$relative, [string]$expected) {
-    $sourceRoot = if ($null -ne $historicalRegistration.source_sha256.PSObject.Properties[$relative]) { $historicalRoot } else { $repoRoot }
+    $sourceRoot = if ($null -ne $historicalRegistration.source_sha256.PSObject.Properties[$relative]) { $historicalRoot } elseif ($relative.StartsWith('src/minecraft_scientist/') -or $relative.StartsWith('tests/')) { Join-Path $repoRoot 'runs/apartness-main-source-v1' } else { $repoRoot }
     if ((Get-FileHash -LiteralPath (Join-Path $sourceRoot $relative)).Hash.ToLower() -cne $expected) { throw "Source/artifact drift: $relative" }
 }
 function Assert-SameJson($left, $right, [string]$label) {

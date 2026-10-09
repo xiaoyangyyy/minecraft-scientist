@@ -6,6 +6,7 @@ function Read-ArtifactJson([string]$relative) {
 }
 
 function Assert-Hash([string]$relative, [string]$expected) {
+    if ($relative.StartsWith('src/minecraft_scientist/') -or $relative.StartsWith('tests/')) { $relative = 'runs/apartness-main-source-v1/' + $relative }
     $actual = (Get-FileHash -LiteralPath (Join-Path $repoRoot $relative) -Algorithm SHA256).Hash.ToLower()
     if ($actual -cne $expected) { throw "SHA256 mismatch: $relative" }
 }

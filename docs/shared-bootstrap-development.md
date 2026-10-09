@@ -4,6 +4,11 @@
 完整公平 H3 比较建立共同入口。不是完整强基线矩阵、结构留出、因果归因、
 学习符号迁移、未知噪声、Minecraft/RGB 或研究创新验收。
 
+本页现为历史冻结：14 文件位于 `runs/shared-bootstrap-source-v1`，其主包
+依赖/默认测试位于 `runs/apartness-main-source-v1`。历史验证器只认证这些
+历史字节与产物，不认证新改动。共享入口晋入主包及 H3 核心接入见
+`matched-h3-development.md`；本页 362 项/650 文件结果保留原知识条件。
+
 ## 当前实现
 
 `shared_bootstrap.py` 只接受公开联合候选、校准序列、成本与声明预算，不接受
@@ -92,5 +97,7 @@ uv run python scripts/run_online_automata_development.py --output runs/<新目�
 powershell -NoProfile -File scripts/verify_shared_bootstrap_development.ps1
 ```
 
-下一步仍需完整 H3 共同入口、正式结构/编辑留出、全部计算成本、未知控制与
-噪声、H4 符号/负迁移，以及受控 Minecraft 与自然 RGB 的完整系统验证。
+随后 H3 已接入新的四方法共同生命周期，见 `matched-h3-development.md`。
+本页362项/650产物及14文件源码是历史冻结；新阶段560项/1010产物另外绑定
+其源码与验证器，不混用证据。下一步仍需完整公平矩阵、正式结构/编辑留出、
+未知控制与噪声、H4 符号/负迁移，以及受控 Minecraft 与自然 RGB 的完整系统验证。

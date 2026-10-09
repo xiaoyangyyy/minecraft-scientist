@@ -4,6 +4,25 @@ Isolated research implementation, NOT accepted full H3/H4 or project completion.
 It imports the frozen paid/from-scratch adaptive learner and existing TheoryIR.
 No main package/default test files or earlier prototype freezes are modified.
 
+That paragraph describes the archived phase, not the current matched-H3 change:
+the shared bootstrap/checker now live in `agent/bootstrap.py` and
+`evaluation/bootstrap.py`; compatibility modules here alias them. The existing
+H3 loop and this lifecycle use one `discover_structural_repair` core. Main H1
+measurement failures are paid but no longer treated as mechanism evidence.
+Previous 130/131 main source/test and 14-file bootstrap phases are byte archived;
+their green counts cannot certify current code.
+
+The new `run_matched_h3_development.py` compares four declared discovery methods
+with the SAME paid prelude, monitoring and final random-Wp-plus-coverage protocol.
+All actual discovery/internal-conformance/final-validation bills are charged.
+Internal tests are discovery for this lifecycle, not its promotion evidence.
+Valid final counterexamples retain rejected child versions; control/measurement
+failures retain provisional children and never refute their mechanisms.
+Structured methods use declared edit/controller priors; finite-state methods use
+their general bounded Mealy language. This bias is disclosed, not called a pure
+identical-candidate planning comparison. The checkout runner is not yet a packaged
+four-method CLI or full release. See `docs/matched-h3-development.md`.
+
 The same old learning policy and bounded Random-Wp monitoring are paid by both
 methods. The world changes on an episode schedule withheld from the Agent. A
 completed, compliant prediction counterexample challenges the old **issued

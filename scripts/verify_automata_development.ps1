@@ -1,4 +1,4 @@
-# Frozen baseline phase only. Later package changes must reject this evidence.
+# HISTORICAL frozen baseline source archive only; not current-source evidence.
 param([string]$Repository = (Split-Path -Parent $PSScriptRoot))
 $ErrorActionPreference = 'Stop'
 $automataNames = @('apartness-development-windows-v1', 'apartness-development-windows-v2', 'apartness-development-wsl-v1')
@@ -51,9 +51,9 @@ foreach ($automataName in $automataNames) {
     }
 }
 foreach ($automataEntry in $automataSources.PSObject.Properties) {
-    if ((Get-FileHash -LiteralPath "$Repository/src/minecraft_scientist/$($automataEntry.Name)").Hash.ToLowerInvariant() -cne $automataEntry.Value) { throw 'Current source differs from frozen baseline phase' }
+    if ((Get-FileHash -LiteralPath "$Repository/runs/apartness-main-source-v1/src/minecraft_scientist/$($automataEntry.Name)").Hash.ToLowerInvariant() -cne $automataEntry.Value) { throw 'Historical source archive differs from frozen baseline phase' }
 }
-if (@($automataSources.PSObject.Properties).Count -ne 130 -or @(Get-ChildItem -LiteralPath "$Repository/src/minecraft_scientist" -Recurse -File -Filter '*.py').Count -ne 130) { throw 'Incomplete source registration' }
+if (@($automataSources.PSObject.Properties).Count -ne 130 -or @(Get-ChildItem -LiteralPath "$Repository/runs/apartness-main-source-v1/src/minecraft_scientist" -Recurse -File -Filter '*.py').Count -ne 130) { throw 'Incomplete source registration' }
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $automataWheel = "$Repository/runs/apartness-source-v1/minecraft_scientist-0.1.0-py3-none-any.whl"
 $automataArchive = [System.IO.Compression.ZipFile]::OpenRead($automataWheel)
@@ -97,5 +97,5 @@ if (@(Compare-Object -ReferenceObject $automataCaseSets['apartness-focused-windo
     runs = $automataRuns; identical_deterministic_artifacts = $true
     excluded_nondeterministic_artifacts = @('timing.json')
     design_sha256 = (Get-FileHash -LiteralPath "$Repository/configs/automata-development-v1.json").Hash.ToLowerInvariant()
-    scope = 'Basic L# stationary development and focused compatibility only; preserves three wrong provisional models/eleven unresolved. Not full Adaptive L#, structural holdout, H3/LLM matrix, method superiority, H4, Minecraft/RGB or new full/default release.'
+    scope = 'HISTORICAL archived Basic L# stationary development and focused compatibility only; NOT current source certification; preserves three wrong provisional models/eleven unresolved. Not full Adaptive L#, structural holdout, H3/LLM matrix, method superiority, H4, Minecraft/RGB or new full/default release.'
 } | ConvertTo-Json -Depth 10

@@ -91,6 +91,31 @@ This is not full Adaptive L#, an online revision baseline or a completed strong
 comparison; all wrong provisional and unresolved outcomes remain in the report.
 See `active-automata-development.md` for the new source-phase evidence and limits.
 
+The shared paid known-family entry now lives in `agent/bootstrap.py`, with its
+public-first independent checks in `evaluation/bootstrap.py` and reusable public
+capability replay in `evaluation/public_replay.py`. The research bootstrap imports
+are compatibility aliases, not a parallel implementation. Reported measurement
+failure without a control flag stops H1 without filtering hypotheses or promoting
+theory; the actual reset/action remains charged and recorded.
+
+`agent/revision.py:discover_structural_repair` separates candidate discovery from
+promotion and serves both the original bounded scientific loop and the checkout
+four-method matched lifecycle in `research/online_automata`. The latter compares
+from-scratch, adaptive-reference, structural-witness and structural-IG discovery
+under identical paid prelude/monitoring/anomaly and common fresh final validation
+(8 bounded random Wp queries plus 3 coverage queries). Internal learner tests are
+discovery costs, not final promotion evidence. A valid final counterexample keeps
+a rejected child; control/measurement failure keeps a provisional unresolved
+child. Only complete final validation accepts the child and supersedes its parent.
+
+The matched public-first auditor checks raw edits/factors, receipt chronology,
+costs, frozen plans, evidence and version lineage before private scoring. The
+general-state-machine and edit-family search biases differ and are disclosed;
+their behavior comparison is not a same-candidate planning experiment or unique
+causal-factor recovery. The four-method runner is currently checkout-only, not an
+installed CLI. See `matched-h3-development.md`; formal structure holdouts, complete
+strong baselines, unknown/noisy controls, H4 and Minecraft/RGB remain open.
+
 ## Learned experiment planner
 
 The training package exposes ToolDiscoveryEnv as a Gymnasium environment. A

@@ -7,6 +7,7 @@ from audit_bootstrap import check_bootstrap_public
 from audit_random_wp import check_random_wp_plan
 from audit_run import PublicLedger, canonical
 from audit_transfer import replay_capability
+from matched_repair import MATCHED_METHODS, check_policy, repair_config
 from online import online_relearn
 from paid_transfer import METHODS, learn_phase, phase_config
 from shared_bootstrap import bootstrap_config, final_validation_ids, validated
@@ -64,6 +65,11 @@ class IssuedBehaviorLedger(PublicLedger):
 
 
 def check_phase_public(phase):
+    if phase["config"]["schema"] == "matched-repair-config-v1":
+        from audit_matched import check_matched_repair_public
+
+        check_matched_repair_public(phase, check_phase_public, check_monitor_query)
+        return
     if phase["config"]["schema"] == "public-family-bootstrap-config-v1":
         check_bootstrap_public(phase)
         return
@@ -185,9 +191,21 @@ def check_global_controls(config, result):
     return controls
 
 
-def check_monitor_query(config, q, item, *, index, sample_index, remaining):
-    epoch = f"monitor-{index}-{sample_index}"
-    qid = epoch + "-0"
+def check_monitor_query(
+    config,
+    q,
+    item,
+    *,
+    index,
+    sample_index,
+    remaining,
+    epoch=None,
+    qid=None,
+    reason="monitor",
+    reset_episode=0,
+):
+    epoch = f"monitor-{index}-{sample_index}" if epoch is None else epoch
+    qid = epoch + "-0" if qid is None else qid
     if q["epoch"] != epoch or type(q["budget"]) is not int or q["budget"] != remaining:
         raise ValueError("independent monitor epoch/remaining budget mismatch")
     intervention = {
@@ -203,7 +221,7 @@ def check_monitor_query(config, q, item, *, index, sample_index, remaining):
         "kind": "plan",
         "query_id": qid,
         "epoch": epoch,
-        "reason": "monitor",
+        "reason": reason,
         "actions": item["actions"],
         "prediction": item["prediction"],
         "total_cost": item["cost"],
@@ -221,7 +239,7 @@ def check_monitor_query(config, q, item, *, index, sample_index, remaining):
         or reset["query_id"] != qid
         or type(reset["cost"]) is not int
         or reset["cost"] != 1
-        or reset["observation"]["episode_id"] != 0
+        or reset["observation"]["episode_id"] != reset_episode
         or reset["observation"]["step"] != 0
     ):
         raise ValueError("independent paid monitor reset mismatch")
@@ -279,7 +297,7 @@ def check_monitor_query(config, q, item, *, index, sample_index, remaining):
 def check_lineage(result):
     events, assignments = [], []
 
-    def publish(phase, epoch, version, parent):
+    def publish(phase, epoch, version, parent, *, accepted=True):
         run = phase["run"]
         final = final_validation_ids(run)
         discovery = [
@@ -288,13 +306,28 @@ def check_lineage(result):
             if e["kind"] == "evidence" and e["query_id"] not in final
         ]
         validation = [f"{epoch}/{q}" for q in final]
-        if set(discovery) & set(validation) or len(set(validation)) != (
-            phase["config"]["family"]["shadow_count"]
-            if phase["config"]["schema"] == "public-family-bootstrap-config-v1"
-            else phase["config"]["protocol"]["conformance_count"]
+        if (
+            set(discovery) & set(validation)
+            or len(set(validation)) != len(validation)
+            or (
+                accepted
+                and len(set(validation))
+                != (
+                    phase["config"]["family"]["shadow_count"]
+                    if phase["config"]["schema"] == "public-family-bootstrap-config-v1"
+                    else phase["config"]["protocol"]["conformance_count"]
+                    + (
+                        phase["config"]["policy"]["shadow_count"]
+                        if phase["config"]["schema"] == "matched-repair-config-v1"
+                        else 0
+                    )
+                )
+            )
         ):
             raise ValueError("independent online validation evidence overlap/count")
-        ir = json.loads(canonical(run["candidate_ir"]))
+        ir = json.loads(
+            canonical(run["candidate_ir"] if accepted else run["proposed_ir"])
+        )
         ir["scope"]["evidence_epoch"] = epoch
         base = {
             "theory_id": "issued-response",
@@ -305,9 +338,15 @@ def check_lineage(result):
             "counterexample_ids": [],
             "validation_score": 0.0,
             "confidence": 0.0,
-            "created_by": "ordered-lsharp-paid-online-relearning",
+            "created_by": "shared-paid-scientific-lifecycle"
+            if result["schema"] == "paid-online-relearning-v3"
+            else "ordered-lsharp-paid-online-relearning",
         }
-        for status in ("proposed", "provisional", "accepted"):
+        for status in (
+            ("proposed", "provisional", "accepted")
+            if accepted
+            else ("proposed", "provisional")
+        ):
             events.append(base | {"status": status})
         assignments.append(
             {
@@ -333,12 +372,26 @@ def check_lineage(result):
             "counterexample_ids": [result["anomaly"]["query_id"]],
         }
         events.append(challenged)
-        if (
-            result["new"] is not None
-            and result["new"]["run"]["status"] == "provisional_conformance_passed"
-        ):
+        if result["new"] is not None and validated(result["new"]["run"]):
             publish(result["new"], "repair-epoch", 2, 1)
             events.append(challenged | {"status": "superseded"})
+        elif (
+            result["new"] is not None
+            and result["new"]["run"]["schema"] == "matched-repair-run-v1"
+            and result["new"]["run"]["proposed_ir"] is not None
+        ):
+            child = publish(result["new"], "repair-epoch", 2, 1, accepted=False)
+            counterexamples = result["new"]["run"]["validation_counterexample_ids"]
+            if counterexamples:
+                events.append(
+                    child
+                    | {
+                        "status": "rejected",
+                        "counterexample_ids": [
+                            f"repair-epoch/{q}" for q in counterexamples
+                        ],
+                    }
+                )
     if canonical(events) != canonical(result["theory_events"]) or canonical(
         assignments
     ) != canonical(result["validation_assignments"]):
@@ -346,26 +399,45 @@ def check_lineage(result):
 
 
 def validate_online_public(config, result):
+    if type(config) is dict and config.get("schema") == "online-relearning-config-v3":
+        if set(config) != {
+            "schema",
+            "method",
+            "actions",
+            "outputs",
+            "costs",
+            "protocol",
+            "initial_family",
+            "repair_policy",
+        }:
+            raise ValueError("unregistered matched online campaign fields")
+        check_policy(config["repair_policy"])
+        if config["protocol"]["horizon"] > 5 or config["initial_family"] is None:
+            raise ValueError("matched campaign outside known-family/H scope")
+    expected_fields = {"schema", "method", "actions", "outputs", "costs", "protocol"}
+    if type(config) is dict and config.get("schema") in (
+        "online-relearning-config-v2",
+        "online-relearning-config-v3",
+    ):
+        expected_fields.add("initial_family")
+    if type(config) is dict and config.get("schema") == "online-relearning-config-v3":
+        expected_fields.add("repair_policy")
     if (
         type(config) is not dict
-        or set(config)
-        != (
-            {
-                "schema",
-                "method",
-                "actions",
-                "outputs",
-                "costs",
-                "protocol",
-                "initial_family",
-            }
-            if config.get("schema") == "online-relearning-config-v2"
-            else {"schema", "method", "actions", "outputs", "costs", "protocol"}
-        )
+        or set(config) != expected_fields
         or config["schema"]
-        not in ("online-relearning-config-v1", "online-relearning-config-v2")
+        not in (
+            "online-relearning-config-v1",
+            "online-relearning-config-v2",
+            "online-relearning-config-v3",
+        )
         or type(config["method"]) is not str
-        or config["method"] not in METHODS
+        or config["method"]
+        not in (
+            MATCHED_METHODS
+            if config["schema"] == "online-relearning-config-v3"
+            else METHODS
+        )
     ):
         raise ValueError("unregistered online campaign")
     protocol = config["protocol"]
@@ -388,7 +460,9 @@ def validate_online_public(config, result):
     if (
         result["schema"]
         != (
-            "paid-online-relearning-v2"
+            "paid-online-relearning-v3"
+            if config["schema"] == "online-relearning-config-v3"
+            else "paid-online-relearning-v2"
             if config["schema"] == "online-relearning-config-v2"
             else "paid-online-relearning-v1"
         )
@@ -433,7 +507,8 @@ def validate_online_public(config, result):
             horizon=protocol["horizon"],
             seed=protocol["seed"],
         )
-        if config["schema"] == "online-relearning-config-v2"
+        if config["schema"]
+        in ("online-relearning-config-v2", "online-relearning-config-v3")
         else phase_config(
             tuple(config["actions"]),
             tuple(config["outputs"]),
@@ -530,6 +605,22 @@ def validate_online_public(config, result):
             "protocol": common
             | {"budget": protocol["budget"] - spent, "epoch": "repair-epoch"},
         }
+        if config["schema"] == "online-relearning-config-v3":
+            expected = repair_config(
+                tuple(config["actions"]),
+                tuple(config["outputs"]),
+                config["costs"],
+                method=config["method"],
+                family=result["old"]["config"]["family"],
+                anchor_index=min(
+                    result["old"]["run"]["discovery"]["remaining_candidates"]
+                ),
+                old_ir=result["public_old_theory"]["ir"],
+                anomaly=anomaly,
+                policy=config["repair_policy"],
+                protocol=common
+                | {"budget": protocol["budget"] - spent, "epoch": "repair-epoch"},
+            )
         if canonical(expected) != canonical(result["new"]["config"]):
             raise ValueError("independent repair prior/remaining budget mismatch")
         spent += result["new"]["run"]["spent"]
@@ -548,6 +639,7 @@ def validate_online_public(config, result):
         config["costs"],
         method=config["method"],
         initial_family=config.get("initial_family"),
+        repair_policy=config.get("repair_policy"),
         **protocol,
     )
     if not consumed() or canonical(replay) != canonical(result):

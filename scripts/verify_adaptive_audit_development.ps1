@@ -6,7 +6,8 @@ function Read-RunJson([string]$relative) {
     Get-Content -LiteralPath (Join-Path $repoRoot $relative) -Raw | ConvertFrom-Json
 }
 function Assert-RunHash([string]$relative, [string]$expected) {
-    if ((Get-FileHash -LiteralPath (Join-Path $repoRoot $relative) -Algorithm SHA256).Hash.ToLower() -cne $expected) { throw "Source/artifact drift: $relative" }
+    $sourceRoot = if ($relative.StartsWith('src/minecraft_scientist/') -or $relative.StartsWith('tests/')) { Join-Path $repoRoot 'runs/apartness-main-source-v1' } else { $repoRoot }
+    if ((Get-FileHash -LiteralPath (Join-Path $sourceRoot $relative) -Algorithm SHA256).Hash.ToLower() -cne $expected) { throw "Source/artifact drift: $relative" }
 }
 function Assert-HistoricalSourceHash([string]$relative, [string]$expected) {
     if ($relative.StartsWith('research/adaptive_automata/') -or $relative -ceq 'scripts/run_adaptive_audit_development.py') {

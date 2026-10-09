@@ -5,7 +5,8 @@ function Read-RunJson([string]$relative) {
     Get-Content -LiteralPath (Join-Path $repoRoot $relative) -Raw | ConvertFrom-Json
 }
 function Assert-RunHash([string]$relative, [string]$expected) {
-    if ((Get-FileHash -LiteralPath (Join-Path $repoRoot $relative) -Algorithm SHA256).Hash.ToLower() -cne $expected) { throw "Source/artifact drift: $relative" }
+    $sourceRoot = if ($relative.StartsWith('src/minecraft_scientist/') -or $relative.StartsWith('tests/')) { Join-Path $repoRoot 'runs/apartness-main-source-v1' } else { $repoRoot }
+    if ((Get-FileHash -LiteralPath (Join-Path $sourceRoot $relative) -Algorithm SHA256).Hash.ToLower() -cne $expected) { throw "Source/artifact drift: $relative" }
 }
 function Assert-SameJson($left, $right, [string]$label) {
     if (($left | ConvertTo-Json -Depth 100 -Compress) -cne ($right | ConvertTo-Json -Depth 100 -Compress)) { throw "JSON mismatch: $label" }
@@ -89,4 +90,4 @@ foreach ($run in $proof.runs) {
     if ($both -ne 19 -or $adaptiveCheaper -ne 7 -or $scratchCheaper -ne 12 -or $tied -ne 0) { throw 'Success-conditioned cost comparison changed' }
     if ($report.summary.both_methods_correct_pairs -ne $both -or $report.summary.adaptive_cheaper_among_both_correct -ne $adaptiveCheaper -or $report.summary.scratch_cheaper_among_both_correct -ne $scratchCheaper -or $report.summary.tied_cost_among_both_correct -ne $tied) { throw 'Summary/pair disagreement' }
 }
-Write-Output 'Verified paid explicit-context development: Windows/Linux 235 focused cases each; three identical 450-artifact runs, 64 valid campaign audits. Each method: 19 correct/5 wrong/8 unresolved. Both-correct cost wins: adaptive 7, scratch 12. NOT stable transfer advantage, hidden online mutation, causal identification, learned symbol transfer, formal structural holdout, default/full regression, novelty or full release.'
+Write-Output 'Verified HISTORICAL archived-main paid explicit-context development: Windows/Linux 235 focused cases each; three identical 450-artifact runs, 64 valid campaign audits. Each method: 19 correct/5 wrong/8 unresolved. Both-correct cost wins: adaptive 7, scratch 12. NOT stable transfer advantage, hidden online mutation, causal identification, learned symbol transfer, formal structural holdout, default/full regression, novelty or full release.'

@@ -116,6 +116,9 @@ def identify_mechanism(
             if not transition.intervention_compliance or transition.controller_failure:
                 events.append({"kind": "control_failure", "query_id": query_id})
                 return "control_failure"  # Do not eliminate world theories.
+            if not transition.event.success:
+                events.append({"kind": "measurement_failure", "query_id": query_id})
+                return "measurement_failure"  # Paid, but not usable mechanism evidence.
             outputs.append(transition.event.details["signal"])
         queries += 1
         space.observe(word, tuple(outputs))
