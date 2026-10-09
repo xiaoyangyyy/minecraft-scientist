@@ -233,7 +233,8 @@ def learn_adaptive(
     except LearnerStop as error:
         reason = str(error)
     return {
-        "schema": "isolated-adaptive-rules-v3",
+        "schema": "isolated-adaptive-rules-v4",
+        "learning_mode": "adaptive" if references else "from_scratch",
         "status": status,
         "stop_reason": reason,
         "budget": budget,
@@ -255,6 +256,6 @@ def learn_adaptive(
         else candidate.to_ir(horizon).model_dump(mode="json"),
         "unique_causal_structure_claimed": False,
         "all_allowed_queries_certified": False,
-        "reference_models_used": True,
+        "reference_models_used": bool(references),
         "limitations": "isolated ordered adaptive-rule adaptation; H-conditioned random-Wp with recorded rejected samples, canonical pair-BFS suffix sets and Python RNG; not bit-for-bit LearnLib, full baseline acceptance or exact MAT convergence",
     }

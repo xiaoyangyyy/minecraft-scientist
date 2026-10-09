@@ -1,5 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
+$archiveRoot = Join-Path $repoRoot 'runs/adaptive-audit-source-v1'
 
 function Read-RunJson([string]$relative) {
     Get-Content -LiteralPath (Join-Path $repoRoot $relative) -Raw | ConvertFrom-Json
@@ -7,12 +8,18 @@ function Read-RunJson([string]$relative) {
 function Assert-RunHash([string]$relative, [string]$expected) {
     if ((Get-FileHash -LiteralPath (Join-Path $repoRoot $relative) -Algorithm SHA256).Hash.ToLower() -cne $expected) { throw "Source/artifact drift: $relative" }
 }
+function Assert-HistoricalSourceHash([string]$relative, [string]$expected) {
+    if ($relative.StartsWith('research/adaptive_automata/') -or $relative -ceq 'scripts/run_adaptive_audit_development.py') {
+        $path = Join-Path $archiveRoot $relative
+        if ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLower() -cne $expected) { throw "Historical source drift: $relative" }
+    } else { Assert-RunHash $relative $expected }
+}
 $proof = Read-RunJson 'runs/adaptive-audit-cross-platform-verification-v1.json'
 $registration = Read-RunJson 'runs/adaptive-audit-source-registration-v1.json'
 Assert-RunHash 'runs/adaptive-audit-source-registration-v1.json' $proof.registration_sha256
-foreach ($entry in $registration.source_sha256.PSObject.Properties) { Assert-RunHash $entry.Name $entry.Value }
+foreach ($entry in $registration.source_sha256.PSObject.Properties) { Assert-HistoricalSourceHash $entry.Name $entry.Value }
 $registeredPrototype = @($registration.source_sha256.PSObject.Properties.Name | Where-Object { $_.StartsWith('research/adaptive_automata/') } | Sort-Object)
-$actualPrototype = @(Get-ChildItem (Join-Path $repoRoot 'research/adaptive_automata') -File | Where-Object { $_.Extension -in '.py','.md' } | ForEach-Object { 'research/adaptive_automata/' + $_.Name } | Sort-Object)
+$actualPrototype = @(Get-ChildItem (Join-Path $archiveRoot 'research/adaptive_automata') -File | Where-Object { $_.Extension -in '.py','.md' } | ForEach-Object { 'research/adaptive_automata/' + $_.Name } | Sort-Object)
 if (@(Compare-Object $registeredPrototype $actualPrototype).Count -ne 0) { throw 'Prototype file set changed' }
 Assert-RunHash $registration.main_registration $registration.main_registration_sha256
 $mainFreeze = Read-RunJson $registration.main_registration
@@ -45,7 +52,7 @@ foreach ($run in $proof.runs) {
     }
     $runRegistration = Read-RunJson ($run.path + '/registration.json')
     if (@($runRegistration.source_sha256.PSObject.Properties).Count -ne 144) { throw 'Unexpected complete development-source count' }
-    foreach ($entry in $runRegistration.source_sha256.PSObject.Properties) { Assert-RunHash $entry.Name $entry.Value }
+    foreach ($entry in $runRegistration.source_sha256.PSObject.Properties) { Assert-HistoricalSourceHash $entry.Name $entry.Value }
     $report = Read-RunJson ($run.path + '/report.json')
     $correct = @($report.rows | Where-Object { $_.evaluation.provisional_behavior_correct_at_H -eq $true }).Count
     $incorrect = @($report.rows | Where-Object { $_.evaluation.provisional_behavior_correct_at_H -eq $false }).Count
@@ -58,4 +65,4 @@ foreach ($run in $proof.runs) {
         if ($audit.evaluation.provisional_behavior_correct_at_H -ne $row.evaluation.provisional_behavior_correct_at_H) { throw 'Report disagrees with private evaluation' }
     }
 }
-Write-Output 'Verified stationary adaptive audit phase: Windows/Linux 182 focused cases each; three identical 162-artifact runs, 32 valid audits, 19 correct/5 wrong/8 unresolved. Provided-prior development, not fair comparison, online transfer, structural holdout, default/full regression or full release.'
+Write-Output 'Verified HISTORICAL stationary adaptive audit phase from runs/adaptive-audit-source-v1: Windows/Linux 182 focused cases each; three identical 162-artifact runs, 32 valid audits, 19 correct/5 wrong/8 unresolved. NOT evidence for the changed current learner/auditor. Provided-prior development, not fair comparison, online transfer, structural holdout, default/full regression or full release.'

@@ -68,7 +68,7 @@ class ReferencePool:
     def __init__(self, references, actions, *, operation_budget=200_000):
         if (
             type(references) is not tuple
-            or not 1 <= len(references) <= 4
+            or not 0 <= len(references) <= 4
             or any(not isinstance(ir, TheoryIR) for ir in references)
             or type(actions) is not tuple
             or not 1 <= len(actions) <= 8
@@ -210,7 +210,11 @@ class ReferencePool:
         return MatchDegree(agreeing, total)
 
     def matches(self, tree, prefix, *, approximate=True):
+        if not tree.contains(prefix):
+            raise ValueError("unknown observed state")
         degrees = {key: self.degree(tree, prefix, key) for key in self.keys}
+        if not degrees:
+            return ()
         if not approximate:
             return tuple(
                 k for k, d in degrees.items() if d.agreeing_edges == d.observed_edges

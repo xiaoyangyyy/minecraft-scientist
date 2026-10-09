@@ -97,7 +97,7 @@ class PublicLedger:
             type(protocol["epoch"]) is not str
             or not 1 <= len(protocol["epoch"]) <= 80
             or type(config["references"]) is not list
-            or not 1 <= len(config["references"]) <= 4
+            or not 0 <= len(config["references"]) <= 4
         ):
             raise ValueError("independent epoch/reference configuration mismatch")
         if (
@@ -108,7 +108,7 @@ class PublicLedger:
             raise ValueError("independent exact cost configuration mismatch")
         if (
             type(result) is not dict
-            or result["schema"] != "isolated-adaptive-rules-v3"
+            or result["schema"] != "isolated-adaptive-rules-v4"
             or type(result["events"]) is not list
             or len(result["events"]) > 100_000
         ):
@@ -421,7 +421,11 @@ class PublicLedger:
                     raise ValueError("independent unplanned reference cache")
                 self.cache_hits += 1
             elif kind == "reference_plan":
-                if self.active is not None or self.reference_queue:
+                if (
+                    self.active is not None
+                    or self.reference_queue
+                    or not self.config["references"]
+                ):
                     raise ValueError("independent reference plan overlaps a query")
                 plan = event["plan"]
                 if (
@@ -449,6 +453,7 @@ class PublicLedger:
                     or self.reference_queue
                     or event["rule"] not in ("P", "PP")
                     or (event["rule"] == "PP") == self.closed
+                    or (event["rule"] == "PP" and not self.config["references"])
                 ):
                     raise ValueError("independent promotion phase/order mismatch")
                 if (
@@ -548,18 +553,20 @@ class PublicLedger:
                 raise ValueError("independent aggregate ledger mismatch")
         if self.result["reference_digest"] != digest(self.config["references"]):
             raise ValueError("independent owned-reference digest mismatch")
-        if (
-            any(
-                self.result[k] is not False
-                for k in (
-                    "unique_causal_structure_claimed",
-                    "all_allowed_queries_certified",
-                    "operation_counters_are_complete_cpu_cost",
-                )
+        if any(
+            self.result[k] is not False
+            for k in (
+                "unique_causal_structure_claimed",
+                "all_allowed_queries_certified",
+                "operation_counters_are_complete_cpu_cost",
             )
-            or self.result["reference_models_used"] is not True
+        ) or self.result["reference_models_used"] is not bool(
+            self.config["references"]
         ):
             raise ValueError("independent false scope/cost claim")
+        expected_mode = "adaptive" if self.config["references"] else "from_scratch"
+        if self.result["learning_mode"] != expected_mode:
+            raise ValueError("independent learning-mode/reference mismatch")
         if self.result["candidate_ir"] is not None:
             program = independent_program(self.result["candidate_ir"], self.config)
             _check_raw_fold(program, self.basis, self.nodes, self.actions)
@@ -574,7 +581,7 @@ class PublicLedger:
             raise ValueError("independent passing run without a candidate")
 
 
-def audit_adaptive(config, result, private_path):
+def audit_adaptive(config, result, private_path, *, public_only=False):
     public = {
         "public_replay_valid": False,
         "raw_public_ledger_valid": False,
@@ -582,6 +589,8 @@ def audit_adaptive(config, result, private_path):
         "private_truth_read_attempted": False,
     }
     try:
+        if type(public_only) is not bool:
+            raise ValueError("exact public-only audit flag required")
         ledger = PublicLedger(config, result)
         ledger.validate()
         public["raw_public_ledger_valid"] = True
@@ -645,6 +654,12 @@ def audit_adaptive(config, result, private_path):
     ) as error:
         return public | {"valid": False, "failure": str(error), "evaluation": None}
 
+    if public_only:
+        return public | {
+            "valid": True,
+            "evaluation": None,
+            "scope": "public validation only; no evaluator truth read",
+        }
     public["private_truth_read_attempted"] = True
     try:
         private_text = private_path.read_text(encoding="utf-8")

@@ -3,8 +3,9 @@
 Status: isolated research implementation, **not yet an accepted strong baseline**.
 The package and default tests remain frozen while their Linux full regression
 runs. These files are not silently substituted into that source freeze. The
-older 107-case phase is preserved in `runs/adaptive-rules-source-v1`; its tests
-are historical, not evidence for the changed current learner/auditor.
+older 107-case phase is preserved in `runs/adaptive-rules-source-v1`, and the
+182-case stationary full-audit phase in `runs/adaptive-audit-source-v1`; their
+tests are historical, not evidence for the changed current learner/auditor.
 
 This advances the existing strong-baseline contract, not the entire project
 completion claim. H3 structural holdouts, H4/negative transfer, unknown delivery
@@ -79,9 +80,41 @@ shared faults, not every possible algorithm bug. Known terminal failed dispatch
 is charged/excluded. Unknown delivery/confounders, nonstationary worlds and causal
 factor attribution are not certified under this stationary trusted-reset protocol.
 
-Before strong-baseline acceptance: source-bound cross-platform evidence for this
-new phase; paid old-model learning, online epoch wrapper, matched tester/prior/
-cost comparisons; prospectively frozen structural splits and transfer evaluation.
-The development runner supplies a fixed two-state cycle public prior without
-charging prior learning; do not call it an online transfer comparison. See
-`docs/adaptive-audit-development.md`. None of this proves novelty or full release.
+The current learner accepts zero reference models for a from-scratch ablation,
+using the same H-conditioned Random-Wp tester as its adaptive mode. No fabricated
+reference or old observations are inserted into the new observation tree.
+
+`paid_transfer.py` learns and independently finitely validates the old context
+from actual paid queries before either method receives a public old theory.
+Both methods receive the same old evidence and pay its costs; the scratch mode
+deliberately ignores the reference in the new context. Reset/action/validation
+costs share one total budget. Caches and evidence IDs are qualified by context.
+TheoryRegistry records proposed/provisional/accepted snapshots and parent lineage;
+accepted here means a passing finite batch, not all-H correctness or calibrated
+confidence. Old context theories are not falsely challenged/superseded on an
+explicit context switch. This is NOT an unannounced online mutation experiment.
+
+`audit_transfer.py` checks both contexts' raw public ledgers, exact protocol,
+paid reference origin, disjoint final validation evidence, registry snapshots
+and whole campaign replay BEFORE either private artifact is read. It detaches
+the input snapshot before private callbacks. Private scoring reports legitimate
+wrong proposals separately from invalid public runs. Same-learner policy replay
+and targeted independent raw checks do not certify absence of all shared bugs.
+
+Run the paired development grid with:
+
+```powershell
+uv run python scripts/run_paired_transfer_development.py --output runs/<new-directory>
+```
+
+The older stationary development runner supplied a free two-state cycle prior;
+its numbers are not a matched paid transfer comparison. Current paired development
+keeps all failures/unresolved outcomes and reports success-conditioned cost
+differences. It does not prove general savings, causal structure, symbol transfer,
+statistical significance or innovation. Exact current source-bound outcomes belong
+in `docs/paid-transfer-development.md`, not borrowed historical tests.
+
+Before strong-baseline acceptance: cross-platform source-bound evidence, an
+unannounced online epoch wrapper and monitoring costs, full matched comparisons,
+prospectively frozen structural splits and transfer evaluation. H3/H4, unknown
+delivery/noise, Minecraft/RGB/navigation, recovery and full release remain open.
