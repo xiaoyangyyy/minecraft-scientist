@@ -5,6 +5,8 @@ world's episode counter or its hidden schedule: it only rebases returned clocks,
 while retaining original receipts for a separate global chronology audit.
 """
 
+from weakref import ref
+
 from minecraft_scientist.protocols import AgentWorldView
 
 
@@ -13,12 +15,24 @@ class RecordedEpoch:
         self.world = world
         self.base = None
         self.controls = []
-        self.view = AgentWorldView(
-            observe=self.observe,
-            available=world.available_actions,
-            step=self.step,
-            begin_trial=self.begin_trial,
-        )
+        self._view_ref = None
+
+    @property
+    def view(self):
+        # The capability registry holds callbacks strongly, and those callbacks
+        # keep this recorder alive while a caller holds its view. Do not retain
+        # that registry's weak key here: owner -> key -> callback -> owner would
+        # otherwise keep every completed epoch and all its receipts alive.
+        view = None if self._view_ref is None else self._view_ref()
+        if view is None:
+            view = AgentWorldView(
+                observe=self.observe,
+                available=self.world.available_actions,
+                step=self.step,
+                begin_trial=self.begin_trial,
+            )
+            self._view_ref = ref(view)
+        return view
 
     def local(self, observation):
         if self.base is None:
