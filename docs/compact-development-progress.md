@@ -77,11 +77,21 @@ Linux 首组也退出 0，两平台 386 个确定性逻辑产物及 manifest 一
 实际退出 0（终止块 `554ca1`）。首组兼容不等于全开发矩阵或方法创新。
 这些证据另见 `runs/compact-memory-repair-compatibility-verification-v2.json`。
 
-新完整开发组进程 22545 已在全新目录
-`runs/compact-structural-development-all-windows-v2` 启动，选取全部 27 组／
-448 实例／四方法 1792 次，预算与搜索上限不变。未形成终态、最终 manifest
-或 report，不能把启动当作完成；启动记录见
-`runs/compact-development-all-dispatch-v2.json`。全量付费配对尚未启动。
+新完整开发组进程 22545 已实际退出 0（终止块 e6d1d2），全新目录
+`runs/compact-structural-development-all-windows-v2` 保留全部 27 开发泄漏组／
+448 实例／四方法 1792 次，预算与搜索上限不变。最终 manifest 为
+ac6d24866d0f1c9fb6b6ca09090c0bd9a49302f679362d0d8cbc458a59039461；
+注册／报告已读回核验，211 源未漂移，最终声明 10754 逻辑产物。记录见
+`runs/compact-development-all-source-completion-v2.json`。这证明源生成结束，
+不是独立审计已通过；完整公开优先／原始表审计进程 90683 正在执行，必须
+取得其真实终态后才能进入全量付费配对。
+
+尚未经该完整审计接受的源报告：四方法各 448 次，from_scratch 正确57／
+错误25／未解决228，adaptive 正确73／错误7／未解决230，结构见证及 IG
+各正确201／错误25／未解决84；每法有界无异常138。实际费用分别为157816／
+157840／112811／111340。保留全部错误，不把首组挑战者零错误外推到全量。
+结构 IG 比见证便宜1471且恢复数相同，仍不支持见证方法的创新优势。27 是
+泄漏组数量，不自动证明 IID。正式封存评测、配对／组分析和全项目仍未完成。
 
 ## 存储操作与限制
 
