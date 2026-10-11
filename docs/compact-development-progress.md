@@ -87,8 +87,11 @@ ac6d24866d0f1c9fb6b6ca09090c0bd9a49302f679362d0d8cbc458a59039461；
 退出0（终止块6dd1f9），全部10754逻辑产物、公开策略、原始表与完整报告
 重建通过；读回源绑定仍为原211，见
 `runs/compact-development-all-independent-audit-v2.json`。全量付费验证配对
-已在新目录 `runs/compact-validation-development-all-windows-v2` 启动，句柄93456，
-尚未取得其终态、完整审计或全量组分析。
+此前在新目录 `runs/compact-validation-development-all-windows-v2` 启动，句柄93456，
+现已确认实际退出1（终态块1e711e），在写入一个配对分支时发生
+`OSError: [WinError 112]` 磁盘空间不足。全部已有产物保留，不计作完成配对，
+不接受其完整审计或全量组分析。后续须在新目录按相同完整选择和预算重跑；
+磁盘恢复或部分已写文件不构成科学成功。
 
 该完整审计接受的开发源报告：四方法各 448 次，from_scratch 正确57／
 错误25／未解决228，adaptive 正确73／错误7／未解决230，结构见证及 IG
